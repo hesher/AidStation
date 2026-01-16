@@ -321,6 +321,7 @@ This is a non-negotiable requirement to ensure:
 - [x] Calculate elevation gain/loss between aid stations
 - [x] Implement Grade Adjusted Pace (GAP) using Minetti Equations
 - [ ] Store processed course as PostGIS LineString geometry
+- [ ] Uploading a GPX in the page where you add a Race should automatically process it and use the data to update the race information
 
 **Sub-Story Test:** ✅ Python worker correctly processes GPX and calculates metrics (tests written, pending environment setup)
 
@@ -540,19 +541,12 @@ This is a non-negotiable requirement to ensure:
 ## Phase 8: Follow Ups, Fixes, Ideas and Future Work
 
 ### Urgent Fixes
-- [x] The load race dialog is showing "⚠️ Database not available" - Fixed by installing PostgreSQL locally and updating migration to make PostGIS optional
-- [x] Getting frequent CORS in the console - Fixed by properly configuring @fastify/cors with explicit methods, allowedHeaders, and exposedHeaders
-- [x] There is no way to save the race information and it's not saved automatically - Fixed by improving auto-save to update state on success/failure, showing Save button when race has no ID, and adding visual indicators for unsaved state
-- [x] Can't load the page. It's stuck with this error message: net::ERR_ABORTED 404 -bu Fixed by clearing the Next.js cache (.next directory). This was a stale build cache issue.
-- [x] Can't add aid station information manually to race - Fixed by adding inline editing capabilities to AidStationTable component with add/edit/delete functionality
-- [x] Can't save race information with missing values - Fixed by updating Zod schemas and TypeScript interfaces to allow nullable values for aid station fields (distanceKm, elevationM, etc.)
-- [x] When adding aid stations, the auto save is run and resets the race, so I can't really edit the race (it keeps getting cleared) - Fixed by updating the `updateRace` repository function to also handle updating aid stations (delete existing + insert new), and passing the aid stations from the route handler to the update function. The API now returns the complete race with updated aid stations instead of re-fetching from the database.
-- [x] Uploading large GPX will fail with "api.ts:290  POST http://localhost:3001/api/activities 413 (Payload Too Large)" - Fixed by increasing Fastify bodyLimit to 50 MB
+- [x] going from the "past performances" page to the "race planning" page crashes the app with error "GET http://localhost:3001/api/races/current 404 (Not Found)". A hard refresh fixes it.
+  - **Fixed**: The link on the performances page was mislabeled "Back to Race Planning" but actually linked to `/` (home), not `/planning`. Updated the navigation to have correct labels and added a direct link to `/planning`.
 
 
 ### Fast Follows
-- [x] Improve Race Search AI prompt to avoid making up data (as sometimes seen in made up checkpoints, made up distances and climbs). For example, it assumes an even split of distance between aid stations instead of finding real information on the website. If it fails to find, keep it empty - Fixed by strengthening the AI prompt with strict guidelines against fabricating data, and updating types to allow null values for unknown distances
-- [x] There is no way to upload a GPX as a race course.. (no upload button) - Fixed by adding client-side GPX parsing and upload functionality. Users can now upload GPX files when no course data is available, or replace an existing course with a new GPX file.
+
 
 ### Future Work
 

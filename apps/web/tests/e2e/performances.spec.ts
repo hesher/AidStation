@@ -35,8 +35,9 @@ test.describe('User Story 4: Past Performances', () => {
       await expect(page.getByText('Uploaded Activities')).toBeVisible();
     });
 
-    test('should display back link', async ({ page }) => {
-      await expect(page.getByText('← Back to Race Planning')).toBeVisible();
+    test('should display navigation links', async ({ page }) => {
+      await expect(page.getByText('← Back to Home')).toBeVisible();
+      await expect(page.getByText('📋 Race Planning')).toBeVisible();
     });
   });
 
@@ -68,8 +69,13 @@ test.describe('User Story 4: Past Performances', () => {
 
   test.describe('Navigation', () => {
     test('should navigate to home page when back link clicked', async ({ page }) => {
-      await page.getByText('← Back to Race Planning').click();
+      await page.getByText('← Back to Home').click();
       await expect(page).toHaveURL('/');
+    });
+
+    test('should navigate to planning page when planning link clicked', async ({ page }) => {
+      await page.getByText('📋 Race Planning').click();
+      await expect(page).toHaveURL('/planning');
     });
   });
 

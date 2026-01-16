@@ -361,10 +361,15 @@ export default function PerformancesPage() {
         )}
       </section>
 
-      {/* Back to Home Link */}
-      <a href="/" className={styles.backLink}>
-        ← Back to Race Planning
-      </a>
+      {/* Navigation Links */}
+      <nav className={styles.navLinks}>
+        <a href="/" className={styles.backLink}>
+          ← Back to Home
+        </a>
+        <a href="/planning" className={styles.backLink}>
+          📋 Race Planning
+        </a>
+      </nav>
     </main>
   );
 }
