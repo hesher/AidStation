@@ -9,6 +9,7 @@ import { planRoutes } from './routes/plans';
 
 const app = Fastify({
   logger: true,
+  bodyLimit: 50 * 1024 * 1024, // 50 MB limit for GPX file uploads
 });
 
 async function start() {

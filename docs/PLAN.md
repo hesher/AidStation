@@ -527,7 +527,7 @@ This is a non-negotiable requirement to ensure:
 - [x] Can't add aid station information manually to race - Fixed by adding inline editing capabilities to AidStationTable component with add/edit/delete functionality
 - [x] Can't save race information with missing values - Fixed by updating Zod schemas and TypeScript interfaces to allow nullable values for aid station fields (distanceKm, elevationM, etc.)
 - [x] When adding aid stations, the auto save is run and resets the race, so I can't really edit the race (it keeps getting cleared) - Fixed by updating the `updateRace` repository function to also handle updating aid stations (delete existing + insert new), and passing the aid stations from the route handler to the update function. The API now returns the complete race with updated aid stations instead of re-fetching from the database.
-- Uploading large GPX will fail with "api.ts:290  POST http://localhost:3001/api/activities 413 (Payload Too Large)"
+- [x] Uploading large GPX will fail with "api.ts:290  POST http://localhost:3001/api/activities 413 (Payload Too Large)" - Fixed by increasing Fastify bodyLimit to 50 MB
 
 
 ### Fast Follows
