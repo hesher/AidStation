@@ -532,7 +532,7 @@ This is a non-negotiable requirement to ensure:
 
 ### Fast Follows
 - [x] Improve Race Search AI prompt to avoid making up data (as sometimes seen in made up checkpoints, made up distances and climbs). For example, it assumes an even split of distance between aid stations instead of finding real information on the website. If it fails to find, keep it empty - Fixed by strengthening the AI prompt with strict guidelines against fabricating data, and updating types to allow null values for unknown distances
-- There is no way to upload a GPX as a race course.. (no upload button)
+- [x] There is no way to upload a GPX as a race course.. (no upload button) - Fixed by adding client-side GPX parsing and upload functionality. Users can now upload GPX files when no course data is available, or replace an existing course with a new GPX file.
 
 ### Future Work
 

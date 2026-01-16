@@ -172,6 +172,92 @@ export default function Home() {
     }
   }, [raceData]);
 
+  // Handle GPX file upload for race course
+  const handleCourseGpxUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !raceData) return;
+
+    try {
+      const gpxContent = await file.text();
+      const parser = new DOMParser();
+      const xmlDoc = parser.parseFromString(gpxContent, 'text/xml');
+
+      // Check for parse errors
+      const parseError = xmlDoc.querySelector('parsererror');
+      if (parseError) {
+        console.error('GPX parse error:', parseError.textContent);
+        setError('Invalid GPX file format');
+        return;
+      }
+
+      // Extract track points from GPX
+      const coordinates: Array<{ lat: number; lon: number; elevation?: number }> = [];
+
+      // Try to get track points first (most common)
+      const trkpts = xmlDoc.querySelectorAll('trkpt');
+      if (trkpts.length > 0) {
+        trkpts.forEach((pt) => {
+          const lat = parseFloat(pt.getAttribute('lat') || '0');
+          const lon = parseFloat(pt.getAttribute('lon') || '0');
+          const eleEl = pt.querySelector('ele');
+          const elevation = eleEl ? parseFloat(eleEl.textContent || '0') : undefined;
+
+          if (lat && lon) {
+            coordinates.push({ lat, lon, elevation });
+          }
+        });
+      }
+
+      // If no track points, try route points
+      if (coordinates.length === 0) {
+        const rtepts = xmlDoc.querySelectorAll('rtept');
+        rtepts.forEach((pt) => {
+          const lat = parseFloat(pt.getAttribute('lat') || '0');
+          const lon = parseFloat(pt.getAttribute('lon') || '0');
+          const eleEl = pt.querySelector('ele');
+          const elevation = eleEl ? parseFloat(eleEl.textContent || '0') : undefined;
+
+          if (lat && lon) {
+            coordinates.push({ lat, lon, elevation });
+          }
+        });
+      }
+
+      // If no route points, try waypoints
+      if (coordinates.length === 0) {
+        const wpts = xmlDoc.querySelectorAll('wpt');
+        wpts.forEach((pt) => {
+          const lat = parseFloat(pt.getAttribute('lat') || '0');
+          const lon = parseFloat(pt.getAttribute('lon') || '0');
+          const eleEl = pt.querySelector('ele');
+          const elevation = eleEl ? parseFloat(eleEl.textContent || '0') : undefined;
+
+          if (lat && lon) {
+            coordinates.push({ lat, lon, elevation });
+          }
+        });
+      }
+
+      if (coordinates.length === 0) {
+        setError('No track points found in GPX file');
+        return;
+      }
+
+      // Update race data with new course coordinates
+      setRaceData({
+        ...raceData,
+        courseCoordinates: coordinates,
+      });
+      setHasUnsavedChanges(true);
+
+      // Clear the input so the same file can be re-uploaded
+      e.target.value = '';
+    } catch (err) {
+      console.error('Error parsing GPX file:', err);
+      setError('Failed to parse GPX file');
+    }
+  }, [raceData]);
+
   // Handle save race
   const handleSaveRace = useCallback(async () => {
     if (!raceData) return;
@@ -337,10 +423,22 @@ export default function Home() {
             />
           </section>
 
-          {/* Course Map */}
+          {/* Course Map with Replace Button (if coordinates exist) */}
           {raceData.courseCoordinates && raceData.courseCoordinates.length > 0 && (
             <section className={styles.section}>
-              <h3 className={styles.sectionTitle}>Course Map</h3>
+              <div className={styles.sectionHeader}>
+                <h3 className={styles.sectionTitle}>Course Map</h3>
+                <input
+                  type="file"
+                  accept=".gpx"
+                  onChange={handleCourseGpxUpload}
+                  className={styles.gpxUploadInput}
+                  id="replace-gpx-upload"
+                />
+                <label htmlFor="replace-gpx-upload" className={styles.replaceGpxButton}>
+                  🔄 Replace GPX
+                </label>
+              </div>
               <CourseMap
                 coordinates={raceData.courseCoordinates}
                 aidStations={raceData.aidStations}
@@ -372,15 +470,25 @@ export default function Home() {
             </section>
           )}
 
-          {/* No Course Data Message */}
+          {/* No Course Data Message with Upload Button */}
           {(!raceData.courseCoordinates || raceData.courseCoordinates.length === 0) && (
             <section className={styles.section}>
               <div className={styles.noCourseData}>
                 <span className={styles.noCourseIcon}>🗺️</span>
                 <p>Course coordinates not available for this race.</p>
                 <p className={styles.noCourseSubtext}>
-                  You can upload a GPX file to visualize the course.
+                  Upload a GPX file to visualize the course on the map.
                 </p>
+                <input
+                  type="file"
+                  accept=".gpx"
+                  onChange={handleCourseGpxUpload}
+                  className={styles.gpxUploadInput}
+                  id="course-gpx-upload"
+                />
+                <label htmlFor="course-gpx-upload" className={styles.gpxUploadButton}>
+                  📤 Upload GPX Course
+                </label>
               </div>
             </section>
           )}
