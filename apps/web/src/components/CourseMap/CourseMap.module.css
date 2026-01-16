@@ -1,0 +1,130 @@
+/**
+ * CourseMap Styles
+ */
+
+.container {
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+  border: 1px solid #30475e;
+  border-radius: 16px;
+  overflow: hidden;
+  position: relative;
+}
+
+.map {
+  width: 100%;
+  height: 400px;
+}
+
+.error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 300px;
+  color: #888;
+  text-align: center;
+  padding: 24px;
+}
+
+.errorIcon {
+  font-size: 48px;
+  margin-bottom: 16px;
+  opacity: 0.5;
+}
+
+.error p {
+  margin: 0;
+  font-size: 0.9rem;
+  max-width: 300px;
+  line-height: 1.5;
+}
+
+.legend {
+  display: flex;
+  gap: 16px;
+  padding: 12px 16px;
+  background: rgba(0, 0, 0, 0.5);
+  font-size: 0.8rem;
+  color: #e0e0e0;
+}
+
+.legendItem {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.legendMarker {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+/* Aid Station Marker Styles */
+.aidStationMarker {
+  width: 32px;
+  height: 32px;
+  background: #4CAF50;
+  border: 3px solid #fff;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  transition: transform 0.2s ease;
+}
+
+.aidStationMarker:hover {
+  transform: scale(1.15);
+}
+
+.aidStationNumber {
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+/* Popup styles */
+.popupContent {
+  font-size: 13px;
+  line-height: 1.5;
+  color: #333;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .map {
+    height: 300px;
+  }
+
+  .legend {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+}
+
+/* Override Mapbox popup styles for dark theme - scoped to container */
+.container :global(.mapboxgl-popup-content) {
+  background: rgba(26, 26, 46, 0.95);
+  color: #e0e0e0;
+  border-radius: 8px;
+  padding: 12px 16px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+
+.container :global(.mapboxgl-popup-tip) {
+  border-top-color: rgba(26, 26, 46, 0.95);
+}
+
+.container :global(.mapboxgl-popup-close-button) {
+  color: #888;
+  font-size: 18px;
+  padding: 4px 8px;
+}
+
+.container :global(.mapboxgl-popup-close-button:hover) {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.1);
+}

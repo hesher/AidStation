@@ -1,6 +1,8 @@
+import 'dotenv/config';
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import { healthRoutes } from './routes/health';
+import { raceRoutes } from './routes/races';
 
 const app = Fastify({
   logger: true,
@@ -14,6 +16,7 @@ async function start() {
 
   // Register routes
   await app.register(healthRoutes, { prefix: '/api' });
+  await app.register(raceRoutes, { prefix: '/api' });
 
   // Start server
   const port = parseInt(process.env.PORT || '3001', 10);

@@ -1,0 +1,191 @@
+/**
+ * AidStationTable Styles
+ */
+
+.container {
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+  border: 1px solid #30475e;
+  border-radius: 16px;
+  padding: 24px;
+  color: #fff;
+}
+
+.title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin: 0 0 20px 0;
+  color: #f0f0f0;
+}
+
+.tableWrapper {
+  overflow-x: auto;
+  margin: 0 -24px;
+  padding: 0 24px;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.table th {
+  text-align: left;
+  padding: 12px 8px;
+  border-bottom: 2px solid #30475e;
+  color: #888;
+  font-weight: 500;
+  text-transform: uppercase;
+  font-size: 0.7rem;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+}
+
+.thStation {
+  min-width: 180px;
+}
+
+.thNumber {
+  min-width: 80px;
+  text-align: right !important;
+}
+
+.thServices {
+  min-width: 160px;
+  text-align: center !important;
+}
+
+.row {
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.row:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.row td {
+  padding: 12px 8px;
+  border-bottom: 1px solid #30475e40;
+  vertical-align: middle;
+}
+
+.tdStation {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.stationNumber {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  background: #4caf50;
+  color: #fff;
+  border-radius: 50%;
+  font-size: 0.75rem;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.stationName {
+  color: #e0e0e0;
+  font-weight: 500;
+}
+
+.tdNumber {
+  text-align: right;
+  color: #b0b0b0;
+  font-family: 'Monaco', 'Menlo', monospace;
+}
+
+.gain {
+  color: #4caf50;
+}
+
+.loss {
+  color: #f44336;
+}
+
+.tdServices {
+  display: flex;
+  gap: 4px;
+  justify-content: center;
+}
+
+.badge {
+  display: inline-block;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-weight: 500;
+  text-transform: uppercase;
+}
+
+.badgeActive {
+  background: rgba(76, 175, 80, 0.2);
+  color: #81c784;
+  border: 1px solid #4caf5050;
+}
+
+.badgeInactive {
+  background: rgba(128, 128, 128, 0.1);
+  color: #666;
+  border: 1px solid #66666650;
+}
+
+.legend {
+  display: flex;
+  gap: 20px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #30475e;
+}
+
+.legendItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.75rem;
+  color: #888;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .container {
+    padding: 16px;
+  }
+
+  .tableWrapper {
+    margin: 0 -16px;
+    padding: 0 16px;
+  }
+
+  .table {
+    font-size: 0.8rem;
+  }
+
+  .thStation {
+    min-width: 140px;
+  }
+
+  .thNumber {
+    min-width: 60px;
+  }
+
+  .thServices {
+    min-width: 120px;
+  }
+
+  .badge {
+    padding: 2px 4px;
+    font-size: 0.6rem;
+  }
+
+  .legend {
+    flex-direction: column;
+    gap: 8px;
+  }
+}

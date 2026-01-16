@@ -1,110 +1,340 @@
+/**
+ * Main Page Styles
+ */
+
 .main {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  padding: 2rem;
+  background: linear-gradient(180deg, #0d0d1a 0%, #1a1a2e 50%, #0d0d1a 100%);
 }
 
+/* Hero Section */
 .hero {
   text-align: center;
-  margin-bottom: 3rem;
-  padding-top: 4rem;
+  padding: 60px 24px 40px;
+  background: linear-gradient(180deg, rgba(100, 181, 246, 0.1) 0%, transparent 100%);
 }
 
 .title {
-  font-size: 3.5rem;
+  font-size: 3rem;
   font-weight: 800;
-  margin-bottom: 0.5rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
+  color: #fff;
+  margin: 0 0 12px 0;
+  letter-spacing: -1px;
 }
 
 .titleIcon {
-  font-size: 3rem;
+  display: inline-block;
+  margin-right: 8px;
 }
 
 .subtitle {
-  font-size: 1.25rem;
-  color: #64748b;
+  font-size: 1.2rem;
+  color: #888;
+  margin: 0;
+  font-weight: 400;
 }
 
+/* Onboarding Section */
 .onboarding {
   max-width: 600px;
-  width: 100%;
-  background: white;
-  border-radius: 16px;
-  padding: 2.5rem;
-  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
-}
-
-@media (prefers-color-scheme: dark) {
-  .onboarding {
-    background: rgb(30, 41, 59);
-  }
+  margin: 0 auto;
+  padding: 40px 24px;
+  text-align: center;
+  flex: 1;
 }
 
 .onboardingTitle {
-  font-size: 1.5rem;
+  font-size: 1.75rem;
+  color: #fff;
+  margin: 0 0 12px 0;
   font-weight: 600;
-  margin-bottom: 0.5rem;
 }
 
 .onboardingDescription {
-  color: #64748b;
-  margin-bottom: 1.5rem;
+  color: #888;
+  font-size: 1rem;
+  margin: 0 0 32px 0;
+  line-height: 1.6;
 }
 
+/* Search Form */
 .searchForm {
   display: flex;
-  gap: 0.75rem;
+  flex-direction: column;
+  gap: 16px;
 }
 
 .searchInput {
-  flex: 1;
-  padding: 0.875rem 1rem;
-  font-size: 1rem;
-  border: 2px solid #e2e8f0;
-  border-radius: 8px;
+  width: 100%;
+  padding: 16px 20px;
+  font-size: 1.1rem;
+  border: 2px solid #30475e;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  color: #fff;
   outline: none;
-  transition: border-color 0.2s ease;
+  transition: all 0.2s ease;
+}
+
+.searchInput::placeholder {
+  color: #666;
 }
 
 .searchInput:focus {
-  border-color: var(--primary-color);
+  border-color: #64b5f6;
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .searchInput:disabled {
-  background: #f1f5f9;
+  opacity: 0.6;
   cursor: not-allowed;
 }
 
 .searchButton {
-  padding: 0.875rem 1.5rem;
-  font-size: 1rem;
+  padding: 16px 32px;
+  font-size: 1.1rem;
   font-weight: 600;
-  color: white;
-  background: var(--primary-color);
+  color: #fff;
+  background: linear-gradient(135deg, #4CAF50 0%, #2E7D32 100%);
   border: none;
-  border-radius: 8px;
+  border-radius: 12px;
   cursor: pointer;
-  transition: background-color 0.2s ease;
+  transition: all 0.2s ease;
 }
 
 .searchButton:hover:not(:disabled) {
-  background: var(--primary-hover);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(76, 175, 80, 0.4);
 }
 
 .searchButton:disabled {
-  background: #94a3b8;
+  opacity: 0.5;
   cursor: not-allowed;
+  transform: none;
 }
 
-.footer {
-  margin-top: auto;
-  padding-top: 3rem;
-  color: #94a3b8;
+/* Loading State */
+.loading {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 24px;
+}
+
+.loadingSpinner {
+  width: 60px;
+  height: 60px;
+  border: 4px solid rgba(255, 255, 255, 0.1);
+  border-top-color: #4CAF50;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 24px;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.loadingText {
+  font-size: 1.2rem;
+  color: #fff;
+  margin: 0 0 8px 0;
+}
+
+.loadingSubtext {
+  font-size: 0.9rem;
+  color: #888;
+  margin: 0;
+}
+
+/* Error State */
+.errorContainer {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 24px;
+  text-align: center;
+}
+
+.errorIcon {
+  font-size: 64px;
+  margin-bottom: 16px;
+}
+
+.errorTitle {
+  font-size: 1.5rem;
+  color: #fff;
+  margin: 0 0 12px 0;
+}
+
+.errorMessage {
+  color: #f44336;
+  font-size: 1rem;
+  margin: 0 0 24px 0;
+  max-width: 400px;
+}
+
+.retryButton {
+  padding: 12px 24px;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #fff;
+  background: #30475e;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.retryButton:hover {
+  background: #3d5a73;
+}
+
+/* Race Content */
+.raceContent {
+  flex: 1;
+  padding: 0 24px 40px;
+  max-width: 1200px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.header {
+  margin-bottom: 24px;
+}
+
+.backButton {
+  padding: 8px 16px;
+  font-size: 0.9rem;
+  color: #64b5f6;
+  background: transparent;
+  border: 1px solid #30475e;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.backButton:hover {
+  background: rgba(100, 181, 246, 0.1);
+  border-color: #64b5f6;
+}
+
+.raceLayout {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.section {
+  width: 100%;
+}
+
+.sectionTitle {
+  font-size: 1.25rem;
+  color: #fff;
+  margin: 0 0 16px 0;
+  font-weight: 600;
+}
+
+/* No Course Data */
+.noCourseData {
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+  border: 1px solid #30475e;
+  border-radius: 16px;
+  padding: 48px 24px;
+  text-align: center;
+  color: #888;
+}
+
+.noCourseIcon {
+  font-size: 48px;
+  display: block;
+  margin-bottom: 16px;
+  opacity: 0.5;
+}
+
+.noCourseData p {
+  margin: 0 0 8px 0;
+}
+
+.noCourseSubtext {
   font-size: 0.875rem;
+  color: #666;
+}
+
+/* Footer */
+.footer {
+  padding: 24px;
+  text-align: center;
+  color: #666;
+  font-size: 0.875rem;
+  border-top: 1px solid #30475e20;
+}
+
+.footer p {
+  margin: 0;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .hero {
+    padding: 40px 16px 24px;
+  }
+
+  .title {
+    font-size: 2rem;
+  }
+
+  .subtitle {
+    font-size: 1rem;
+  }
+
+  .onboarding {
+    padding: 24px 16px;
+  }
+
+  .onboardingTitle {
+    font-size: 1.5rem;
+  }
+
+  .searchInput,
+  .searchButton {
+    font-size: 1rem;
+    padding: 14px 16px;
+  }
+
+  .raceContent {
+    padding: 0 16px 24px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .hero {
+    padding: 80px 24px 60px;
+  }
+
+  .title {
+    font-size: 3.5rem;
+  }
+
+  .searchForm {
+    flex-direction: row;
+  }
+
+  .searchInput {
+    flex: 1;
+  }
+
+  .searchButton {
+    width: auto;
+    white-space: nowrap;
+  }
 }
