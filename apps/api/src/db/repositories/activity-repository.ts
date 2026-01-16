@@ -213,3 +213,43 @@ export async function getWeightedActivitiesForUser(
     }))
     .sort((a, b) => b.recencyWeight - a.recencyWeight);
 }
+
+/**
+ * Update activity status (used for tracking worker processing)
+ */
+export async function updateActivityStatus(
+  id: string,
+  status: 'pending' | 'processing' | 'completed' | 'failed',
+  metadata?: { taskId?: string; error?: string }
+): Promise<Activity | null> {
+  const updateData: Record<string, unknown> = {};
+
+  // Store status in analysis results
+  const [existing] = await db
+    .select()
+    .from(userActivities)
+    .where(eq(userActivities.id, id));
+
+  if (!existing) {
+    return null;
+  }
+
+  const currentResults = (existing.analysisResults as Record<string, unknown>) || {};
+
+  const [activity] = await db
+    .update(userActivities)
+    .set({
+      analysisResults: {
+        ...currentResults,
+        processingStatus: status,
+        taskId: metadata?.taskId || currentResults.taskId,
+        error: metadata?.error || currentResults.error,
+        lastStatusUpdate: new Date().toISOString(),
+      },
+      ...updateData,
+    })
+    .where(eq(userActivities.id, id))
+    .returning();
+
+  return activity || null;
+}

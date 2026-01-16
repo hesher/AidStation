@@ -5,6 +5,7 @@ Celery tasks for parsing and analyzing GPX/FIT activity files
 and race courses.
 """
 
+import logging
 import math
 from dataclasses import asdict
 from typing import Any, Dict, List
@@ -18,6 +19,8 @@ from ..analysis import (
     GPXCourseAnalyzer,
 )
 from . import app
+
+logger = logging.getLogger(__name__)
 
 
 @app.task(name="analyze_gpx_course")
@@ -225,8 +228,8 @@ def calculate_aid_station_metrics(
         return {"success": False, "error": str(e)}
 
 
-@app.task(name="analyze_user_activity")
-def analyze_user_activity(activity_id: str, gpx_content: str) -> Dict[str, Any]:
+@app.task(name="analyze_user_activity", bind=True)
+def analyze_user_activity(self, activity_id: str, gpx_content: str) -> Dict[str, Any]:
     """
     Analyze a user's GPX activity for performance metrics.
 
@@ -243,9 +246,26 @@ def analyze_user_activity(activity_id: str, gpx_content: str) -> Dict[str, Any]:
     Returns:
         Dict containing complete activity analysis
     """
+    logger.info(
+        f"[Task {self.request.id}] Starting analyze_user_activity for activity_id={activity_id}"
+    )
+    logger.info(
+        f"[Task {self.request.id}] GPX content length: {len(gpx_content)} chars"
+    )
+
     try:
+        logger.info(f"[Task {self.request.id}] Creating ActivityPerformanceAnalyzer...")
         analyzer = ActivityPerformanceAnalyzer(gpx_content, activity_id)
+
+        logger.info(f"[Task {self.request.id}] Running analysis...")
         result = analyzer.analyze()
+
+        logger.info(
+            f"[Task {self.request.id}] Analysis complete. "
+            f"Distance: {result.total_distance_km:.2f}km, "
+            f"Elevation gain: {result.elevation_gain_m:.0f}m, "
+            f"Avg pace: {result.average_pace_min_km:.2f} min/km"
+        )
 
         return {
             "success": True,
@@ -253,6 +273,10 @@ def analyze_user_activity(activity_id: str, gpx_content: str) -> Dict[str, Any]:
         }
 
     except Exception as e:
+        logger.error(
+            f"[Task {self.request.id}] Error analyzing activity {activity_id}: {e}",
+            exc_info=True,
+        )
         return {
             "success": False,
             "error": str(e),

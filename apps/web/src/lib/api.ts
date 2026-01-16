@@ -411,6 +411,74 @@ export async function getPerformanceProfile(): Promise<PerformanceProfileRespons
   }
 }
 
+/**
+ * Sync all pending activities and update performance profile
+ */
+export async function syncActivities(): Promise<{
+  success: boolean;
+  data?: { synced: number; updated: number };
+  error?: string;
+}> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/activities/sync-all`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include',
+      body: JSON.stringify({}),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      return {
+        success: false,
+        error: data.error || 'Failed to sync activities',
+      };
+    }
+
+    return data;
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Network error occurred',
+    };
+  }
+}
+
+/**
+ * Sync a single activity's analysis results
+ */
+export async function syncActivity(id: string): Promise<ActivityResponse> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/activities/${id}/sync`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include',
+      body: JSON.stringify({}),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      return {
+        success: false,
+        error: data.error || 'Failed to sync activity',
+      };
+    }
+
+    return data;
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Network error occurred',
+    };
+  }
+}
+
 // Plan types
 export interface AidStationPrediction {
   aidStationId: string;

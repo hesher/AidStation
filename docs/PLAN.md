@@ -89,6 +89,26 @@ For each User Story:
   6. **COMMIT IMMEDIATELY** with message referencing user story (e.g., "US1: Complete Onboarding Experience")
 ```
 
+### Server Start/Stop Commands
+
+**CRITICAL: Always use non-blocking commands for server operations.**
+
+When starting or stopping development servers (API, web, workers), ALWAYS use `&` to run processes in the background so that commands don't block the AI agent:
+
+```bash
+# ✅ CORRECT - Non-blocking
+cd /path/to/project && npm run dev > .pids/api.log 2>&1 &
+echo $! > .pids/api.pid
+
+# ❌ WRONG - Blocking (will hang the AI)
+cd /path/to/project && npm run dev
+
+# ✅ CORRECT - Stop and restart
+kill $(cat .pids/api.pid) 2>/dev/null; sleep 1 && npm run dev > .pids/api.log 2>&1 &
+```
+
+Never use `interactive: true` for server start commands as they will block indefinitely.
+
 ### 🔴 CRITICAL: Commit Requirement
 
 **The LLM MUST commit changes immediately after completing any story or sub-story.**
@@ -268,7 +288,7 @@ This is a non-negotiable requirement to ensure:
 - [x] Set up Fastify API gateway with route structure
 - [ ] Implement authentication middleware (JWT)
 - [x] Set up Python worker service with Celery
-- [ ] Implement job queue communication between Node.js and Python
+- [x] Implement job queue communication between Node.js and Python
 - [x] Create health check endpoints
 
 **E2E Test:** ✅ Verify application loads and API responds correctly (4 tests passing)
@@ -289,7 +309,7 @@ This is a non-negotiable requirement to ensure:
   - Drop bags, Crew options, Pacer options
   - Cutoff times (per aid station and overall)
   - Course GPX/route
-- [] Allow user to edit the Race information (including Aid Stations)
+- [x] Allow user to edit the Race information (including Aid Stations)
 
 **Sub-Story Test:** ✅ AI returns structured race data for known races (15 tests passing)
 
@@ -395,7 +415,7 @@ This is a non-negotiable requirement to ensure:
 ### 5.1 GPX Upload & Processing
 - [x] Create file upload endpoint (`POST /api/activities`)
 - [x] Support multi-file GPX upload (`POST /api/activities/bulk`)
-- [ ] Queue files to Python worker for analysis
+- [x] Queue files to Python worker for analysis
 - [ ] Store raw GPX in object storage (S3/local)
 - [ ] Allow uploading fit files
 

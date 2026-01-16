@@ -1,0 +1,10 @@
+{
+    "name": "AidStation",
+    "short_name": "AidStation",
+    "description": "Endurance race planning application",
+    "start_url": "/",
+    "display": "standalone",
+    "background_color": "#ffffff",
+    "theme_color": "#000000",
+    "icons": []
+}

@@ -660,7 +660,7 @@ export async function raceRoutes(app: FastifyInstance) {
           elevationLossM: validatedBody.elevationLossM,
           startTime: validatedBody.startTime,
           overallCutoffHours: validatedBody.overallCutoffHours,
-          isPublic: validatedBody.isPublic,
+          isPublic: validatedBody.isPublic ?? undefined,
           metadata: {
             description: validatedBody.description,
             websiteUrl: validatedBody.websiteUrl,

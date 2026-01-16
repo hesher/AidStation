@@ -8,6 +8,7 @@ import {
   uploadActivity,
   getPerformanceProfile,
   deleteActivity,
+  syncActivities,
 } from '../../lib/api';
 
 interface Activity {
@@ -144,6 +145,33 @@ export default function PerformancesPage() {
       }
     }
 
+    // Wait a bit for the worker to process, then sync results
+    setUploadProgress('Analyzing activities...');
+    
+    // Poll for results - try a few times with delays
+    let attempts = 0;
+    const maxAttempts = 10;
+    const delayMs = 2000; // 2 seconds between attempts
+    
+    while (attempts < maxAttempts) {
+      await new Promise(resolve => setTimeout(resolve, delayMs));
+      attempts++;
+      
+      try {
+        const syncResult = await syncActivities();
+        if (syncResult.success && syncResult.data) {
+          if (syncResult.data.updated > 0) {
+            setUploadProgress(`Analyzed ${syncResult.data.updated} activities`);
+            break;
+          }
+        }
+      } catch (err) {
+        console.error('Sync error:', err);
+      }
+      
+      setUploadProgress(`Analyzing activities... (${attempts}/${maxAttempts})`);
+    }
+
     setUploadProgress('');
     setIsUploading(false);
 
@@ -227,8 +255,8 @@ export default function PerformancesPage() {
             <div className={styles.summaryCard}>
               <span className={styles.cardLabel}>Fatigue Factor</span>
               <span className={styles.cardValue}>
-                {performanceProfile.fatigueFactor
-                  ? `${(performanceProfile.fatigueFactor * 100).toFixed(0)}%`
+                {performanceProfile.fatigueFactor !== undefined
+                  ? `${performanceProfile.fatigueFactor.toFixed(1)}%`
                   : '-'}
               </span>
             </div>
