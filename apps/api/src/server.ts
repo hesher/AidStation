@@ -16,6 +16,9 @@ async function start() {
   await app.register(cors, {
     origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
     credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Cookie'],
+    exposedHeaders: ['Set-Cookie'],
   });
 
   await app.register(cookie, {
