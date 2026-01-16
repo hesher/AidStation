@@ -386,13 +386,15 @@ This is a non-negotiable requirement to ensure:
 **Sub-Story Test:** ✅ Activity upload and retrieval API (12 tests passing)
 
 ### 5.2 Performance Analysis (Python Worker)
-- [ ] Parse uploaded GPX files with gpxpy
+- [x] Parse uploaded GPX files with gpxpy
 - [ ] Extract time-series data to TimescaleDB hypertable
-- [ ] Calculate pace per segment (flat, uphill, downhill)
-- [ ] Calculate performance at different race stages (10km, 20km, 30km, etc.)
-- [ ] Identify terrain types and correlate with pace
-- [ ] Calculate Grade Adjusted Pace (GAP) for each activity
-- [ ] Implement fatigue curve analysis (pace degradation over time)
+- [x] Calculate pace per segment (flat, uphill, downhill)
+- [x] Calculate performance at different race stages (10km, 20km, 30km, etc.)
+- [x] Identify terrain types and correlate with pace
+- [x] Calculate Grade Adjusted Pace (GAP) for each activity
+- [x] Implement fatigue curve analysis (pace degradation over time)
+
+**Sub-Story Test:** ✅ Performance analyzer unit tests (25 tests written)
 
 ### 5.3 Recency Weighting Algorithm
 - [ ] Implement exponential decay weighting for recent vs. old activities
