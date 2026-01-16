@@ -5,6 +5,7 @@ import cookie from '@fastify/cookie';
 import { healthRoutes } from './routes/health';
 import { raceRoutes } from './routes/races';
 import { activityRoutes } from './routes/activities';
+import { planRoutes } from './routes/plans';
 
 const app = Fastify({
   logger: true,
@@ -25,6 +26,7 @@ async function start() {
   await app.register(healthRoutes, { prefix: '/api' });
   await app.register(raceRoutes, { prefix: '/api' });
   await app.register(activityRoutes, { prefix: '/api' });
+  await app.register(planRoutes, { prefix: '/api' });
 
   // Start server
   const port = parseInt(process.env.PORT || '3001', 10);

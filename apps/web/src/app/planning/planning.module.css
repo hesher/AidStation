@@ -1,0 +1,587 @@
+.main {
+  min-height: 100vh;
+  padding: 2rem;
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+  color: #ffffff;
+}
+
+.header {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.header h1 {
+  font-size: 2.5rem;
+  margin-bottom: 0.5rem;
+  background: linear-gradient(90deg, #00d4ff, #00ff88);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.subtitle {
+  color: #a0a0a0;
+  font-size: 1.1rem;
+}
+
+.loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
+  gap: 1rem;
+}
+
+.spinner {
+  width: 48px;
+  height: 48px;
+  border: 4px solid rgba(0, 212, 255, 0.2);
+  border-top-color: #00d4ff;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.errorBanner {
+  background: rgba(255, 75, 75, 0.2);
+  border: 1px solid #ff4b4b;
+  border-radius: 8px;
+  padding: 1rem 1.5rem;
+  margin-bottom: 1.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: #ff8888;
+}
+
+.errorBanner button {
+  background: none;
+  border: none;
+  color: #ff8888;
+  font-size: 1.5rem;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: 350px 1fr;
+  gap: 2rem;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+/* Sidebar */
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.performanceCard {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 1.25rem;
+}
+
+.performanceCard h3 {
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  color: #00d4ff;
+  margin-bottom: 1rem;
+  letter-spacing: 0.05em;
+}
+
+.perfStats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.75rem;
+}
+
+.perfStat {
+  text-align: center;
+}
+
+.perfLabel {
+  display: block;
+  font-size: 0.75rem;
+  color: #888;
+  margin-bottom: 0.25rem;
+}
+
+.perfValue {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #00ff88;
+}
+
+.createSection {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 1.25rem;
+}
+
+.createSection h3 {
+  font-size: 1rem;
+  margin-bottom: 1rem;
+  color: #ffffff;
+}
+
+.createForm {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.raceSelect,
+.planNameInput {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.3);
+  color: #ffffff;
+  font-size: 0.9rem;
+}
+
+.raceSelect:focus,
+.planNameInput:focus {
+  outline: none;
+  border-color: #00d4ff;
+}
+
+.raceSelect option {
+  background: #1a1a2e;
+  color: #ffffff;
+}
+
+.createButton {
+  padding: 0.75rem 1.5rem;
+  background: linear-gradient(135deg, #00d4ff, #00ff88);
+  color: #000000;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.2s, opacity 0.2s;
+}
+
+.createButton:hover:not(:disabled) {
+  transform: translateY(-2px);
+}
+
+.createButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.noRaces {
+  font-size: 0.85rem;
+  color: #888;
+  margin-top: 0.75rem;
+}
+
+.noRaces a {
+  color: #00d4ff;
+}
+
+.plansListSection {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 1.25rem;
+  flex: 1;
+}
+
+.plansListSection h3 {
+  font-size: 1rem;
+  margin-bottom: 1rem;
+  color: #ffffff;
+}
+
+.plansList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.planItem {
+  padding: 0.75rem 1rem;
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.planItem:hover {
+  border-color: rgba(0, 212, 255, 0.5);
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.planItemActive {
+  border-color: #00d4ff;
+  background: rgba(0, 212, 255, 0.1);
+}
+
+.planItemHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.25rem;
+}
+
+.planItemName {
+  font-weight: 500;
+  font-size: 0.95rem;
+}
+
+.planItemMeta {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.8rem;
+  color: #888;
+}
+
+.planTime {
+  color: #00ff88;
+}
+
+.deleteButton {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.25rem;
+  font-size: 0.85rem;
+  opacity: 0.6;
+  transition: opacity 0.2s;
+}
+
+.deleteButton:hover {
+  opacity: 1;
+}
+
+.noPlans {
+  color: #888;
+  font-size: 0.9rem;
+  text-align: center;
+  padding: 1rem;
+}
+
+/* Plan Details */
+.planDetails {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 1.5rem;
+  min-height: 500px;
+}
+
+.planHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.planHeader h2 {
+  font-size: 1.5rem;
+  color: #ffffff;
+}
+
+.planActions {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.regenerateButton,
+.generateButton {
+  padding: 0.5rem 1rem;
+  background: rgba(0, 212, 255, 0.2);
+  color: #00d4ff;
+  border: 1px solid #00d4ff;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.regenerateButton:hover:not(:disabled),
+.generateButton:hover:not(:disabled) {
+  background: rgba(0, 212, 255, 0.3);
+}
+
+.regenerateButton:disabled,
+.generateButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.planSummary {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.summaryItem {
+  background: rgba(0, 0, 0, 0.2);
+  padding: 1rem;
+  border-radius: 8px;
+  text-align: center;
+}
+
+.summaryLabel {
+  display: block;
+  font-size: 0.75rem;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.5rem;
+}
+
+.summaryValue {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #00ff88;
+}
+
+.timeline {
+  margin-top: 1.5rem;
+}
+
+.timeline h3 {
+  font-size: 1.1rem;
+  margin-bottom: 1rem;
+  color: #ffffff;
+}
+
+.timelineTable {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  overflow-x: auto;
+}
+
+.timelineHeader,
+.timelineRow {
+  display: grid;
+  grid-template-columns: 60px 1fr 80px 80px 80px 70px 70px 100px;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  align-items: center;
+}
+
+.timelineHeader {
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 8px 8px 0 0;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  color: #888;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+}
+
+.timelineRow {
+  background: rgba(0, 0, 0, 0.15);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  font-size: 0.9rem;
+  transition: background 0.2s;
+}
+
+.timelineRow:hover {
+  background: rgba(0, 0, 0, 0.25);
+}
+
+.timelineRow:last-child {
+  border-radius: 0 0 8px 8px;
+}
+
+.statusCell {
+  font-size: 1.1rem;
+  text-align: center;
+}
+
+.stationName {
+  font-weight: 500;
+}
+
+.bufferLow {
+  color: #ff8888;
+  font-weight: 600;
+}
+
+/* Status colors */
+.statusSafe {
+  border-left: 3px solid #00ff88;
+}
+
+.statusWarning {
+  border-left: 3px solid #ffcc00;
+  background: rgba(255, 204, 0, 0.1);
+}
+
+.statusDanger {
+  border-left: 3px solid #ff6b6b;
+  background: rgba(255, 107, 107, 0.1);
+}
+
+.statusMissed {
+  border-left: 3px solid #ff4444;
+  background: rgba(255, 68, 68, 0.15);
+}
+
+.legend {
+  display: flex;
+  gap: 1.5rem;
+  margin-top: 1rem;
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 8px;
+  flex-wrap: wrap;
+}
+
+.legendItem {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  color: #a0a0a0;
+}
+
+.noPredictions {
+  text-align: center;
+  padding: 3rem;
+  color: #888;
+}
+
+.noPredictions p {
+  margin-bottom: 1rem;
+}
+
+.noPlanSelected {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+  text-align: center;
+  color: #888;
+}
+
+.emptyIcon {
+  font-size: 4rem;
+  margin-bottom: 1rem;
+  opacity: 0.5;
+}
+
+.noPlanSelected h3 {
+  color: #a0a0a0;
+  margin-bottom: 0.5rem;
+}
+
+.noPlanSelected p {
+  max-width: 300px;
+}
+
+/* Navigation */
+.navLinks {
+  display: flex;
+  gap: 2rem;
+  justify-content: center;
+  margin-top: 2rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.navLink {
+  color: #00d4ff;
+  text-decoration: none;
+  font-size: 0.95rem;
+  transition: color 0.2s;
+}
+
+.navLink:hover {
+  color: #00ff88;
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+
+  .performanceCard,
+  .createSection,
+  .plansListSection {
+    flex: 1;
+    min-width: 280px;
+  }
+
+  .planSummary {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .timelineHeader,
+  .timelineRow {
+    grid-template-columns: 50px 1fr 70px 70px 70px 60px 60px 90px;
+    font-size: 0.8rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .main {
+    padding: 1rem;
+  }
+
+  .header h1 {
+    font-size: 2rem;
+  }
+
+  .planSummary {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .timelineHeader,
+  .timelineRow {
+    grid-template-columns: 40px 1fr 60px 60px 60px;
+  }
+
+  .timelineHeader span:nth-child(6),
+  .timelineHeader span:nth-child(7),
+  .timelineHeader span:nth-child(8),
+  .timelineRow span:nth-child(6),
+  .timelineRow span:nth-child(7),
+  .timelineRow span:nth-child(8) {
+    display: none;
+  }
+
+  .navLinks {
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+  }
+
+  .legend {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+}

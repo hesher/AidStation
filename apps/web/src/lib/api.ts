@@ -410,3 +410,376 @@ export async function getPerformanceProfile(): Promise<PerformanceProfileRespons
     };
   }
 }
+
+// Plan types
+export interface AidStationPrediction {
+  aidStationId: string;
+  aidStationName: string;
+  distanceKm: number;
+  predictedArrivalMinutes: number;
+  predictedArrivalTime: string;
+  cutoffHoursFromStart?: number;
+  cutoffTime?: string;
+  bufferMinutes?: number;
+  status: 'safe' | 'warning' | 'danger' | 'missed';
+  pacePredictions: {
+    segmentPaceMinKm: number;
+    gradeAdjustedPaceMinKm: number;
+    terrainFactor: number;
+    fatigueFactor: number;
+    nighttimeFactor: number;
+  };
+}
+
+export interface RacePlan {
+  id: string;
+  userId: string;
+  raceId: string;
+  name: string | null;
+  basePaceMinKm: number | null;
+  nighttimeSlowdown: number | null;
+  startTime: string | null;
+  predictedFinishTime: string | null;
+  predictedTotalMinutes: number | null;
+  aidStationPredictions: AidStationPrediction[] | null;
+  isActive: boolean | null;
+  createdAt: string;
+  updatedAt: string;
+  race?: {
+    id: string;
+    name: string;
+    distanceKm: number | null;
+    elevationGainM: number | null;
+    startTime: string | null;
+  };
+}
+
+interface PlansResponse {
+  success: boolean;
+  data?: {
+    plans: RacePlan[];
+    total: number;
+  };
+  error?: string;
+}
+
+interface PlanResponse {
+  success: boolean;
+  data?: RacePlan;
+  error?: string;
+}
+
+/**
+ * Create a new race plan
+ */
+export async function createPlan(
+  raceId: string,
+  options?: {
+    name?: string;
+    basePaceMinKm?: number;
+    nighttimeSlowdown?: number;
+    startTime?: string;
+  }
+): Promise<PlanResponse> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/plans`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include',
+      body: JSON.stringify({
+        raceId,
+        ...options,
+      }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      return {
+        success: false,
+        error: data.error || 'Failed to create plan',
+      };
+    }
+
+    return data;
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Network error occurred',
+    };
+  }
+}
+
+/**
+ * Get all plans for the current user
+ */
+export async function getPlans(limit = 50, offset = 0): Promise<PlansResponse> {
+  try {
+    const response = await fetch(
+      `${API_BASE_URL}/plans?limit=${limit}&offset=${offset}`,
+      {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+      }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      return {
+        success: false,
+        error: data.error || 'Failed to get plans',
+      };
+    }
+
+    return data;
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Network error occurred',
+    };
+  }
+}
+
+/**
+ * Get a single plan by ID
+ */
+export async function getPlan(id: string): Promise<PlanResponse> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/plans/${id}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include',
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      return {
+        success: false,
+        error: data.error || 'Failed to get plan',
+      };
+    }
+
+    return data;
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Network error occurred',
+    };
+  }
+}
+
+/**
+ * Get plans for a specific race
+ */
+export async function getPlansByRace(raceId: string): Promise<PlansResponse> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/plans/race/${raceId}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include',
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      return {
+        success: false,
+        error: data.error || 'Failed to get plans',
+      };
+    }
+
+    return data;
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Network error occurred',
+    };
+  }
+}
+
+/**
+ * Update a plan
+ */
+export async function updatePlan(
+  id: string,
+  updates: {
+    name?: string;
+    basePaceMinKm?: number;
+    nighttimeSlowdown?: number;
+    startTime?: string;
+  }
+): Promise<PlanResponse> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/plans/${id}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include',
+      body: JSON.stringify(updates),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      return {
+        success: false,
+        error: data.error || 'Failed to update plan',
+      };
+    }
+
+    return data;
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Network error occurred',
+    };
+  }
+}
+
+/**
+ * Delete a plan
+ */
+export async function deletePlan(id: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/plans/${id}`, {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include',
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      return {
+        success: false,
+        error: data.error || 'Failed to delete plan',
+      };
+    }
+
+    return data;
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Network error occurred',
+    };
+  }
+}
+
+/**
+ * Generate predictions for a plan
+ */
+export async function generatePredictions(id: string): Promise<PlanResponse> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/plans/${id}/predict`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include',
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      return {
+        success: false,
+        error: data.error || 'Failed to generate predictions',
+      };
+    }
+
+    return data;
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Network error occurred',
+    };
+  }
+}
+
+/**
+ * Set a plan as active
+ */
+export async function activatePlan(id: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/plans/${id}/activate`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include',
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      return {
+        success: false,
+        error: data.error || 'Failed to activate plan',
+      };
+    }
+
+    return data;
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Network error occurred',
+    };
+  }
+}
+
+/**
+ * Get all saved races (for race selection in planning)
+ */
+export async function getSavedRaces(): Promise<{
+  success: boolean;
+  data?: {
+    races: Array<{
+      id: string;
+      name: string;
+      date?: string;
+      distanceKm?: number;
+      country?: string;
+    }>;
+  };
+  error?: string;
+}> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/races`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include',
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      return {
+        success: false,
+        error: data.error || 'Failed to get saved races',
+      };
+    }
+
+    return data;
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Network error occurred',
+    };
+  }
+}

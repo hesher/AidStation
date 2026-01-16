@@ -171,6 +171,10 @@ export default function Home() {
       <a href="/performances" className={styles.performancesLink}>
         📊 My Past Performances
       </a>
+
+      <a href="/planning" className={styles.performancesLink}>
+        📋 Race Planning
+      </a>
     </div>
   );
 

@@ -427,47 +427,47 @@ This is a non-negotiable requirement to ensure:
 ## Phase 6: User Story 5 - Race Planning
 
 ### 6.1 Plan Creation Engine
-- [ ] Create race plan table in database
-- [ ] Link plans to races and user performance data
-- [ ] Create plan generation API (`POST /api/plans`)
+- [x] Create race plan table in database
+- [x] Link plans to races and user performance data
+- [x] Create plan generation API (`POST /api/plans`)
 
 ### 6.2 Prediction Algorithm (Python Worker)
-- [ ] Implement base prediction using Riegel formula
-- [ ] Calculate personalized fatigue exponent from user's past races
-- [ ] Apply Minetti cost function for terrain adjustment
-- [ ] Factor in:
+- [x] Implement base prediction using Riegel formula
+- [x] Calculate personalized fatigue exponent from user's past races
+- [x] Apply Minetti cost function for terrain adjustment
+- [x] Factor in:
   - Climbing sections (reduced pace)
   - Descending sections (adjusted pace)
   - Altitude effects
   - Time of day (nighttime slowdown factor)
   - Race distance fatigue curve
-- [ ] Generate predicted arrival time for each aid station
+- [x] Generate predicted arrival time for each aid station
 
 ### 6.3 Cutoff Time Analysis
-- [ ] Compare predicted times to aid station cutoffs
-- [ ] Calculate buffer time at each station
-- [ ] Classify stations:
+- [x] Compare predicted times to aid station cutoffs
+- [x] Calculate buffer time at each station
+- [x] Classify stations:
   - 🟢 Green: >30 min buffer
   - 🟡 Orange: 15-30 min buffer (warning)
   - 🔴 Red: <15 min buffer or missed cutoff
 
 ### 6.4 Planning UI
-- [ ] Create "Race Planning" page
-- [ ] Race selector dropdown (from saved races)
-- [ ] Display user's performance summary card
-- [ ] Show predicted race timeline:
+- [x] Create "Race Planning" page
+- [x] Race selector dropdown (from saved races)
+- [x] Display user's performance summary card
+- [x] Show predicted race timeline:
   - Aid station arrival times
   - Time spent at each station (configurable)
   - Cumulative elapsed time
-- [ ] Visual timeline with cutoff indicators
-- [ ] Color-coded aid station cards (green/orange/red)
+- [x] Visual timeline with cutoff indicators
+- [x] Color-coded aid station cards (green/orange/red)
 - [ ] Editable pace adjustments (override predictions)
 - [ ] Export plan as PDF/printable format
 
 ### 6.5 Nighttime & Fatigue Modeling
-- [ ] Calculate which sections occur at night (based on start time)
-- [ ] Apply configurable nighttime slowdown factor (default: 10-15%)
-- [ ] Model progressive fatigue based on:
+- [x] Calculate which sections occur at night (based on start time)
+- [x] Apply configurable nighttime slowdown factor (default: 10-15%)
+- [x] Model progressive fatigue based on:
   - Distance covered
   - Time elapsed
   - Cumulative elevation gain
@@ -500,6 +500,9 @@ This is a non-negotiable requirement to ensure:
 - [ ] Configure production environment
 - [ ] Set up monitoring and logging
 - [ ] Create deployment documentation
+
+## Phase 8: Follow Ups, Fixes, Ideas and Future Work
+- [ ] Improve Race Search AI prompt to avoid making up data (as sometimes seen in made up checkpoints, made up distances and climbs)
 
 ---
 
