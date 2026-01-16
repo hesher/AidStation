@@ -223,7 +223,10 @@ export function RaceBrowser({
 
           {error && (
             <div className={styles.error}>
-              <p>⚠️ {error}</p>
+              <p>⚠️ {error === 'Database not available'
+                ? 'Unable to load races. Please ensure the database is running.'
+                : error}
+              </p>
               <button onClick={fetchRaces} className={styles.retryButton}>
                 Retry
               </button>
