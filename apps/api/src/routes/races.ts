@@ -77,7 +77,9 @@ const updateRaceSchema = z.object({
   isPublic: z.boolean().optional(),
 });
 
-const listRacesSchema = z.object({
+// List races query schema - for future use when query validation is added
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const _listRacesSchema = z.object({
   search: z.string().optional(),
   country: z.string().optional(),
   includePublic: z.boolean().optional().default(true),

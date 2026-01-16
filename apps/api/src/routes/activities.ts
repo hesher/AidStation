@@ -13,7 +13,7 @@ import {
   getActivityById,
   deleteActivity,
   getUserPerformanceProfile,
-  updateUserPerformanceProfile,
+  // updateUserPerformanceProfile - will be used when Python worker integration is complete
 } from '../db/repositories';
 
 // Request validation schemas

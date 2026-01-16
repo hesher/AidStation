@@ -9,7 +9,6 @@ import { userActivities, userPerformanceProfiles } from '../schema';
 import { eq, desc, sql } from 'drizzle-orm';
 
 type Activity = typeof userActivities.$inferSelect;
-type NewActivity = typeof userActivities.$inferInsert;
 type PerformanceProfile = typeof userPerformanceProfiles.$inferSelect;
 
 export interface CreateActivityData {

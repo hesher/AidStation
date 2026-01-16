@@ -66,7 +66,9 @@ The repository must be configured with Git hooks that enforce:
 5. new stories
 6. "Future Work" from Phase 8
 
-Mark the active
+* Mark the active task in the plan file so we can track which task is active.
+* If a Task failed - Add the failure reason to the plan so the next iteration tries to fix it
+* If there are follow ups or interesting insights, add them to the plan for future reference
 
 
 

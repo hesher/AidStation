@@ -1,9 +1,11 @@
-import { pgTable, serial, text, timestamp, boolean, integer, real, jsonb, uuid } from 'drizzle-orm/pg-core';
-import { sql } from 'drizzle-orm';
+import { pgTable, text, timestamp, boolean, integer, real, jsonb, uuid } from 'drizzle-orm/pg-core';
 
-// Custom PostGIS geometry type
-const geometry = (name: string, srid = 4326) => {
-  return sql<string>`geometry(Geometry, ${srid})`.as(name);
+// Custom PostGIS geometry type (for future use when PostGIS is enabled)
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const _geometry = (name: string, _srid = 4326) => {
+  // This will be used when PostGIS is available
+  // return sql<string>`geometry(Geometry, ${srid})`.as(name);
+  return name;
 };
 
 // Users table

@@ -4,7 +4,7 @@
  * Unit tests for the race repository database operations.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import type { RaceData, AidStationData } from '../repositories/types';
 
 // Mock the database connection
