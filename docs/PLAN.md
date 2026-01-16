@@ -58,6 +58,8 @@ The repository must be configured with Git hooks that enforce:
 ### Workflow Summary
 
 ```
+!! When the prompt didn't specify a story, sub-story or a specific request, start with the "Urgent Fixes" from Phase 8
+
 For each Sub-Story:
   1. Implement the feature/fix
   2. Write/update tests
@@ -502,6 +504,11 @@ This is a non-negotiable requirement to ensure:
 - [ ] Create deployment documentation
 
 ## Phase 8: Follow Ups, Fixes, Ideas and Future Work
+
+### Urgent Fixes
+- [] The load race dialog is showing "⚠️ Database not available"
+
+### Improvements
 - [ ] Improve Race Search AI prompt to avoid making up data (as sometimes seen in made up checkpoints, made up distances and climbs)
 
 ---
