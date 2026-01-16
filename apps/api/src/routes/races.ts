@@ -1,12 +1,24 @@
 /**
  * Race Routes
  *
- * API endpoints for race-related operations including AI-powered race search.
+ * API endpoints for race-related operations including AI-powered race search,
+ * race persistence, and session management.
  */
 
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { z } from 'zod';
 import { searchRace, RaceSearchResult, AidStationInfo } from '../services/ai';
+import {
+  createRace,
+  getRaceById,
+  updateRace,
+  deleteRace,
+  getOrCreateSessionUser,
+  upsertSession,
+  getLastRaceId,
+  type AidStationData,
+  type SessionData,
+} from '../db/repositories';
 
 // Request validation schemas
 const searchRaceSchema = z.object({
@@ -15,17 +27,88 @@ const searchRaceSchema = z.object({
   includeCourseData: z.boolean().optional().default(true),
 });
 
+const saveRaceSchema = z.object({
+  name: z.string().min(1),
+  date: z.string().optional(),
+  location: z.string().optional(),
+  country: z.string().optional(),
+  distanceKm: z.number().optional(),
+  elevationGainM: z.number().optional(),
+  elevationLossM: z.number().optional(),
+  startTime: z.string().optional(),
+  overallCutoffHours: z.number().optional(),
+  description: z.string().optional(),
+  websiteUrl: z.string().optional(),
+  aidStations: z.array(z.object({
+    name: z.string(),
+    distanceKm: z.number(),
+    distanceFromPrevKm: z.number().optional(),
+    elevationM: z.number().optional(),
+    elevationGainFromPrevM: z.number().optional(),
+    elevationLossFromPrevM: z.number().optional(),
+    hasDropBag: z.boolean().optional(),
+    hasCrew: z.boolean().optional(),
+    hasPacer: z.boolean().optional(),
+    cutoffTime: z.string().optional(),
+    cutoffHoursFromStart: z.number().optional(),
+  })).optional(),
+  courseCoordinates: z.array(z.object({
+    lat: z.number(),
+    lon: z.number(),
+    elevation: z.number().optional(),
+  })).optional(),
+});
+
 type SearchRaceBody = z.infer<typeof searchRaceSchema>;
+type SaveRaceBody = z.infer<typeof saveRaceSchema>;
+
+// Session ID cookie name
+const SESSION_COOKIE = 'aidstation_session';
+
+/**
+ * Generate a random session ID
+ */
+function generateSessionId(): string {
+  return Math.random().toString(36).substring(2) + Date.now().toString(36);
+}
+
+/**
+ * Get or create session ID from request
+ */
+function getSessionId(request: FastifyRequest): string {
+  const cookies = request.cookies || {};
+  return cookies[SESSION_COOKIE] || generateSessionId();
+}
 
 // Response types
 interface RaceSearchResponse {
   success: boolean;
   data?: RaceSearchResult & {
+    id?: string;
     aidStations?: (AidStationInfo & {
       distanceFromPrevKm?: number;
       elevationGainFromPrevM?: number;
       elevationLossFromPrevM?: number;
     })[];
+  };
+  error?: string;
+}
+
+interface RaceResponse {
+  success: boolean;
+  data?: {
+    id: string;
+    name: string;
+    date?: string | null;
+    location?: string | null;
+    country?: string | null;
+    distanceKm?: number | null;
+    elevationGainM?: number | null;
+    elevationLossM?: number | null;
+    startTime?: string | null;
+    overallCutoffHours?: number | null;
+    aidStations?: AidStationData[];
+    courseCoordinates?: Array<{ lat: number; lon: number; elevation?: number }>;
   };
   error?: string;
 }
@@ -129,19 +212,342 @@ export async function raceRoutes(app: FastifyInstance) {
   });
 
   /**
+   * POST /api/races
+   *
+   * Save a race to the database and update session
+   */
+  app.post('/races', async (
+    request: FastifyRequest<{ Body: SaveRaceBody }>,
+    reply: FastifyReply
+  ): Promise<RaceResponse> => {
+    try {
+      const validatedBody = saveRaceSchema.parse(request.body);
+
+      // Get or create session
+      const sessionId = getSessionId(request);
+
+      // Get or create user for session
+      let userId: string;
+      try {
+        userId = await getOrCreateSessionUser(sessionId);
+      } catch (dbError) {
+        // Database might not be available, log and continue without persistence
+        app.log.warn({ error: dbError }, 'Database not available, skipping persistence');
+        reply.status(503);
+        return {
+          success: false,
+          error: 'Database not available. Please ensure PostgreSQL is running.',
+        };
+      }
+
+      // Create race in database
+      const race = await createRace(
+        {
+          name: validatedBody.name,
+          date: validatedBody.date,
+          location: validatedBody.location,
+          country: validatedBody.country,
+          distanceKm: validatedBody.distanceKm,
+          elevationGainM: validatedBody.elevationGainM,
+          elevationLossM: validatedBody.elevationLossM,
+          startTime: validatedBody.startTime,
+          overallCutoffHours: validatedBody.overallCutoffHours,
+          ownerId: userId,
+          metadata: {
+            description: validatedBody.description,
+            websiteUrl: validatedBody.websiteUrl,
+          },
+          courseCoordinates: validatedBody.courseCoordinates,
+        },
+        validatedBody.aidStations as AidStationData[]
+      );
+
+      // Update session with last viewed race
+      const sessionData: SessionData = {
+        lastRaceId: race.id,
+        courseCoordinates: validatedBody.courseCoordinates,
+      };
+      await upsertSession(userId, race.id, sessionData);
+
+      // Set session cookie
+      reply.setCookie(SESSION_COOKIE, sessionId, {
+        path: '/',
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 60 * 60 * 24 * 365, // 1 year
+      });
+
+      return {
+        success: true,
+        data: {
+          id: race.id,
+          name: race.name,
+          date: race.date?.toISOString(),
+          location: race.location,
+          country: race.country,
+          distanceKm: race.distanceKm,
+          elevationGainM: race.elevationGainM,
+          elevationLossM: race.elevationLossM,
+          startTime: race.startTime,
+          overallCutoffHours: race.overallCutoffHours,
+          aidStations: race.aidStations.map((as) => ({
+            name: as.name,
+            distanceKm: as.distanceKm,
+            distanceFromPrevKm: as.distanceFromPrevKm ?? undefined,
+            elevationM: as.elevationM ?? undefined,
+            elevationGainFromPrevM: as.elevationGainFromPrevM ?? undefined,
+            elevationLossFromPrevM: as.elevationLossFromPrevM ?? undefined,
+            hasDropBag: as.hasDropBag ?? undefined,
+            hasCrew: as.hasCrew ?? undefined,
+            hasPacer: as.hasPacer ?? undefined,
+            cutoffTime: as.cutoffTime ?? undefined,
+            cutoffHoursFromStart: as.cutoffHoursFromStart ?? undefined,
+          })),
+          courseCoordinates: validatedBody.courseCoordinates,
+        },
+      };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+
+      app.log.error({ error: errorMessage }, 'Failed to save race');
+
+      reply.status(error instanceof z.ZodError ? 400 : 500);
+
+      return {
+        success: false,
+        error: error instanceof z.ZodError
+          ? error.errors.map(e => e.message).join(', ')
+          : errorMessage,
+      };
+    }
+  });
+
+  /**
+   * GET /api/races/current
+   *
+   * Get the current/last viewed race for the session
+   */
+  app.get('/races/current', async (
+    request: FastifyRequest,
+    reply: FastifyReply
+  ): Promise<RaceResponse> => {
+    try {
+      const sessionId = getSessionId(request);
+
+      // Get user for session
+      let userId: string;
+      try {
+        userId = await getOrCreateSessionUser(sessionId);
+      } catch (dbError) {
+        app.log.warn({ error: dbError }, 'Database not available');
+        reply.status(503);
+        return {
+          success: false,
+          error: 'Database not available',
+        };
+      }
+
+      // Get last race ID from session
+      const lastRaceId = await getLastRaceId(userId);
+
+      if (!lastRaceId) {
+        reply.status(404);
+        return {
+          success: false,
+          error: 'No previous race found',
+        };
+      }
+
+      // Get race with aid stations
+      const race = await getRaceById(lastRaceId);
+
+      if (!race) {
+        reply.status(404);
+        return {
+          success: false,
+          error: 'Race not found',
+        };
+      }
+
+      // Get course coordinates from session data or metadata
+      const metadata = race.metadata as Record<string, unknown> | null;
+      const courseCoordinates = metadata?.courseCoordinates as Array<{ lat: number; lon: number; elevation?: number }> | undefined;
+
+      // Set session cookie
+      reply.setCookie(SESSION_COOKIE, sessionId, {
+        path: '/',
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 60 * 60 * 24 * 365,
+      });
+
+      return {
+        success: true,
+        data: {
+          id: race.id,
+          name: race.name,
+          date: race.date?.toISOString(),
+          location: race.location,
+          country: race.country,
+          distanceKm: race.distanceKm,
+          elevationGainM: race.elevationGainM,
+          elevationLossM: race.elevationLossM,
+          startTime: race.startTime,
+          overallCutoffHours: race.overallCutoffHours,
+          aidStations: race.aidStations.map((as) => ({
+            name: as.name,
+            distanceKm: as.distanceKm,
+            distanceFromPrevKm: as.distanceFromPrevKm ?? undefined,
+            elevationM: as.elevationM ?? undefined,
+            elevationGainFromPrevM: as.elevationGainFromPrevM ?? undefined,
+            elevationLossFromPrevM: as.elevationLossFromPrevM ?? undefined,
+            hasDropBag: as.hasDropBag ?? undefined,
+            hasCrew: as.hasCrew ?? undefined,
+            hasPacer: as.hasPacer ?? undefined,
+            cutoffTime: as.cutoffTime ?? undefined,
+            cutoffHoursFromStart: as.cutoffHoursFromStart ?? undefined,
+          })),
+          courseCoordinates,
+        },
+      };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+
+      app.log.error({ error: errorMessage }, 'Failed to get current race');
+
+      reply.status(500);
+
+      return {
+        success: false,
+        error: errorMessage,
+      };
+    }
+  });
+
+  /**
    * GET /api/races/:id
    *
    * Get a specific race by ID (from database)
-   * TODO: Implement after database connection is set up
    */
   app.get('/races/:id', async (
     request: FastifyRequest<{ Params: { id: string } }>,
     reply: FastifyReply
-  ) => {
-    reply.status(501);
-    return {
-      success: false,
-      error: 'Not implemented yet',
-    };
+  ): Promise<RaceResponse> => {
+    try {
+      const { id } = request.params;
+
+      // Validate UUID format
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (!uuidRegex.test(id)) {
+        reply.status(400);
+        return {
+          success: false,
+          error: 'Invalid race ID format',
+        };
+      }
+
+      let race;
+      try {
+        race = await getRaceById(id);
+      } catch (dbError) {
+        app.log.warn({ error: dbError }, 'Database not available');
+        reply.status(503);
+        return {
+          success: false,
+          error: 'Database not available',
+        };
+      }
+
+      if (!race) {
+        reply.status(404);
+        return {
+          success: false,
+          error: 'Race not found',
+        };
+      }
+
+      const metadata = race.metadata as Record<string, unknown> | null;
+      const courseCoordinates = metadata?.courseCoordinates as Array<{ lat: number; lon: number; elevation?: number }> | undefined;
+
+      return {
+        success: true,
+        data: {
+          id: race.id,
+          name: race.name,
+          date: race.date?.toISOString(),
+          location: race.location,
+          country: race.country,
+          distanceKm: race.distanceKm,
+          elevationGainM: race.elevationGainM,
+          elevationLossM: race.elevationLossM,
+          startTime: race.startTime,
+          overallCutoffHours: race.overallCutoffHours,
+          aidStations: race.aidStations.map((as) => ({
+            name: as.name,
+            distanceKm: as.distanceKm,
+            distanceFromPrevKm: as.distanceFromPrevKm ?? undefined,
+            elevationM: as.elevationM ?? undefined,
+            elevationGainFromPrevM: as.elevationGainFromPrevM ?? undefined,
+            elevationLossFromPrevM: as.elevationLossFromPrevM ?? undefined,
+            hasDropBag: as.hasDropBag ?? undefined,
+            hasCrew: as.hasCrew ?? undefined,
+            hasPacer: as.hasPacer ?? undefined,
+            cutoffTime: as.cutoffTime ?? undefined,
+            cutoffHoursFromStart: as.cutoffHoursFromStart ?? undefined,
+          })),
+          courseCoordinates,
+        },
+      };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+
+      app.log.error({ error: errorMessage }, 'Failed to get race');
+
+      reply.status(500);
+
+      return {
+        success: false,
+        error: errorMessage,
+      };
+    }
+  });
+
+  /**
+   * DELETE /api/races/:id
+   *
+   * Delete a race
+   */
+  app.delete('/races/:id', async (
+    request: FastifyRequest<{ Params: { id: string } }>,
+    reply: FastifyReply
+  ): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const { id } = request.params;
+
+      const deleted = await deleteRace(id);
+
+      if (!deleted) {
+        reply.status(404);
+        return {
+          success: false,
+          error: 'Race not found',
+        };
+      }
+
+      return { success: true };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+
+      app.log.error({ error: errorMessage }, 'Failed to delete race');
+
+      reply.status(500);
+
+      return {
+        success: false,
+        error: errorMessage,
+      };
+    }
   });
 }

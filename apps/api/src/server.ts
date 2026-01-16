@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
+import cookie from '@fastify/cookie';
 import { healthRoutes } from './routes/health';
 import { raceRoutes } from './routes/races';
 
@@ -12,6 +13,11 @@ async function start() {
   // Register plugins
   await app.register(cors, {
     origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
+    credentials: true,
+  });
+
+  await app.register(cookie, {
+    secret: process.env.COOKIE_SECRET || 'aidstation-cookie-secret-dev',
   });
 
   // Register routes

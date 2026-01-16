@@ -25,6 +25,7 @@ export interface CourseCoordinate {
 }
 
 export interface RaceData {
+  id?: string;
   name: string;
   date?: string;
   location?: string;
@@ -41,6 +42,12 @@ export interface RaceData {
 }
 
 export interface RaceSearchResponse {
+  success: boolean;
+  data?: RaceData;
+  error?: string;
+}
+
+export interface RaceResponse {
   success: boolean;
   data?: RaceData;
   error?: string;

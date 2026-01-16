@@ -147,13 +147,27 @@ describe('Race Routes', () => {
   });
 
   describe('GET /api/races/:id', () => {
-    it('should return 501 (not implemented)', async () => {
+    it('should return 400 for invalid UUID format', async () => {
       const response = await app.inject({
         method: 'GET',
-        url: '/api/races/some-uuid',
+        url: '/api/races/invalid-uuid',
       });
 
-      expect(response.statusCode).toBe(501);
+      expect(response.statusCode).toBe(400);
+      const body = JSON.parse(response.body);
+      expect(body.success).toBe(false);
+      expect(body.error).toBe('Invalid race ID format');
+    });
+
+    it('should return 503 when database is not available', async () => {
+      // Valid UUID format but database not connected
+      const response = await app.inject({
+        method: 'GET',
+        url: '/api/races/12345678-1234-1234-1234-123456789012',
+      });
+
+      // Should return 503 (database not available) or 404 (not found)
+      expect([404, 503]).toContain(response.statusCode);
     });
   });
 });

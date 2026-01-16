@@ -1,27 +1,51 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import styles from './page.module.css';
 import { RaceCard } from '@/components/RaceCard';
 import { AidStationTable } from '@/components/AidStationTable';
 import { CourseMap } from '@/components/CourseMap';
-import { searchRace } from '@/lib/api';
+import { searchRace, getCurrentRace, saveRace } from '@/lib/api';
 import { RaceData, AidStation } from '@/lib/types';
 
-type SearchState = 'idle' | 'searching' | 'success' | 'error';
+type AppState = 'initializing' | 'idle' | 'searching' | 'success' | 'error';
 
 export default function Home() {
   const [raceName, setRaceName] = useState('');
-  const [searchState, setSearchState] = useState<SearchState>('idle');
+  const [appState, setAppState] = useState<AppState>('initializing');
   const [raceData, setRaceData] = useState<RaceData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selectedStation, setSelectedStation] = useState<number | null>(null);
+
+  // Initialize app - check for previous race on load
+  useEffect(() => {
+    const initializeApp = async () => {
+      try {
+        const result = await getCurrentRace();
+
+        if (result.success && result.data) {
+          // Previous race found - load it
+          setRaceData(result.data);
+          setAppState('success');
+        } else {
+          // No previous race - show onboarding
+          setAppState('idle');
+        }
+      } catch (err) {
+        // Error loading previous race - show onboarding
+        console.warn('Failed to load previous race:', err);
+        setAppState('idle');
+      }
+    };
+
+    initializeApp();
+  }, []);
 
   const handleSearch = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     if (!raceName.trim()) return;
 
-    setSearchState('searching');
+    setAppState('searching');
     setError(null);
     setRaceData(null);
     setSelectedStation(null);
@@ -30,15 +54,21 @@ export default function Home() {
 
     if (result.success && result.data) {
       setRaceData(result.data);
-      setSearchState('success');
+      setAppState('success');
+
+      // Save the race to persist it for page refresh
+      // This runs in the background, doesn't block UI
+      saveRace(result.data).catch((err) => {
+        console.warn('Failed to save race:', err);
+      });
     } else {
       setError(result.error || 'Failed to find race');
-      setSearchState('error');
+      setAppState('error');
     }
   }, [raceName]);
 
   const handleNewSearch = useCallback(() => {
-    setSearchState('idle');
+    setAppState('idle');
     setRaceData(null);
     setError(null);
     setRaceName('');
@@ -64,18 +94,27 @@ export default function Home() {
           onChange={(e) => setRaceName(e.target.value)}
           placeholder="e.g., Western States 100, UTMB, Leadville 100..."
           className={styles.searchInput}
-          disabled={searchState === 'searching'}
+          disabled={appState === 'searching'}
           data-testid="race-search-input"
         />
         <button
           type="submit"
           className={styles.searchButton}
-          disabled={searchState === 'searching' || !raceName.trim()}
+          disabled={appState === 'searching' || !raceName.trim()}
           data-testid="race-search-button"
         >
-          {searchState === 'searching' ? 'Searching...' : 'Find Race'}
+          {appState === 'searching' ? 'Searching...' : 'Find Race'}
         </button>
       </form>
+    </div>
+  );
+
+  // Render initialization loading state
+  const renderInitializing = () => (
+    <div className={styles.loading} data-testid="initializing-state">
+      <div className={styles.loadingSpinner} />
+      <p className={styles.loadingText}>Loading AidStation...</p>
+      <p className={styles.loadingSubtext}>Checking for previous race data.</p>
     </div>
   );
 
@@ -172,10 +211,11 @@ export default function Home() {
         </p>
       </div>
 
-      {searchState === 'idle' && renderSearchForm()}
-      {searchState === 'searching' && renderLoading()}
-      {searchState === 'error' && renderError()}
-      {searchState === 'success' && renderRaceData()}
+      {appState === 'initializing' && renderInitializing()}
+      {appState === 'idle' && renderSearchForm()}
+      {appState === 'searching' && renderLoading()}
+      {appState === 'error' && renderError()}
+      {appState === 'success' && renderRaceData()}
 
       <footer className={styles.footer}>
         <p>AidStation v0.1.0 — Built for endurance athletes</p>

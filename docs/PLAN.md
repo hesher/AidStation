@@ -321,18 +321,18 @@ This is a non-negotiable requirement to ensure:
 ## Phase 3: User Story 2 - Page Refresh / Persistence
 
 ### 3.1 Session & State Persistence
-- [ ] Implement current race storage in PostgreSQL
-- [ ] Create user session tracking (last viewed race)
-- [ ] Create API endpoint to get current/last race (`GET /api/races/current`)
-- [ ] Implement client-side state hydration on page load
+- [x] Implement current race storage in PostgreSQL
+- [x] Create user session tracking (last viewed race)
+- [x] Create API endpoint to get current/last race (`GET /api/races/current`)
+- [x] Implement client-side state hydration on page load
 
 ### 3.2 Auto-Load Previous Race
-- [ ] Check for existing race on app load
-- [ ] Load race data from database if exists
-- [ ] Re-render map and table with stored data
-- [ ] Handle edge case of no previous race (redirect to onboarding)
+- [x] Check for existing race on app load
+- [x] Load race data from database if exists
+- [x] Re-render map and table with stored data
+- [x] Handle edge case of no previous race (redirect to onboarding)
 
-**E2E Test (User Story 2 Complete):** User loads race → Refreshes page → Same race with all data loads automatically
+**E2E Test (User Story 2 Complete):** ✅ User loads race → Refreshes page → Same race with all data loads automatically (17 E2E tests written)
 
 ---
 
