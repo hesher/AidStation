@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import styles from './page.module.css';
 import { RaceCard } from '@/components/RaceCard';
 import { AidStationTable } from '@/components/AidStationTable';
@@ -12,6 +12,9 @@ import { RaceData, AidStation } from '@/lib/types';
 
 type AppState = 'initializing' | 'idle' | 'searching' | 'success' | 'error';
 
+// Auto-save debounce delay in milliseconds
+const AUTO_SAVE_DELAY = 2000;
+
 export default function Home() {
   const [raceName, setRaceName] = useState('');
   const [appState, setAppState] = useState<AppState>('initializing');
@@ -21,6 +24,55 @@ export default function Home() {
   const [isRaceBrowserOpen, setIsRaceBrowserOpen] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [autoSaveEnabled, setAutoSaveEnabled] = useState(true);
+  const [lastSaveTime, setLastSaveTime] = useState<Date | null>(null);
+
+  // Ref to track auto-save timer
+  const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Auto-save effect: triggers save after debounce delay when changes are made
+  useEffect(() => {
+    // Only auto-save if:
+    // 1. Auto-save is enabled
+    // 2. There are unsaved changes
+    // 3. The race has an ID (already saved once, so we can update it)
+    if (!autoSaveEnabled || !hasUnsavedChanges || !raceData?.id) {
+      return;
+    }
+
+    // Clear any existing timer
+    if (autoSaveTimerRef.current) {
+      clearTimeout(autoSaveTimerRef.current);
+    }
+
+    // Set up new auto-save timer
+    autoSaveTimerRef.current = setTimeout(async () => {
+      if (!raceData?.id) return;
+
+      setIsSaving(true);
+      try {
+        const result = await updateRace(raceData.id, raceData);
+        if (result.success && result.data) {
+          setRaceData(result.data);
+          setHasUnsavedChanges(false);
+          setLastSaveTime(new Date());
+        } else {
+          console.warn('Auto-save failed:', result.error);
+        }
+      } catch (err) {
+        console.warn('Auto-save error:', err);
+      } finally {
+        setIsSaving(false);
+      }
+    }, AUTO_SAVE_DELAY);
+
+    // Cleanup timer on unmount or dependency change
+    return () => {
+      if (autoSaveTimerRef.current) {
+        clearTimeout(autoSaveTimerRef.current);
+      }
+    };
+  }, [autoSaveEnabled, hasUnsavedChanges, raceData]);
 
   // Initialize app - check for previous race on load
   useEffect(() => {
@@ -131,6 +183,7 @@ export default function Home() {
       if (result.success && result.data) {
         setRaceData(result.data);
         setHasUnsavedChanges(false);
+        setLastSaveTime(new Date());
       } else {
         console.error('Failed to save race:', result.error);
       }
@@ -270,6 +323,9 @@ export default function Home() {
               onSave={handleSaveRace}
               isSaving={isSaving}
               hasUnsavedChanges={hasUnsavedChanges}
+              autoSaveEnabled={autoSaveEnabled}
+              onAutoSaveToggle={setAutoSaveEnabled}
+              lastSaveTime={lastSaveTime}
             />
           </section>
 

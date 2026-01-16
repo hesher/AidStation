@@ -178,6 +178,21 @@
   border-radius: 4px;
 }
 
+.lastSaveTime {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+  color: #4CAF50;
+  padding: 8px 12px;
+  background: rgba(76, 175, 80, 0.1);
+  border-radius: 6px;
+}
+
+.lastSaveIcon {
+  font-size: 0.9rem;
+}
+
 /* Responsive */
 @media (max-width: 480px) {
   .settingRow {

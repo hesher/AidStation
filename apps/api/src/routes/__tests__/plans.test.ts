@@ -4,19 +4,15 @@
  * Tests for the race plan API endpoints.
  */
 
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from 'vitest';
 import Fastify from 'fastify';
 import cookie from '@fastify/cookie';
 import { planRoutes } from '../plans';
 
-// Mock the repositories
-const mockPlans = new Map<string, Record<string, unknown>>();
-let planIdCounter = 0;
-
 // Sample test data
 const testUserId = 'test-user-123';
 const testRace = {
-  id: 'test-race-123',
+  id: '12345678-1234-1234-1234-123456789012',
   name: 'Western States 100',
   distanceKm: 161,
   elevationGainM: 5500,
@@ -25,132 +21,146 @@ const testRace = {
   overallCutoffHours: 30,
 };
 
-const testAidStations = [
-  {
-    id: 'as-1',
-    name: 'Lyon Ridge',
-    distanceKm: 16.5,
-    distanceFromPrevKm: 16.5,
-    elevationM: 1900,
-    elevationGainFromPrevM: 500,
-    elevationLossFromPrevM: 100,
-    cutoffHoursFromStart: 4.5,
-    sortOrder: 0,
-  },
-  {
-    id: 'as-2',
-    name: 'Red Star Ridge',
-    distanceKm: 24.5,
-    distanceFromPrevKm: 8,
-    elevationM: 2300,
-    elevationGainFromPrevM: 600,
-    elevationLossFromPrevM: 200,
-    cutoffHoursFromStart: 7,
-    sortOrder: 1,
-  },
-];
+// Setup mock module - move the factory implementations inline to avoid hoisting issues
+vi.mock('../../db/repositories', () => {
+  const mockPlansInternal = new Map<string, Record<string, unknown>>();
+  let planIdCounterInternal = 0;
 
-// Mock repository functions
-interface MockPlanData {
-  userId: string;
-  raceId: string;
-  name: string;
-}
-
-interface MockPredictionData {
-  aidStationPredictions: unknown;
-  predictedTotalMinutes: number;
-  predictedFinishTime: Date;
-}
-
-const mockCreatePlan = async (data: MockPlanData) => {
-  const id = `plan-${++planIdCounter}`;
-  const plan = {
-    id,
-    ...data,
-    isActive: true,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-    aidStationPredictions: null,
-    predictedTotalMinutes: null,
-    predictedFinishTime: null,
+  const mockCreatePlan = async (data: { userId: string; raceId: string; name: string }) => {
+    const id = `plan-${++planIdCounterInternal}`;
+    const plan = {
+      id,
+      ...data,
+      isActive: true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      aidStationPredictions: null,
+      predictedTotalMinutes: null,
+      predictedFinishTime: null,
+    };
+    mockPlansInternal.set(id, plan);
+    return plan;
   };
-  mockPlans.set(id, plan);
-  return plan;
-};
 
-const mockGetPlanById = async (id: string) => {
-  return mockPlans.get(id) || null;
-};
+  const mockGetPlanById = async (id: string) => {
+    return mockPlansInternal.get(id) || null;
+  };
 
-const mockGetPlansByUser = async (userId: string, _options: Record<string, unknown> = {}) => {
-  const userPlans = Array.from(mockPlans.values()).filter(
-    (p) => p.userId === userId
-  );
-  return { plans: userPlans, total: userPlans.length };
-};
+  const mockGetPlansByUser = async (userId: string, _options: Record<string, unknown> = {}) => {
+    const userPlans = Array.from(mockPlansInternal.values()).filter(
+      (p) => p.userId === userId
+    );
+    return { plans: userPlans, total: userPlans.length };
+  };
 
-const mockGetPlansByRace = async (userId: string, raceId: string) => {
-  return Array.from(mockPlans.values()).filter(
-    (p) => p.userId === userId && p.raceId === raceId
-  );
-};
+  const mockGetPlansByRace = async (userId: string, raceId: string) => {
+    return Array.from(mockPlansInternal.values()).filter(
+      (p) => p.userId === userId && p.raceId === raceId
+    );
+  };
 
-const mockUpdatePlan = async (id: string, data: Partial<MockPlanData>) => {
-  const plan = mockPlans.get(id);
-  if (!plan) return null;
-  const updated = { ...plan, ...data, updatedAt: new Date() };
-  mockPlans.set(id, updated);
-  return updated;
-};
+  const mockUpdatePlan = async (id: string, data: Partial<{ userId: string; raceId: string; name: string }>) => {
+    const plan = mockPlansInternal.get(id);
+    if (!plan) return null;
+    const updated = { ...plan, ...data, updatedAt: new Date() };
+    mockPlansInternal.set(id, updated);
+    return updated;
+  };
 
-const mockDeletePlan = async (id: string) => {
-  return mockPlans.delete(id);
-};
+  const mockDeletePlan = async (id: string) => {
+    return mockPlansInternal.delete(id);
+  };
 
-const mockGetRaceForPrediction = async (raceId: string) => {
-  if (raceId !== testRace.id) return null;
-  return { race: testRace, aidStations: testAidStations };
-};
+  // Use a valid UUID that matches what tests expect
+  const TEST_RACE_ID = '12345678-1234-1234-1234-123456789012';
 
-const mockGetUserPerformanceForPrediction = async (_userId: string) => {
+  const mockGetRaceForPrediction = async (raceId: string) => {
+    const testRaceData = {
+      id: TEST_RACE_ID,
+      name: 'Western States 100',
+      distanceKm: 161,
+      elevationGainM: 5500,
+      elevationLossM: 7000,
+      startTime: '05:00',
+      overallCutoffHours: 30,
+    };
+
+    const testAidStationsData = [
+      {
+        id: 'as-1',
+        name: 'Lyon Ridge',
+        distanceKm: 16.5,
+        distanceFromPrevKm: 16.5,
+        elevationM: 1900,
+        elevationGainFromPrevM: 500,
+        elevationLossFromPrevM: 100,
+        cutoffHoursFromStart: 4.5,
+        sortOrder: 0,
+      },
+      {
+        id: 'as-2',
+        name: 'Red Star Ridge',
+        distanceKm: 24.5,
+        distanceFromPrevKm: 8,
+        elevationM: 2300,
+        elevationGainFromPrevM: 600,
+        elevationLossFromPrevM: 200,
+        cutoffHoursFromStart: 7,
+        sortOrder: 1,
+      },
+    ];
+
+    if (raceId !== testRaceData.id) return null;
+    return { race: testRaceData, aidStations: testAidStationsData };
+  };
+
+  const mockGetUserPerformanceForPrediction = async () => {
+    return {
+      flatPaceMinKm: 6.5,
+      climbingPaceMinKm: 12.0,
+      descendingPaceMinKm: 5.5,
+      fatigueFactor: 1.08,
+      profileData: null,
+    };
+  };
+
+  const mockUpdatePlanPredictions = async (id: string, predictions: { aidStationPredictions: unknown; predictedTotalMinutes: number; predictedFinishTime: Date }) => {
+    const plan = mockPlansInternal.get(id);
+    if (!plan) return null;
+    const updated = { ...plan, ...predictions, updatedAt: new Date() };
+    mockPlansInternal.set(id, updated);
+    return updated;
+  };
+
+  const mockSetActivePlan = async () => {
+    // Mock implementation
+  };
+
+  // Export a clear function for tests to reset state
+  const clearMocks = () => {
+    mockPlansInternal.clear();
+    planIdCounterInternal = 0;
+  };
+
   return {
-    flatPaceMinKm: 6.5,
-    climbingPaceMinKm: 12.0,
-    descendingPaceMinKm: 5.5,
-    fatigueFactor: 1.08,
-    profileData: null,
+    createPlan: mockCreatePlan,
+    getPlanById: mockGetPlanById,
+    getPlansByUser: mockGetPlansByUser,
+    getPlansByRace: mockGetPlansByRace,
+    updatePlan: mockUpdatePlan,
+    deletePlan: mockDeletePlan,
+    getRaceForPrediction: mockGetRaceForPrediction,
+    getUserPerformanceForPrediction: mockGetUserPerformanceForPrediction,
+    updatePlanPredictions: mockUpdatePlanPredictions,
+    setActivePlan: mockSetActivePlan,
+    __clearMocks: clearMocks,
   };
-};
-
-const mockUpdatePlanPredictions = async (id: string, predictions: MockPredictionData) => {
-  const plan = mockPlans.get(id);
-  if (!plan) return null;
-  const updated = { ...plan, ...predictions, updatedAt: new Date() };
-  mockPlans.set(id, updated);
-  return updated;
-};
-
-const mockSetActivePlan = async () => {
-  // Mock implementation
-};
-
-// Setup mock module
-vi.mock('../../db/repositories', () => ({
-  createPlan: mockCreatePlan,
-  getPlanById: mockGetPlanById,
-  getPlansByUser: mockGetPlansByUser,
-  getPlansByRace: mockGetPlansByRace,
-  updatePlan: mockUpdatePlan,
-  deletePlan: mockDeletePlan,
-  getRaceForPrediction: mockGetRaceForPrediction,
-  getUserPerformanceForPrediction: mockGetUserPerformanceForPrediction,
-  updatePlanPredictions: mockUpdatePlanPredictions,
-  setActivePlan: mockSetActivePlan,
-}));
+});
 
 describe('Plan Routes', () => {
   let app: ReturnType<typeof Fastify>;
+  // Import the mock clear function
+  let clearMocks: () => void;
 
   beforeAll(async () => {
     app = Fastify();
@@ -161,6 +171,10 @@ describe('Plan Routes', () => {
 
     await app.register(planRoutes, { prefix: '/api' });
     await app.ready();
+
+    // Get the clear function from the mocked module
+    const repositories = await import('../../db/repositories');
+    clearMocks = (repositories as unknown as { __clearMocks: () => void }).__clearMocks;
   });
 
   afterAll(async () => {
@@ -169,9 +183,24 @@ describe('Plan Routes', () => {
 
   beforeEach(() => {
     // Clear mocks between tests
-    mockPlans.clear();
-    planIdCounter = 0;
+    if (clearMocks) clearMocks();
   });
+
+  // Helper to create a plan via API
+  const createPlanViaAPI = async (userId: string, raceId: string, name: string) => {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/plans',
+      headers: {
+        Cookie: `userId=${userId}`,
+      },
+      payload: {
+        raceId,
+        name,
+      },
+    });
+    return JSON.parse(response.body);
+  };
 
   describe('POST /api/plans', () => {
     it('should create a new plan', async () => {
@@ -255,12 +284,8 @@ describe('Plan Routes', () => {
     });
 
     it('should return plans for authenticated user', async () => {
-      // Create a plan first
-      await mockCreatePlan({
-        userId: testUserId,
-        raceId: testRace.id,
-        name: 'Test Plan',
-      });
+      // Create a plan first via API
+      await createPlanViaAPI(testUserId, testRace.id, 'Test Plan');
 
       const response = await app.inject({
         method: 'GET',
@@ -288,15 +313,13 @@ describe('Plan Routes', () => {
 
   describe('GET /api/plans/:id', () => {
     it('should return a plan by ID', async () => {
-      const plan = await mockCreatePlan({
-        userId: testUserId,
-        raceId: testRace.id,
-        name: 'Test Plan',
-      });
+      // Create plan via API
+      const createResult = await createPlanViaAPI(testUserId, testRace.id, 'Test Plan');
+      const planId = createResult.data.id;
 
       const response = await app.inject({
         method: 'GET',
-        url: `/api/plans/${plan.id}`,
+        url: `/api/plans/${planId}`,
         headers: {
           Cookie: `userId=${testUserId}`,
         },
@@ -305,7 +328,7 @@ describe('Plan Routes', () => {
       expect(response.statusCode).toBe(200);
       const body = JSON.parse(response.body);
       expect(body.success).toBe(true);
-      expect(body.data.id).toBe(plan.id);
+      expect(body.data.id).toBe(planId);
     });
 
     it('should return 404 for non-existent plan', async () => {
@@ -321,15 +344,13 @@ describe('Plan Routes', () => {
     });
 
     it('should return 403 when accessing another users plan', async () => {
-      const plan = await mockCreatePlan({
-        userId: 'other-user',
-        raceId: testRace.id,
-        name: 'Other User Plan',
-      });
+      // Create plan via API for another user
+      const createResult = await createPlanViaAPI('other-user', testRace.id, 'Other User Plan');
+      const planId = createResult.data.id;
 
       const response = await app.inject({
         method: 'GET',
-        url: `/api/plans/${plan.id}`,
+        url: `/api/plans/${planId}`,
         headers: {
           Cookie: `userId=${testUserId}`,
         },
@@ -341,15 +362,13 @@ describe('Plan Routes', () => {
 
   describe('PUT /api/plans/:id', () => {
     it('should update a plan', async () => {
-      const plan = await mockCreatePlan({
-        userId: testUserId,
-        raceId: testRace.id,
-        name: 'Original Name',
-      });
+      // Create plan via API
+      const createResult = await createPlanViaAPI(testUserId, testRace.id, 'Original Name');
+      const planId = createResult.data.id;
 
       const response = await app.inject({
         method: 'PUT',
-        url: `/api/plans/${plan.id}`,
+        url: `/api/plans/${planId}`,
         headers: {
           Cookie: `userId=${testUserId}`,
         },
@@ -381,15 +400,13 @@ describe('Plan Routes', () => {
     });
 
     it('should return 403 when updating another users plan', async () => {
-      const plan = await mockCreatePlan({
-        userId: 'other-user',
-        raceId: testRace.id,
-        name: 'Other User Plan',
-      });
+      // Create plan via API for another user
+      const createResult = await createPlanViaAPI('other-user', testRace.id, 'Other User Plan');
+      const planId = createResult.data.id;
 
       const response = await app.inject({
         method: 'PUT',
-        url: `/api/plans/${plan.id}`,
+        url: `/api/plans/${planId}`,
         headers: {
           Cookie: `userId=${testUserId}`,
         },
@@ -404,15 +421,13 @@ describe('Plan Routes', () => {
 
   describe('DELETE /api/plans/:id', () => {
     it('should delete a plan', async () => {
-      const plan = await mockCreatePlan({
-        userId: testUserId,
-        raceId: testRace.id,
-        name: 'To Be Deleted',
-      });
+      // Create plan via API
+      const createResult = await createPlanViaAPI(testUserId, testRace.id, 'To Be Deleted');
+      const planId = createResult.data.id;
 
       const response = await app.inject({
         method: 'DELETE',
-        url: `/api/plans/${plan.id}`,
+        url: `/api/plans/${planId}`,
         headers: {
           Cookie: `userId=${testUserId}`,
         },
@@ -422,8 +437,15 @@ describe('Plan Routes', () => {
       const body = JSON.parse(response.body);
       expect(body.success).toBe(true);
 
-      // Verify it was deleted
-      expect(mockPlans.has(plan.id)).toBe(false);
+      // Verify it was deleted by trying to get it
+      const getResponse = await app.inject({
+        method: 'GET',
+        url: `/api/plans/${planId}`,
+        headers: {
+          Cookie: `userId=${testUserId}`,
+        },
+      });
+      expect(getResponse.statusCode).toBe(404);
     });
 
     it('should return 404 for non-existent plan', async () => {
@@ -439,15 +461,13 @@ describe('Plan Routes', () => {
     });
 
     it('should return 403 when deleting another users plan', async () => {
-      const plan = await mockCreatePlan({
-        userId: 'other-user',
-        raceId: testRace.id,
-        name: 'Other User Plan',
-      });
+      // Create plan via API for another user
+      const createResult = await createPlanViaAPI('other-user', testRace.id, 'Other User Plan');
+      const planId = createResult.data.id;
 
       const response = await app.inject({
         method: 'DELETE',
-        url: `/api/plans/${plan.id}`,
+        url: `/api/plans/${planId}`,
         headers: {
           Cookie: `userId=${testUserId}`,
         },
@@ -459,16 +479,9 @@ describe('Plan Routes', () => {
 
   describe('GET /api/plans/race/:raceId', () => {
     it('should return plans for a specific race', async () => {
-      await mockCreatePlan({
-        userId: testUserId,
-        raceId: testRace.id,
-        name: 'Race Plan 1',
-      });
-      await mockCreatePlan({
-        userId: testUserId,
-        raceId: testRace.id,
-        name: 'Race Plan 2',
-      });
+      // Create plans via API
+      await createPlanViaAPI(testUserId, testRace.id, 'Race Plan 1');
+      await createPlanViaAPI(testUserId, testRace.id, 'Race Plan 2');
 
       const response = await app.inject({
         method: 'GET',
@@ -487,15 +500,13 @@ describe('Plan Routes', () => {
 
   describe('POST /api/plans/:id/predict', () => {
     it('should generate predictions for a plan', async () => {
-      const plan = await mockCreatePlan({
-        userId: testUserId,
-        raceId: testRace.id,
-        name: 'Prediction Test Plan',
-      });
+      // Create plan via API
+      const createResult = await createPlanViaAPI(testUserId, testRace.id, 'Prediction Test Plan');
+      const planId = createResult.data.id;
 
       const response = await app.inject({
         method: 'POST',
-        url: `/api/plans/${plan.id}/predict`,
+        url: `/api/plans/${planId}/predict`,
         headers: {
           Cookie: `userId=${testUserId}`,
         },
@@ -523,15 +534,13 @@ describe('Plan Routes', () => {
 
   describe('POST /api/plans/:id/activate', () => {
     it('should activate a plan', async () => {
-      const plan = await mockCreatePlan({
-        userId: testUserId,
-        raceId: testRace.id,
-        name: 'Activate Test Plan',
-      });
+      // Create plan via API
+      const createResult = await createPlanViaAPI(testUserId, testRace.id, 'Activate Test Plan');
+      const planId = createResult.data.id;
 
       const response = await app.inject({
         method: 'POST',
-        url: `/api/plans/${plan.id}/activate`,
+        url: `/api/plans/${planId}/activate`,
         headers: {
           Cookie: `userId=${testUserId}`,
         },

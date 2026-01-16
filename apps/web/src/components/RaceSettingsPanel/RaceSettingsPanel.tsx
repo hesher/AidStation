@@ -16,6 +16,9 @@ interface RaceSettingsPanelProps {
   onSave: () => void;
   isSaving?: boolean;
   hasUnsavedChanges?: boolean;
+  autoSaveEnabled?: boolean;
+  onAutoSaveToggle?: (enabled: boolean) => void;
+  lastSaveTime?: Date | null;
 }
 
 export function RaceSettingsPanel({
@@ -24,6 +27,9 @@ export function RaceSettingsPanel({
   onSave,
   isSaving = false,
   hasUnsavedChanges = false,
+  autoSaveEnabled = true,
+  onAutoSaveToggle,
+  lastSaveTime,
 }: RaceSettingsPanelProps) {
   const [isPublic, setIsPublic] = useState(race.isPublic ?? false);
 
@@ -35,6 +41,24 @@ export function RaceSettingsPanel({
     setIsPublic(newValue);
     onVisibilityChange(newValue);
   }, [isPublic, onVisibilityChange]);
+
+  const handleAutoSaveToggle = useCallback(() => {
+    onAutoSaveToggle?.(!autoSaveEnabled);
+  }, [autoSaveEnabled, onAutoSaveToggle]);
+
+  // Format last save time
+  const formatLastSaveTime = (date: Date | null | undefined) => {
+    if (!date) return null;
+    const now = new Date();
+    const diff = now.getTime() - date.getTime();
+    const seconds = Math.floor(diff / 1000);
+    const minutes = Math.floor(seconds / 60);
+
+    if (seconds < 5) return 'just now';
+    if (seconds < 60) return `${seconds}s ago`;
+    if (minutes < 60) return `${minutes}m ago`;
+    return date.toLocaleTimeString();
+  };
 
   return (
     <div className={styles.panel} data-testid="race-settings-panel">
@@ -74,6 +98,34 @@ export function RaceSettingsPanel({
           </button>
         </div>
 
+        {/* Auto-Save Toggle */}
+        {race.id && onAutoSaveToggle && (
+          <div className={styles.settingRow}>
+            <div className={styles.settingInfo}>
+              <span className={styles.settingLabel}>Auto-Save</span>
+              <span className={styles.settingDescription}>
+                {autoSaveEnabled
+                  ? 'Changes are saved automatically'
+                  : 'Save changes manually'}
+              </span>
+            </div>
+
+            <button
+              className={`${styles.toggleButton} ${autoSaveEnabled ? styles.togglePublic : styles.togglePrivate}`}
+              onClick={handleAutoSaveToggle}
+              aria-pressed={autoSaveEnabled}
+              data-testid="autosave-toggle"
+            >
+              <span className={styles.toggleIcon}>
+                {autoSaveEnabled ? '✓' : '✗'}
+              </span>
+              <span className={styles.toggleText}>
+                {autoSaveEnabled ? 'On' : 'Off'}
+              </span>
+            </button>
+          </div>
+        )}
+
         {/* Save Button */}
         <div className={styles.actions}>
           <button
@@ -94,6 +146,14 @@ export function RaceSettingsPanel({
             )}
           </button>
         </div>
+
+        {/* Last Save Time Indicator */}
+        {lastSaveTime && (
+          <div className={styles.lastSaveTime} data-testid="last-save-time">
+            <span className={styles.lastSaveIcon}>✓</span>
+            <span>Saved {formatLastSaveTime(lastSaveTime)}</span>
+          </div>
+        )}
       </div>
 
       {/* Race ID (for debugging/reference) */}
