@@ -199,7 +199,7 @@ This is a non-negotiable requirement to ensure:
 
 ---
 
-### User Story 2: Page Refresh
+### User Story 2: Page Refresh and Navigation
 
 **Acceptance Criteria:**
 
@@ -354,7 +354,7 @@ This is a non-negotiable requirement to ensure:
 
 ---
 
-## Phase 3: User Story 2 - Page Refresh / Persistence
+## Phase 3: User Story 2 - Page Refresh / Persistence and Navigation
 
 ### 3.1 Session & State Persistence
 - [x] Implement current race storage in PostgreSQL
@@ -367,6 +367,11 @@ This is a non-negotiable requirement to ensure:
 - [x] Load race data from database if exists
 - [x] Re-render map and table with stored data
 - [x] Handle edge case of no previous race (redirect to onboarding)
+
+
+### 3.3 Navigation Bar
+- [x] Create navigation bar component
+- [x] Make navigation bar sticky
 
 **E2E Test (User Story 2 Complete):** ✅ User loads race → Refreshes page → Same race with all data loads automatically (17 E2E tests written)
 
@@ -543,6 +548,7 @@ This is a non-negotiable requirement to ensure:
 ### Urgent Fixes
 - [x] going from the "past performances" page to the "race planning" page crashes the app with error "GET http://localhost:3001/api/races/current 404 (Not Found)". A hard refresh fixes it.
   - **Fixed**: The link on the performances page was mislabeled "Back to Race Planning" but actually linked to `/` (home), not `/planning`. Updated the navigation to have correct labels and added a direct link to `/planning`.
+  - when clicking "create plan" in "planning" i get a big red banner "authentication required"
 
 
 ### Fast Follows

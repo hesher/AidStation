@@ -9,38 +9,11 @@
   background: linear-gradient(180deg, #0d0d1a 0%, #1a1a2e 50%, #0d0d1a 100%);
 }
 
-/* Hero Section */
-.hero {
-  text-align: center;
-  padding: 60px 24px 40px;
-  background: linear-gradient(180deg, rgba(100, 181, 246, 0.1) 0%, transparent 100%);
-}
-
-.title {
-  font-size: 3rem;
-  font-weight: 800;
-  color: #fff;
-  margin: 0 0 12px 0;
-  letter-spacing: -1px;
-}
-
-.titleIcon {
-  display: inline-block;
-  margin-right: 8px;
-}
-
-.subtitle {
-  font-size: 1.2rem;
-  color: #888;
-  margin: 0;
-  font-weight: 400;
-}
-
 /* Onboarding Section */
 .onboarding {
   max-width: 600px;
   margin: 0 auto;
-  padding: 40px 24px;
+  padding: 60px 24px;
   text-align: center;
   flex: 1;
 }

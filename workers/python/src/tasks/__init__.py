@@ -17,12 +17,12 @@ from .gpx_tasks import (
 from .prediction_tasks import *  # noqa: F401,F403
 
 __all__ = [
-    'app',
-    'analyze_gpx',
-    'analyze_gpx_course',
-    'analyze_user_activity',
-    'calculate_aid_station_metrics',
-    'calculate_gap',
-    'calculate_performance_profile',
-    'smooth_elevation',
+    "app",
+    "analyze_gpx",
+    "analyze_gpx_course",
+    "analyze_user_activity",
+    "calculate_aid_station_metrics",
+    "calculate_gap",
+    "calculate_performance_profile",
+    "smooth_elevation",
 ]

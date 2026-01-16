@@ -12,3 +12,4 @@ export { RaceSettingsPanel } from './RaceSettingsPanel';
 export { ElevationProfile } from './ElevationProfile';
 export { Skeleton, SkeletonCard, SkeletonTable, SkeletonMap } from './Skeleton';
 export { ErrorBoundary } from './ErrorBoundary';
+export { NavBar } from './NavBar';

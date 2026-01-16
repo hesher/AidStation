@@ -146,16 +146,16 @@ export default function PerformancesPage() {
 
     // Wait a bit for the worker to process, then sync results
     setUploadProgress('Analyzing activities...');
-    
+
     // Poll for results - try a few times with delays
     let attempts = 0;
     const maxAttempts = 10;
     const delayMs = 2000; // 2 seconds between attempts
-    
+
     while (attempts < maxAttempts) {
       await new Promise(resolve => setTimeout(resolve, delayMs));
       attempts++;
-      
+
       try {
         const syncResult = await syncActivities();
         if (syncResult.success && syncResult.data) {
@@ -167,7 +167,7 @@ export default function PerformancesPage() {
       } catch (err) {
         console.error('Sync error:', err);
       }
-      
+
       setUploadProgress(`Analyzing activities... (${attempts}/${maxAttempts})`);
     }
 
@@ -360,15 +360,6 @@ export default function PerformancesPage() {
         )}
       </section>
 
-      {/* Navigation Links */}
-      <nav className={styles.navLinks}>
-        <a href="/" className={styles.backLink}>
-          ← Back to Home
-        </a>
-        <a href="/planning" className={styles.backLink}>
-          📋 Race Planning
-        </a>
-      </nav>
     </main>
   );
 }

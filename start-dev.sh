@@ -128,7 +128,7 @@ mkdir -p "$PID_DIR"
 cleanup() {
     echo ""
     echo -e "${YELLOW}Shutting down services...${NC}"
-    
+
     # Kill background processes
     if [ -f "$PID_DIR/api.pid" ]; then
         kill $(cat "$PID_DIR/api.pid") 2>/dev/null || true
@@ -142,10 +142,10 @@ cleanup() {
         kill $(cat "$PID_DIR/worker.pid") 2>/dev/null || true
         rm "$PID_DIR/worker.pid"
     fi
-    
+
     # Stop docker services (optional - comment out to keep them running)
     # docker-compose down
-    
+
     echo -e "${GREEN}All services stopped.${NC}"
     exit 0
 }

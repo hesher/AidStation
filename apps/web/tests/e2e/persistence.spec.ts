@@ -131,7 +131,7 @@ test.describe('User Story 2: Page Refresh / Persistence', () => {
       // App should still be functional
       // Check for main structural elements
       await expect(page.locator('main')).toBeVisible();
-      await expect(page.locator('h1:has-text("AidStation")')).toBeVisible();
+      await expect(page.getByTestId('navbar')).toBeVisible();
       await expect(page.locator('footer')).toBeVisible();
     });
   });
@@ -178,12 +178,12 @@ test.describe('User Story 2: Page Refresh / Persistence', () => {
   });
 
   test.describe('UI Components', () => {
-    test('hero section is always visible', async ({ page }) => {
+    test('navbar is always visible', async ({ page }) => {
       await page.goto('/');
 
-      // Hero should always be visible
-      await expect(page.locator('h1:has-text("AidStation")')).toBeVisible({ timeout: 10000 });
-      await expect(page.getByText('AI-powered race planning')).toBeVisible();
+      // Navbar should always be visible
+      await expect(page.getByTestId('navbar')).toBeVisible({ timeout: 10000 });
+      await expect(page.getByTestId('navbar')).toContainText('AidStation');
     });
 
     test('footer is always visible', async ({ page }) => {

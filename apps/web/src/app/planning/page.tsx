@@ -596,15 +596,6 @@ export default function PlanningPage() {
         </section>
       </div>
 
-      {/* Back to Home Link */}
-      <nav className={styles.navLinks}>
-        <a href="/" className={styles.navLink}>
-          ← Back to Race Search
-        </a>
-        <a href="/performances" className={styles.navLink}>
-          📊 Past Performances
-        </a>
-      </nav>
     </main>
   );
 }

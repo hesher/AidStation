@@ -652,27 +652,6 @@
   cursor: not-allowed;
 }
 
-/* Navigation */
-.navLinks {
-  display: flex;
-  gap: 2rem;
-  justify-content: center;
-  margin-top: 2rem;
-  padding-top: 1.5rem;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.navLink {
-  color: #00d4ff;
-  text-decoration: none;
-  font-size: 0.95rem;
-  transition: color 0.2s;
-}
-
-.navLink:hover {
-  color: #00ff88;
-}
-
 /* Responsive */
 @media (max-width: 1024px) {
   .layout {

@@ -327,14 +327,6 @@ export default function Home() {
       >
         📁 Load Saved Race
       </button>
-
-      <a href="/performances" className={styles.performancesLink}>
-        📊 My Past Performances
-      </a>
-
-      <a href="/planning" className={styles.performancesLink}>
-        📋 Race Planning
-      </a>
     </div>
   );
 
@@ -499,15 +491,6 @@ export default function Home() {
 
   return (
     <main className={styles.main}>
-      <div className={styles.hero}>
-        <h1 className={styles.title}>
-          <span className={styles.titleIcon}>⛰️</span> AidStation
-        </h1>
-        <p className={styles.subtitle}>
-          AI-powered race planning for endurance athletes
-        </p>
-      </div>
-
       {appState === 'initializing' && renderInitializing()}
       {appState === 'idle' && renderSearchForm()}
       {appState === 'searching' && renderLoading()}

@@ -7,7 +7,7 @@
  * 1. Viewing past activities
  * 2. Uploading new GPX files
  * 3. Performance profile display
- * 4. Navigation
+ * 4. Navigation via navbar
  */
 
 import { test, expect } from '@playwright/test';
@@ -35,9 +35,11 @@ test.describe('User Story 4: Past Performances', () => {
       await expect(page.getByText('Uploaded Activities')).toBeVisible();
     });
 
-    test('should display navigation links', async ({ page }) => {
-      await expect(page.getByText('← Back to Home')).toBeVisible();
-      await expect(page.getByText('📋 Race Planning')).toBeVisible();
+    test('should display navigation bar', async ({ page }) => {
+      await expect(page.getByTestId('navbar')).toBeVisible();
+      await expect(page.getByTestId('nav-home')).toBeVisible();
+      await expect(page.getByTestId('nav-planning')).toBeVisible();
+      await expect(page.getByTestId('nav-performances')).toBeVisible();
     });
   });
 
@@ -68,13 +70,13 @@ test.describe('User Story 4: Past Performances', () => {
   });
 
   test.describe('Navigation', () => {
-    test('should navigate to home page when back link clicked', async ({ page }) => {
-      await page.getByText('← Back to Home').click();
+    test('should navigate to home page when home link clicked', async ({ page }) => {
+      await page.getByTestId('nav-home').click();
       await expect(page).toHaveURL('/');
     });
 
     test('should navigate to planning page when planning link clicked', async ({ page }) => {
-      await page.getByText('📋 Race Planning').click();
+      await page.getByTestId('nav-planning').click();
       await expect(page).toHaveURL('/planning');
     });
   });

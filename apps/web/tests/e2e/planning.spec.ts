@@ -32,9 +32,11 @@ test.describe('User Story 5: Race Planning', () => {
       await expect(page.getByText('Your Plans')).toBeVisible();
     });
 
-    test('should display navigation links', async ({ page }) => {
-      await expect(page.getByText('← Back to Race Search')).toBeVisible();
-      await expect(page.getByText('📊 Past Performances')).toBeVisible();
+    test('should display navigation bar', async ({ page }) => {
+      await expect(page.getByTestId('navbar')).toBeVisible();
+      await expect(page.getByTestId('nav-home')).toBeVisible();
+      await expect(page.getByTestId('nav-planning')).toBeVisible();
+      await expect(page.getByTestId('nav-performances')).toBeVisible();
     });
   });
 
@@ -350,13 +352,13 @@ test.describe('User Story 5: Race Planning', () => {
   });
 
   test.describe('Navigation', () => {
-    test('should navigate to home page when back link clicked', async ({ page }) => {
-      await page.getByText('← Back to Race Search').click();
+    test('should navigate to home page when home link clicked', async ({ page }) => {
+      await page.getByTestId('nav-home').click();
       await expect(page).toHaveURL('/');
     });
 
     test('should navigate to performances page when link clicked', async ({ page }) => {
-      await page.getByText('📊 Past Performances').click();
+      await page.getByTestId('nav-performances').click();
       await expect(page).toHaveURL('/performances');
     });
   });

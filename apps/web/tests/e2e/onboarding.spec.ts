@@ -18,8 +18,9 @@ test.describe('User Story 1: Onboarding Experience', () => {
   });
 
   test('should display onboarding form on first load', async ({ page }) => {
-    // Verify the hero section is visible
-    await expect(page.locator('h1')).toContainText('AidStation');
+    // Verify the navbar is visible with app branding
+    await expect(page.getByTestId('navbar')).toBeVisible();
+    await expect(page.locator('[data-testid="navbar"]')).toContainText('AidStation');
 
     // Verify onboarding elements are present
     await expect(page.locator('h2')).toContainText('Find Your Race');

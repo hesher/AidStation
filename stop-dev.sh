@@ -15,9 +15,26 @@ NC='\033[0m' # No Color
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PID_DIR="$PROJECT_ROOT/.pids"
 
+# Ports used by AidStation services
+API_PORT=3001
+WEB_PORT=3000
+
+# Function to kill process on a specific port
+kill_port() {
+    local port=$1
+    local name=$2
+    local pids=$(lsof -ti ":$port" 2>/dev/null || true)
+    if [ -n "$pids" ]; then
+        echo "$pids" | xargs kill -9 2>/dev/null || true
+        echo -e "  ${GREEN}✓ Killed orphan process(es) on port $port ($name)${NC}"
+        return 0
+    fi
+    return 1
+}
+
 echo -e "${YELLOW}Stopping AidStation services...${NC}"
 
-# Stop Node.js processes
+# Stop Node.js processes by PID
 if [ -f "$PID_DIR/api.pid" ]; then
     pid=$(cat "$PID_DIR/api.pid")
     if kill -0 "$pid" 2>/dev/null; then
@@ -43,6 +60,21 @@ if [ -f "$PID_DIR/worker.pid" ]; then
         echo -e "  ${GREEN}✓ Celery worker stopped${NC}"
     fi
     rm -f "$PID_DIR/worker.pid"
+fi
+
+# Kill any orphan processes still listening on our ports
+# This catches child processes, zombie processes, or processes from crashed runs
+echo -e "${YELLOW}Checking for orphan processes on ports...${NC}"
+sleep 1  # Give processes a moment to terminate gracefully
+
+kill_port $API_PORT "API server" || true
+kill_port $WEB_PORT "Web frontend" || true
+
+# Also kill any stray celery workers for this project
+celery_pids=$(pgrep -f "celery.*aidstation" 2>/dev/null || true)
+if [ -n "$celery_pids" ]; then
+    echo "$celery_pids" | xargs kill -9 2>/dev/null || true
+    echo -e "  ${GREEN}✓ Killed orphan Celery worker(s)${NC}"
 fi
 
 # Optionally stop Docker containers

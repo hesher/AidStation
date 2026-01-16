@@ -7,13 +7,9 @@ test.describe('AidStation Foundation', () => {
     // Check page title
     await expect(page).toHaveTitle(/AidStation/);
 
-    // Check main heading is visible
-    const heading = page.locator('h1');
-    await expect(heading).toContainText('AidStation');
-
-    // Check subtitle is visible
-    const subtitle = page.locator('text=AI-powered race planning');
-    await expect(subtitle).toBeVisible();
+    // Check navbar is visible with branding
+    await expect(page.getByTestId('navbar')).toBeVisible();
+    await expect(page.getByTestId('navbar')).toContainText('AidStation');
 
     // Check onboarding section is visible
     const onboardingTitle = page.locator('text=Find Your Race');
