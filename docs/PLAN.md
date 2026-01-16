@@ -378,10 +378,12 @@ This is a non-negotiable requirement to ensure:
 ## Phase 5: User Story 4 - Past Performances
 
 ### 5.1 GPX Upload & Processing
-- [ ] Create file upload endpoint (`POST /api/activities`)
-- [ ] Support multi-file GPX upload
+- [x] Create file upload endpoint (`POST /api/activities`)
+- [x] Support multi-file GPX upload (`POST /api/activities/bulk`)
 - [ ] Queue files to Python worker for analysis
 - [ ] Store raw GPX in object storage (S3/local)
+
+**Sub-Story Test:** ✅ Activity upload and retrieval API (12 tests passing)
 
 ### 5.2 Performance Analysis (Python Worker)
 - [ ] Parse uploaded GPX files with gpxpy

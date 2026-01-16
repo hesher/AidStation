@@ -6,4 +6,5 @@
 
 export * from './race-repository';
 export * from './session-repository';
+export * from './activity-repository';
 export * from './types';
