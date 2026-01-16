@@ -548,7 +548,8 @@ This is a non-negotiable requirement to ensure:
 ### Urgent Fixes
 - [x] going from the "past performances" page to the "race planning" page crashes the app with error "GET http://localhost:3001/api/races/current 404 (Not Found)". A hard refresh fixes it.
   - **Fixed**: The link on the performances page was mislabeled "Back to Race Planning" but actually linked to `/` (home), not `/planning`. Updated the navigation to have correct labels and added a direct link to `/planning`.
-  - when clicking "create plan" in "planning" i get a big red banner "authentication required"
+- [x] when clicking "create plan" in "planning" i get a big red banner "authentication required"
+  - **Fixed**: Updated plans routes to use session-based authentication via `aidstation_session` cookie (same as activities routes), instead of requiring a `userId` cookie that was never set. Now plans routes use `getOrCreateSessionUser()` to automatically create/retrieve the user based on session.
 
 
 ### Fast Follows

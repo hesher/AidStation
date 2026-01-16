@@ -4,7 +4,7 @@
  * API routes for race plan management and prediction generation.
  */
 
-import { FastifyInstance } from 'fastify';
+import { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import {
   createPlan,
@@ -17,8 +17,17 @@ import {
   getRaceForPrediction,
   getUserPerformanceForPrediction,
   setActivePlan,
+  getOrCreateSessionUser,
   AidStationPrediction,
 } from '../db/repositories';
+
+// Session cookie name
+const SESSION_COOKIE = 'aidstation_session';
+
+function getSessionId(request: FastifyRequest): string {
+  const cookies = request.cookies || {};
+  return cookies[SESSION_COOKIE] || Math.random().toString(36).substring(2) + Date.now().toString(36);
+}
 
 // Validation schemas
 const createPlanSchema = z.object({
@@ -36,15 +45,6 @@ const updatePlanSchema = z.object({
   startTime: z.string().datetime().optional(),
 });
 
-// Helper to get userId from cookie (simplified - in production use proper auth)
-function getUserId(request: { cookies?: { userId?: string } }): string {
-  const userId = request.cookies?.userId;
-  if (!userId) {
-    throw new Error('User not authenticated');
-  }
-  return userId;
-}
-
 export async function planRoutes(app: FastifyInstance) {
   /**
    * Create a new race plan
@@ -52,7 +52,18 @@ export async function planRoutes(app: FastifyInstance) {
    */
   app.post('/plans', async (request, reply) => {
     try {
-      const userId = getUserId(request);
+      const sessionId = getSessionId(request);
+      let userId: string;
+      try {
+        userId = await getOrCreateSessionUser(sessionId);
+      } catch (dbError) {
+        app.log.warn({ error: dbError }, 'Database not available');
+        return reply.status(503).send({
+          success: false,
+          error: 'Database not available',
+        });
+      }
+
       const body = createPlanSchema.parse(request.body);
 
       // Verify race exists
@@ -85,12 +96,6 @@ export async function planRoutes(app: FastifyInstance) {
           details: error.errors,
         });
       }
-      if (error instanceof Error && error.message === 'User not authenticated') {
-        return reply.status(401).send({
-          success: false,
-          error: 'Authentication required',
-        });
-      }
       console.error('Create plan error:', error);
       return reply.status(500).send({
         success: false,
@@ -105,7 +110,18 @@ export async function planRoutes(app: FastifyInstance) {
    */
   app.get('/plans', async (request, reply) => {
     try {
-      const userId = getUserId(request);
+      const sessionId = getSessionId(request);
+      let userId: string;
+      try {
+        userId = await getOrCreateSessionUser(sessionId);
+      } catch (dbError) {
+        app.log.warn({ error: dbError }, 'Database not available');
+        return reply.status(503).send({
+          success: false,
+          error: 'Database not available',
+        });
+      }
+
       const query = request.query as { limit?: string; offset?: string };
 
       const { plans, total } = await getPlansByUser(userId, {
@@ -118,12 +134,6 @@ export async function planRoutes(app: FastifyInstance) {
         data: { plans, total },
       });
     } catch (error) {
-      if (error instanceof Error && error.message === 'User not authenticated') {
-        return reply.status(401).send({
-          success: false,
-          error: 'Authentication required',
-        });
-      }
       console.error('Get plans error:', error);
       return reply.status(500).send({
         success: false,
@@ -138,6 +148,18 @@ export async function planRoutes(app: FastifyInstance) {
    */
   app.get('/plans/:id', async (request, reply) => {
     try {
+      const sessionId = getSessionId(request);
+      let userId: string;
+      try {
+        userId = await getOrCreateSessionUser(sessionId);
+      } catch (dbError) {
+        app.log.warn({ error: dbError }, 'Database not available');
+        return reply.status(503).send({
+          success: false,
+          error: 'Database not available',
+        });
+      }
+
       const { id } = request.params as { id: string };
       const plan = await getPlanById(id);
 
@@ -149,7 +171,6 @@ export async function planRoutes(app: FastifyInstance) {
       }
 
       // Verify ownership
-      const userId = getUserId(request);
       if (plan.userId !== userId) {
         return reply.status(403).send({
           success: false,
@@ -162,12 +183,6 @@ export async function planRoutes(app: FastifyInstance) {
         data: plan,
       });
     } catch (error) {
-      if (error instanceof Error && error.message === 'User not authenticated') {
-        return reply.status(401).send({
-          success: false,
-          error: 'Authentication required',
-        });
-      }
       console.error('Get plan error:', error);
       return reply.status(500).send({
         success: false,
@@ -182,7 +197,18 @@ export async function planRoutes(app: FastifyInstance) {
    */
   app.get('/plans/race/:raceId', async (request, reply) => {
     try {
-      const userId = getUserId(request);
+      const sessionId = getSessionId(request);
+      let userId: string;
+      try {
+        userId = await getOrCreateSessionUser(sessionId);
+      } catch (dbError) {
+        app.log.warn({ error: dbError }, 'Database not available');
+        return reply.status(503).send({
+          success: false,
+          error: 'Database not available',
+        });
+      }
+
       const { raceId } = request.params as { raceId: string };
 
       const plans = await getPlansByRace(userId, raceId);
@@ -192,12 +218,6 @@ export async function planRoutes(app: FastifyInstance) {
         data: { plans },
       });
     } catch (error) {
-      if (error instanceof Error && error.message === 'User not authenticated') {
-        return reply.status(401).send({
-          success: false,
-          error: 'Authentication required',
-        });
-      }
       console.error('Get plans by race error:', error);
       return reply.status(500).send({
         success: false,
@@ -212,7 +232,18 @@ export async function planRoutes(app: FastifyInstance) {
    */
   app.put('/plans/:id', async (request, reply) => {
     try {
-      const userId = getUserId(request);
+      const sessionId = getSessionId(request);
+      let userId: string;
+      try {
+        userId = await getOrCreateSessionUser(sessionId);
+      } catch (dbError) {
+        app.log.warn({ error: dbError }, 'Database not available');
+        return reply.status(503).send({
+          success: false,
+          error: 'Database not available',
+        });
+      }
+
       const { id } = request.params as { id: string };
       const body = updatePlanSchema.parse(request.body);
 
@@ -248,12 +279,6 @@ export async function planRoutes(app: FastifyInstance) {
           details: error.errors,
         });
       }
-      if (error instanceof Error && error.message === 'User not authenticated') {
-        return reply.status(401).send({
-          success: false,
-          error: 'Authentication required',
-        });
-      }
       console.error('Update plan error:', error);
       return reply.status(500).send({
         success: false,
@@ -268,7 +293,18 @@ export async function planRoutes(app: FastifyInstance) {
    */
   app.delete('/plans/:id', async (request, reply) => {
     try {
-      const userId = getUserId(request);
+      const sessionId = getSessionId(request);
+      let userId: string;
+      try {
+        userId = await getOrCreateSessionUser(sessionId);
+      } catch (dbError) {
+        app.log.warn({ error: dbError }, 'Database not available');
+        return reply.status(503).send({
+          success: false,
+          error: 'Database not available',
+        });
+      }
+
       const { id } = request.params as { id: string };
 
       // Verify ownership
@@ -293,12 +329,6 @@ export async function planRoutes(app: FastifyInstance) {
         message: 'Plan deleted',
       });
     } catch (error) {
-      if (error instanceof Error && error.message === 'User not authenticated') {
-        return reply.status(401).send({
-          success: false,
-          error: 'Authentication required',
-        });
-      }
       console.error('Delete plan error:', error);
       return reply.status(500).send({
         success: false,
@@ -313,7 +343,18 @@ export async function planRoutes(app: FastifyInstance) {
    */
   app.post('/plans/:id/predict', async (request, reply) => {
     try {
-      const userId = getUserId(request);
+      const sessionId = getSessionId(request);
+      let userId: string;
+      try {
+        userId = await getOrCreateSessionUser(sessionId);
+      } catch (dbError) {
+        app.log.warn({ error: dbError }, 'Database not available');
+        return reply.status(503).send({
+          success: false,
+          error: 'Database not available',
+        });
+      }
+
       const { id } = request.params as { id: string };
 
       // Verify ownership
@@ -362,12 +403,6 @@ export async function planRoutes(app: FastifyInstance) {
         data: updatedPlan,
       });
     } catch (error) {
-      if (error instanceof Error && error.message === 'User not authenticated') {
-        return reply.status(401).send({
-          success: false,
-          error: 'Authentication required',
-        });
-      }
       console.error('Generate predictions error:', error);
       return reply.status(500).send({
         success: false,
@@ -382,7 +417,18 @@ export async function planRoutes(app: FastifyInstance) {
    */
   app.post('/plans/:id/activate', async (request, reply) => {
     try {
-      const userId = getUserId(request);
+      const sessionId = getSessionId(request);
+      let userId: string;
+      try {
+        userId = await getOrCreateSessionUser(sessionId);
+      } catch (dbError) {
+        app.log.warn({ error: dbError }, 'Database not available');
+        return reply.status(503).send({
+          success: false,
+          error: 'Database not available',
+        });
+      }
+
       const { id } = request.params as { id: string };
 
       // Verify ownership
@@ -407,12 +453,6 @@ export async function planRoutes(app: FastifyInstance) {
         message: 'Plan activated',
       });
     } catch (error) {
-      if (error instanceof Error && error.message === 'User not authenticated') {
-        return reply.status(401).send({
-          success: false,
-          error: 'Authentication required',
-        });
-      }
       console.error('Activate plan error:', error);
       return reply.status(500).send({
         success: false,
