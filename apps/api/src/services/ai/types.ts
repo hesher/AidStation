@@ -7,30 +7,30 @@
 
 export interface AidStationInfo {
   name: string;
-  distanceKm: number;
-  elevationM?: number;
-  hasDropBag?: boolean;
-  hasCrew?: boolean;
-  hasPacer?: boolean;
-  cutoffTime?: string;
-  cutoffHoursFromStart?: number;
+  distanceKm: number | null;
+  elevationM?: number | null;
+  hasDropBag?: boolean | null;
+  hasCrew?: boolean | null;
+  hasPacer?: boolean | null;
+  cutoffTime?: string | null;
+  cutoffHoursFromStart?: number | null;
 }
 
 export interface RaceSearchResult {
   name: string;
-  date?: string;
-  location?: string;
-  country?: string;
-  distanceKm?: number;
-  elevationGainM?: number;
-  elevationLossM?: number;
-  startTime?: string;
-  overallCutoffHours?: number;
-  description?: string;
-  websiteUrl?: string;
+  date?: string | null;
+  location?: string | null;
+  country?: string | null;
+  distanceKm?: number | null;
+  elevationGainM?: number | null;
+  elevationLossM?: number | null;
+  startTime?: string | null;
+  overallCutoffHours?: number | null;
+  description?: string | null;
+  websiteUrl?: string | null;
   aidStations?: AidStationInfo[];
-  courseGpxUrl?: string;
-  courseCoordinates?: Array<{ lat: number; lon: number; elevation?: number }>;
+  courseGpxUrl?: string | null;
+  courseCoordinates?: Array<{ lat: number; lon: number; elevation?: number | null }>;
   metadata?: Record<string, unknown>;
 }
 

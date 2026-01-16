@@ -10,43 +10,58 @@ import { AIProvider, AISearchOptions, RaceSearchResult, AidStationInfo } from '.
 const RACE_SEARCH_SYSTEM_PROMPT = `You are an expert on ultra-marathon and endurance running races worldwide.
 When given a race name, you must provide detailed, accurate information about that race.
 
+CRITICAL: ONLY PROVIDE INFORMATION YOU ARE CERTAIN ABOUT. DO NOT MAKE UP OR FABRICATE DATA.
+
 You must respond with valid JSON only, no other text. Use this exact structure:
 {
   "name": "Official race name",
-  "date": "YYYY-MM-DD or 'Unknown' if uncertain",
+  "date": "YYYY-MM-DD or null if unknown",
   "location": "City/Region name",
   "country": "Country name",
-  "distanceKm": number (race distance in kilometers),
-  "elevationGainM": number (total elevation gain in meters),
-  "elevationLossM": number (total elevation loss in meters),
-  "startTime": "HH:MM" (24-hour format, typical start time),
-  "overallCutoffHours": number (overall time limit in hours),
+  "distanceKm": number (race distance in kilometers) or null,
+  "elevationGainM": number (total elevation gain in meters) or null,
+  "elevationLossM": number (total elevation loss in meters) or null,
+  "startTime": "HH:MM" (24-hour format) or null if unknown,
+  "overallCutoffHours": number (overall time limit in hours) or null,
   "description": "Brief description of the race",
-  "websiteUrl": "Official race website URL",
+  "websiteUrl": "Official race website URL" or null,
   "aidStations": [
     {
       "name": "Station name",
-      "distanceKm": number (distance from start),
-      "elevationM": number (elevation in meters),
-      "hasDropBag": boolean,
-      "hasCrew": boolean,
-      "hasPacer": boolean,
+      "distanceKm": number (distance from start) or null if unknown,
+      "elevationM": number (elevation in meters) or null if unknown,
+      "hasDropBag": boolean or null if unknown,
+      "hasCrew": boolean or null if unknown,
+      "hasPacer": boolean or null if unknown,
       "cutoffTime": "HH:MM" or null,
       "cutoffHoursFromStart": number or null
     }
   ],
   "courseCoordinates": [
-    {"lat": number, "lon": number, "elevation": number}
+    {"lat": number, "lon": number, "elevation": number or null}
   ]
 }
 
-Guidelines:
-- If you know the race well, provide complete information
-- For aid stations, include as many as you know with accurate distances
-- If you don't know specific information, use null for that field
-- For courseCoordinates, provide key waypoints along the course (start, aid stations, finish) if you know them
-- Be accurate - it's better to say null than to guess incorrectly
-- Include the start and finish as part of the course flow
+STRICT GUIDELINES - YOU MUST FOLLOW THESE:
+1. NEVER FABRICATE DATA: If you don't know specific information, use null. Do not guess or make up values.
+2. NEVER ASSUME EQUAL DISTANCES: Do not calculate aid station distances by dividing total distance evenly. If you don't know the actual distance to an aid station, set distanceKm to null.
+3. NEVER INVENT AID STATION NAMES: Only include aid stations you are certain exist. An empty array is acceptable.
+4. NEVER FABRICATE ELEVATION DATA: If you don't know the actual elevation gain/loss or aid station elevations, use null.
+5. NEVER GUESS COORDINATES: Only provide courseCoordinates if you know the actual GPS coordinates. An empty array is acceptable.
+6. ACCURACY OVER COMPLETENESS: It is far better to return null values than to provide inaccurate data.
+
+For aid stations:
+- Only include stations you are confident exist in the race
+- Only include distances you know from official race information
+- If you only know the station name but not its distance, include it with distanceKm: null
+- Do NOT estimate distances based on total race distance
+- Do NOT assume evenly spaced checkpoints
+
+For elevation data:
+- Only provide elevationGainM/elevationLossM if you know the actual figures
+- Do NOT estimate based on location or race type
+
+The user will use this data for race planning - inaccurate data could be dangerous. When in doubt, use null.
 `;
 
 export class OpenAIProvider implements AIProvider {
@@ -111,11 +126,23 @@ ${options?.includeCourseData !== false ? 'Include approximate course coordinates
       result.name = originalQuery;
     }
 
-    // Clean up aid stations
+    // Clean up aid stations - only require a valid name, allow null for distanceKm
     if (result.aidStations) {
       result.aidStations = result.aidStations
-        .filter((s): s is AidStationInfo => s && typeof s.name === 'string' && typeof s.distanceKm === 'number')
-        .sort((a, b) => a.distanceKm - b.distanceKm);
+        .filter((s): s is AidStationInfo => s && typeof s.name === 'string' && s.name.length > 0)
+        .map(s => ({
+          ...s,
+          // Ensure distanceKm is either a valid number or null
+          distanceKm: typeof s.distanceKm === 'number' && !isNaN(s.distanceKm) ? s.distanceKm : null,
+          elevationM: typeof s.elevationM === 'number' && !isNaN(s.elevationM) ? s.elevationM : null,
+        }))
+        // Sort by distance, putting stations with null distances at the end
+        .sort((a, b) => {
+          if (a.distanceKm === null && b.distanceKm === null) return 0;
+          if (a.distanceKm === null) return 1;
+          if (b.distanceKm === null) return -1;
+          return a.distanceKm - b.distanceKm;
+        });
     }
 
     // Clean up coordinates
@@ -125,11 +152,23 @@ ${options?.includeCourseData !== false ? 'Include approximate course coordinates
       );
     }
 
-    // Ensure numeric values are actually numbers
-    if (result.distanceKm) result.distanceKm = Number(result.distanceKm);
-    if (result.elevationGainM) result.elevationGainM = Number(result.elevationGainM);
-    if (result.elevationLossM) result.elevationLossM = Number(result.elevationLossM);
-    if (result.overallCutoffHours) result.overallCutoffHours = Number(result.overallCutoffHours);
+    // Ensure numeric values are actually numbers or null
+    if (result.distanceKm !== null && result.distanceKm !== undefined) {
+      result.distanceKm = Number(result.distanceKm);
+      if (isNaN(result.distanceKm)) result.distanceKm = null;
+    }
+    if (result.elevationGainM !== null && result.elevationGainM !== undefined) {
+      result.elevationGainM = Number(result.elevationGainM);
+      if (isNaN(result.elevationGainM)) result.elevationGainM = null;
+    }
+    if (result.elevationLossM !== null && result.elevationLossM !== undefined) {
+      result.elevationLossM = Number(result.elevationLossM);
+      if (isNaN(result.elevationLossM)) result.elevationLossM = null;
+    }
+    if (result.overallCutoffHours !== null && result.overallCutoffHours !== undefined) {
+      result.overallCutoffHours = Number(result.overallCutoffHours);
+      if (isNaN(result.overallCutoffHours)) result.overallCutoffHours = null;
+    }
 
     return result;
   }

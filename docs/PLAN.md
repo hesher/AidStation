@@ -58,7 +58,15 @@ The repository must be configured with Git hooks that enforce:
 ### Workflow Summary
 
 ```
-!! When the prompt didn't specify a story, sub-story or a specific request, start with the "Urgent Fixes" from Phase 8
+!! When the prompt didn't specify a story, sub-story or a specific request, prioritise work in this order:
+1. "Urgent Fixes" from Phase 8
+2. "Fast Follows" from Phase 8
+3. Incomplete steps in partially completed stories
+4. Lint and type errors and warnings
+5. new stories
+6. "Future Work" from Phase 8
+
+
 
 For each Sub-Story:
   1. Implement the feature/fix
@@ -277,6 +285,7 @@ This is a non-negotiable requirement to ensure:
   - Drop bags, Crew options, Pacer options
   - Cutoff times (per aid station and overall)
   - Course GPX/route
+- [] Allow user to edit the Race information (including Aid Stations)
 
 **Sub-Story Test:** ✅ AI returns structured race data for known races (15 tests passing)
 
@@ -508,9 +517,12 @@ This is a non-negotiable requirement to ensure:
 ### Urgent Fixes
 - [x] The load race dialog is showing "⚠️ Database not available" - Fixed by installing PostgreSQL locally and updating migration to make PostGIS optional
 - [x] Getting frequent CORS in the console - Fixed by properly configuring @fastify/cors with explicit methods, allowedHeaders, and exposedHeaders
+- There is no way to save the race information and it's not saved automatically
 
-### Improvements
-- [ ] Improve Race Search AI prompt to avoid making up data (as sometimes seen in made up checkpoints, made up distances and climbs)
+### Fast Follows
+- [x] Improve Race Search AI prompt to avoid making up data (as sometimes seen in made up checkpoints, made up distances and climbs). For example, it assumes an even split of distance between aid stations instead of finding real information on the website. If it fails to find, keep it empty - Fixed by strengthening the AI prompt with strict guidelines against fabricating data, and updating types to allow null values for unknown distances
+
+### Future Work
 
 ---
 

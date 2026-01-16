@@ -112,7 +112,7 @@ interface RaceSearchResponse {
   data?: RaceSearchResult & {
     id?: string;
     aidStations?: (AidStationInfo & {
-      distanceFromPrevKm?: number;
+      distanceFromPrevKm?: number | null;
       elevationGainFromPrevM?: number;
       elevationLossFromPrevM?: number;
     })[];
@@ -143,7 +143,7 @@ interface RaceResponse {
  * Calculate derived metrics for aid stations (distance and elevation from previous station)
  */
 function enrichAidStations(aidStations: AidStationInfo[]): (AidStationInfo & {
-  distanceFromPrevKm?: number;
+  distanceFromPrevKm?: number | null;
   elevationGainFromPrevM?: number;
   elevationLossFromPrevM?: number;
 })[] {
@@ -156,18 +156,23 @@ function enrichAidStations(aidStations: AidStationInfo[]): (AidStationInfo & {
       return {
         ...station,
         distanceFromPrevKm: station.distanceKm,
-        elevationGainFromPrevM: station.elevationM ? station.elevationM : undefined,
+        elevationGainFromPrevM: station.elevationM != null ? station.elevationM : undefined,
         elevationLossFromPrevM: undefined,
       };
     }
 
     const prevStation = aidStations[index - 1];
-    const distanceFromPrev = station.distanceKm - prevStation.distanceKm;
+
+    // Calculate distance from previous (only if both values are known)
+    let distanceFromPrev: number | null = null;
+    if (station.distanceKm != null && prevStation.distanceKm != null) {
+      distanceFromPrev = Math.round((station.distanceKm - prevStation.distanceKm) * 100) / 100;
+    }
 
     let elevationGainFromPrev: number | undefined;
     let elevationLossFromPrev: number | undefined;
 
-    if (station.elevationM !== undefined && prevStation.elevationM !== undefined) {
+    if (station.elevationM != null && prevStation.elevationM != null) {
       const elevDiff = station.elevationM - prevStation.elevationM;
       if (elevDiff > 0) {
         elevationGainFromPrev = elevDiff;
@@ -180,7 +185,7 @@ function enrichAidStations(aidStations: AidStationInfo[]): (AidStationInfo & {
 
     return {
       ...station,
-      distanceFromPrevKm: Math.round(distanceFromPrev * 100) / 100,
+      distanceFromPrevKm: distanceFromPrev,
       elevationGainFromPrevM: elevationGainFromPrev,
       elevationLossFromPrevM: elevationLossFromPrev,
     };
