@@ -16,6 +16,8 @@ import {
   getOrCreateSessionUser,
   upsertSession,
   getLastRaceId,
+  searchRaces,
+  getUniqueCountries,
   type AidStationData,
   type SessionData,
 } from '../db/repositories';
@@ -39,6 +41,7 @@ const saveRaceSchema = z.object({
   overallCutoffHours: z.number().optional(),
   description: z.string().optional(),
   websiteUrl: z.string().optional(),
+  isPublic: z.boolean().optional().default(false),
   aidStations: z.array(z.object({
     name: z.string(),
     distanceKm: z.number(),
@@ -57,6 +60,29 @@ const saveRaceSchema = z.object({
     lon: z.number(),
     elevation: z.number().optional(),
   })).optional(),
+});
+
+const updateRaceSchema = z.object({
+  name: z.string().min(1).optional(),
+  date: z.string().optional(),
+  location: z.string().optional(),
+  country: z.string().optional(),
+  distanceKm: z.number().optional(),
+  elevationGainM: z.number().optional(),
+  elevationLossM: z.number().optional(),
+  startTime: z.string().optional(),
+  overallCutoffHours: z.number().optional(),
+  description: z.string().optional(),
+  websiteUrl: z.string().optional(),
+  isPublic: z.boolean().optional(),
+});
+
+const listRacesSchema = z.object({
+  search: z.string().optional(),
+  country: z.string().optional(),
+  includePublic: z.boolean().optional().default(true),
+  limit: z.number().min(1).max(100).optional().default(20),
+  offset: z.number().min(0).optional().default(0),
 });
 
 type SearchRaceBody = z.infer<typeof searchRaceSchema>;
@@ -541,6 +567,261 @@ export async function raceRoutes(app: FastifyInstance) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
 
       app.log.error({ error: errorMessage }, 'Failed to delete race');
+
+      reply.status(500);
+
+      return {
+        success: false,
+        error: errorMessage,
+      };
+    }
+  });
+
+  /**
+   * PUT /api/races/:id
+   *
+   * Update an existing race
+   */
+  app.put('/races/:id', async (
+    request: FastifyRequest<{ Params: { id: string }; Body: z.infer<typeof updateRaceSchema> }>,
+    reply: FastifyReply
+  ): Promise<RaceResponse> => {
+    try {
+      const { id } = request.params;
+
+      // Validate UUID format
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (!uuidRegex.test(id)) {
+        reply.status(400);
+        return {
+          success: false,
+          error: 'Invalid race ID format',
+        };
+      }
+
+      const validatedBody = updateRaceSchema.parse(request.body);
+
+      // Check if race exists
+      let existingRace;
+      try {
+        existingRace = await getRaceById(id);
+      } catch (dbError) {
+        app.log.warn({ error: dbError }, 'Database not available');
+        reply.status(503);
+        return {
+          success: false,
+          error: 'Database not available',
+        };
+      }
+
+      if (!existingRace) {
+        reply.status(404);
+        return {
+          success: false,
+          error: 'Race not found',
+        };
+      }
+
+      // Update the race
+      const updatedRace = await updateRace(id, {
+        name: validatedBody.name,
+        date: validatedBody.date,
+        location: validatedBody.location,
+        country: validatedBody.country,
+        distanceKm: validatedBody.distanceKm,
+        elevationGainM: validatedBody.elevationGainM,
+        elevationLossM: validatedBody.elevationLossM,
+        startTime: validatedBody.startTime,
+        overallCutoffHours: validatedBody.overallCutoffHours,
+        isPublic: validatedBody.isPublic,
+        metadata: {
+          description: validatedBody.description,
+          websiteUrl: validatedBody.websiteUrl,
+        },
+      });
+
+      if (!updatedRace) {
+        reply.status(500);
+        return {
+          success: false,
+          error: 'Failed to update race',
+        };
+      }
+
+      // Get full race with aid stations
+      const race = await getRaceById(id);
+
+      if (!race) {
+        reply.status(500);
+        return {
+          success: false,
+          error: 'Failed to retrieve updated race',
+        };
+      }
+
+      const metadata = race.metadata as Record<string, unknown> | null;
+      const courseCoordinates = metadata?.courseCoordinates as Array<{ lat: number; lon: number; elevation?: number }> | undefined;
+
+      return {
+        success: true,
+        data: {
+          id: race.id,
+          name: race.name,
+          date: race.date?.toISOString(),
+          location: race.location,
+          country: race.country,
+          distanceKm: race.distanceKm,
+          elevationGainM: race.elevationGainM,
+          elevationLossM: race.elevationLossM,
+          startTime: race.startTime,
+          overallCutoffHours: race.overallCutoffHours,
+          aidStations: race.aidStations.map((as) => ({
+            name: as.name,
+            distanceKm: as.distanceKm,
+            distanceFromPrevKm: as.distanceFromPrevKm ?? undefined,
+            elevationM: as.elevationM ?? undefined,
+            elevationGainFromPrevM: as.elevationGainFromPrevM ?? undefined,
+            elevationLossFromPrevM: as.elevationLossFromPrevM ?? undefined,
+            hasDropBag: as.hasDropBag ?? undefined,
+            hasCrew: as.hasCrew ?? undefined,
+            hasPacer: as.hasPacer ?? undefined,
+            cutoffTime: as.cutoffTime ?? undefined,
+            cutoffHoursFromStart: as.cutoffHoursFromStart ?? undefined,
+          })),
+          courseCoordinates,
+        },
+      };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+
+      app.log.error({ error: errorMessage }, 'Failed to update race');
+
+      reply.status(error instanceof z.ZodError ? 400 : 500);
+
+      return {
+        success: false,
+        error: error instanceof z.ZodError
+          ? error.errors.map(e => e.message).join(', ')
+          : errorMessage,
+      };
+    }
+  });
+
+  /**
+   * GET /api/races
+   *
+   * List races with search and filtering
+   */
+  app.get('/races', async (
+    request: FastifyRequest<{ Querystring: { search?: string; country?: string; limit?: string; offset?: string } }>,
+    reply: FastifyReply
+  ): Promise<{ success: boolean; data?: { races: unknown[]; total: number }; error?: string }> => {
+    try {
+      const query = request.query;
+      const sessionId = getSessionId(request);
+
+      // Get user for session
+      let userId: string | undefined;
+      try {
+        userId = await getOrCreateSessionUser(sessionId);
+      } catch (dbError) {
+        // Database not available - no user filtering
+        app.log.warn({ error: dbError }, 'Database not available for user lookup');
+      }
+
+      // Parse query params
+      const search = query.search?.trim();
+      const country = query.country?.trim();
+      const limit = query.limit ? parseInt(query.limit, 10) : 20;
+      const offset = query.offset ? parseInt(query.offset, 10) : 0;
+
+      let result;
+      try {
+        result = await searchRaces({
+          userId,
+          search,
+          country,
+          includePublic: true,
+          limit: Math.min(limit, 100),
+          offset: Math.max(offset, 0),
+        });
+      } catch (dbError) {
+        app.log.warn({ error: dbError }, 'Database not available');
+        reply.status(503);
+        return {
+          success: false,
+          error: 'Database not available',
+        };
+      }
+
+      // Set session cookie
+      reply.setCookie(SESSION_COOKIE, sessionId, {
+        path: '/',
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 60 * 60 * 24 * 365,
+      });
+
+      return {
+        success: true,
+        data: {
+          races: result.races.map((race) => ({
+            id: race.id,
+            name: race.name,
+            date: race.date?.toISOString(),
+            location: race.location,
+            country: race.country,
+            distanceKm: race.distanceKm,
+            isPublic: race.isPublic,
+          })),
+          total: result.total,
+        },
+      };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+
+      app.log.error({ error: errorMessage }, 'Failed to list races');
+
+      reply.status(500);
+
+      return {
+        success: false,
+        error: errorMessage,
+      };
+    }
+  });
+
+  /**
+   * GET /api/races/countries
+   *
+   * Get list of unique countries for filtering
+   */
+  app.get('/races/countries', async (
+    _request: FastifyRequest,
+    reply: FastifyReply
+  ): Promise<{ success: boolean; data?: string[]; error?: string }> => {
+    try {
+      let countries: string[];
+      try {
+        countries = await getUniqueCountries();
+      } catch (dbError) {
+        app.log.warn({ error: dbError }, 'Database not available');
+        reply.status(503);
+        return {
+          success: false,
+          error: 'Database not available',
+        };
+      }
+
+      return {
+        success: true,
+        data: countries,
+      };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+
+      app.log.error({ error: errorMessage }, 'Failed to get countries');
 
       reply.status(500);
 

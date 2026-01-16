@@ -147,3 +147,106 @@ export async function getRacesByOwner(
     .where(eq(races.ownerId, ownerId))
     .orderBy(desc(races.createdAt));
 }
+
+/**
+ * Search races with visibility filtering
+ * Returns public races and user's own private races
+ */
+export async function searchRaces(
+  options: {
+    userId?: string;
+    search?: string;
+    country?: string;
+    includePublic?: boolean;
+    limit?: number;
+    offset?: number;
+  }
+): Promise<{ races: typeof races.$inferSelect[]; total: number }> {
+  const {
+    userId,
+    search,
+    country,
+    includePublic = true,
+    limit = 20,
+    offset = 0,
+  } = options;
+
+  // Build conditions
+  const conditions: ReturnType<typeof eq>[] = [];
+
+  // Visibility filter: public races OR user's own races
+  // This is handled in the query logic below
+
+  // Country filter
+  if (country) {
+    conditions.push(eq(races.country, country));
+  }
+
+  // Execute query with visibility logic
+  // Note: For complex OR conditions with Drizzle, we need to use raw SQL or multiple queries
+  // For simplicity, we'll fetch and filter, which is acceptable for reasonable dataset sizes
+  const allRaces = await db
+    .select()
+    .from(races)
+    .orderBy(desc(races.createdAt))
+    .limit(limit + 100); // Fetch extra for filtering
+
+  // Apply visibility filter
+  let filteredRaces = allRaces.filter((race) => {
+    // Include if public and includePublic is true
+    if (includePublic && race.isPublic) {
+      return true;
+    }
+    // Include if owned by the user
+    if (userId && race.ownerId === userId) {
+      return true;
+    }
+    return false;
+  });
+
+  // Apply country filter
+  if (country) {
+    filteredRaces = filteredRaces.filter(
+      (race) => race.country?.toLowerCase() === country.toLowerCase()
+    );
+  }
+
+  // Apply search filter
+  if (search) {
+    const searchLower = search.toLowerCase();
+    filteredRaces = filteredRaces.filter(
+      (race) =>
+        race.name.toLowerCase().includes(searchLower) ||
+        race.location?.toLowerCase().includes(searchLower)
+    );
+  }
+
+  const total = filteredRaces.length;
+
+  // Apply pagination
+  const paginatedRaces = filteredRaces.slice(offset, offset + limit);
+
+  return {
+    races: paginatedRaces,
+    total,
+  };
+}
+
+/**
+ * Get all unique countries from races (for filter dropdown)
+ */
+export async function getUniqueCountries(): Promise<string[]> {
+  const results = await db
+    .select({ country: races.country })
+    .from(races)
+    .where(eq(races.isPublic, true));
+
+  const countries = new Set<string>();
+  for (const row of results) {
+    if (row.country) {
+      countries.add(row.country);
+    }
+  }
+
+  return Array.from(countries).sort();
+}

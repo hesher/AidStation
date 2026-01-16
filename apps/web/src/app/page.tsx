@@ -5,6 +5,7 @@ import styles from './page.module.css';
 import { RaceCard } from '@/components/RaceCard';
 import { AidStationTable } from '@/components/AidStationTable';
 import { CourseMap } from '@/components/CourseMap';
+import { RaceBrowser } from '@/components/RaceBrowser';
 import { searchRace, getCurrentRace, saveRace } from '@/lib/api';
 import { RaceData, AidStation } from '@/lib/types';
 
@@ -16,6 +17,8 @@ export default function Home() {
   const [raceData, setRaceData] = useState<RaceData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selectedStation, setSelectedStation] = useState<number | null>(null);
+  const [isRaceBrowserOpen, setIsRaceBrowserOpen] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
   // Initialize app - check for previous race on load
   useEffect(() => {
@@ -79,6 +82,13 @@ export default function Home() {
     setSelectedStation(index);
   }, []);
 
+  // Handle loading a race from the browser
+  const handleLoadRace = useCallback((race: RaceData) => {
+    setRaceData(race);
+    setAppState('success');
+    setHasUnsavedChanges(false);
+  }, []);
+
   // Render the search/onboarding form
   const renderSearchForm = () => (
     <div className={styles.onboarding}>
@@ -106,6 +116,18 @@ export default function Home() {
           {appState === 'searching' ? 'Searching...' : 'Find Race'}
         </button>
       </form>
+
+      <div className={styles.orDivider}>
+        <span>or</span>
+      </div>
+
+      <button
+        onClick={() => setIsRaceBrowserOpen(true)}
+        className={styles.loadRaceButton}
+        data-testid="load-race-button"
+      >
+        📁 Load Saved Race
+      </button>
     </div>
   );
 
@@ -220,6 +242,14 @@ export default function Home() {
       <footer className={styles.footer}>
         <p>AidStation v0.1.0 — Built for endurance athletes</p>
       </footer>
+
+      {/* Race Browser Modal */}
+      <RaceBrowser
+        isOpen={isRaceBrowserOpen}
+        onClose={() => setIsRaceBrowserOpen(false)}
+        onSelectRace={handleLoadRace}
+        hasUnsavedChanges={hasUnsavedChanges}
+      />
     </main>
   );
 }

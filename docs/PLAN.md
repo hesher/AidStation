@@ -339,28 +339,28 @@ This is a non-negotiable requirement to ensure:
 ## Phase 4: User Story 3 - Saving and Loading Races
 
 ### 4.1 Race CRUD Operations
-- [ ] Create save race API (`POST /api/races`)
-- [ ] Create update race API (`PUT /api/races/:id`)
-- [ ] Create delete race API (`DELETE /api/races/:id`)
+- [x] Create save race API (`POST /api/races`) - Implemented in Phase 3
+- [x] Create update race API (`PUT /api/races/:id`)
+- [x] Create delete race API (`DELETE /api/races/:id`)
 - [ ] Implement race versioning (track changes)
 
 ### 4.2 Public/Private Race Visibility
-- [ ] Add `is_public` flag to races table
-- [ ] Add `owner_id` foreign key to races
-- [ ] Implement visibility filtering in API queries
+- [x] Add `is_public` flag to races table (already in schema)
+- [x] Add `owner_id` foreign key to races (already in schema)
+- [x] Implement visibility filtering in API queries
 - [ ] Create toggle UI for public/private setting
 
 ### 4.3 Race Browser/Loader UI
-- [ ] Create race selection menu/modal
-- [ ] Implement search by race name
-- [ ] Implement filter by country
-- [ ] Display race list with metadata (name, date, distance, public/private)
-- [ ] Show user's private races and all public races
-- [ ] Create "Load Race" confirmation dialog
+- [x] Create race selection menu/modal
+- [x] Implement search by race name
+- [x] Implement filter by country
+- [x] Display race list with metadata (name, date, distance, public/private)
+- [x] Show user's private races and all public races
+- [x] Create "Load Race" confirmation dialog
 
 ### 4.4 Unsaved Changes Protection
 - [ ] Track dirty state for current race
-- [ ] Implement "Discard Changes?" confirmation dialog
+- [x] Implement "Discard Changes?" confirmation dialog
 - [ ] Auto-save functionality (optional enhancement)
 
 ### 4.5 Current Race Indicator

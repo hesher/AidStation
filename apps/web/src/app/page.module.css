@@ -115,6 +115,46 @@
   transform: none;
 }
 
+/* Or Divider */
+.orDivider {
+  display: flex;
+  align-items: center;
+  margin: 24px 0;
+  color: #666;
+  font-size: 0.9rem;
+}
+
+.orDivider::before,
+.orDivider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: #30475e;
+}
+
+.orDivider span {
+  padding: 0 16px;
+}
+
+/* Load Race Button */
+.loadRaceButton {
+  width: 100%;
+  padding: 14px 24px;
+  font-size: 1rem;
+  font-weight: 500;
+  color: #64b5f6;
+  background: transparent;
+  border: 2px solid #30475e;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.loadRaceButton:hover {
+  background: rgba(100, 181, 246, 0.1);
+  border-color: #64b5f6;
+}
+
 /* Loading State */
 .loading {
   flex: 1;
