@@ -1,0 +1,57 @@
+version: '3.8'
+
+services:
+  # PostgreSQL with PostGIS and TimescaleDB
+  postgres:
+    image: timescale/timescaledb-ha:pg16
+    container_name: aidstation-postgres
+    environment:
+      POSTGRES_USER: aidstation
+      POSTGRES_PASSWORD: aidstation_dev
+      POSTGRES_DB: aidstation
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/init-postgis.sql:/docker-entrypoint-initdb.d/init-postgis.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aidstation"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis for BullMQ job queue
+  redis:
+    image: redis:7-alpine
+    container_name: aidstation-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Python worker for GPX/FIT analysis
+  python-worker:
+    build:
+      context: ./workers/python
+      dockerfile: Dockerfile
+    container_name: aidstation-python-worker
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - DATABASE_URL=postgresql://aidstation:aidstation_dev@postgres:5432/aidstation
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./workers/python:/app
+    command: celery -A src.tasks worker --loglevel=info
+
+volumes:
+  postgres_data:
+  redis_data:

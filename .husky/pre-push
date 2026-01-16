@@ -1,0 +1,25 @@
+# Get the commit message
+commit_msg=$(git log -1 --pretty=%B)
+
+# Check if commit references a sub-story (e.g., US1.2, P1.1)
+if echo "$commit_msg" | grep -qE "(US|P)[0-9]+\.[0-9]+"; then
+  echo "✅ Commit references a sub-story, running relevant tests..."
+
+  # Extract the story reference
+  story_ref=$(echo "$commit_msg" | grep -oE "(US|P)[0-9]+\.[0-9]+" | head -1)
+
+  # Run e2e tests that match the story
+  npm run test:e2e -- --grep "$story_ref" || {
+    echo "❌ Tests for $story_ref failed. Push aborted."
+    exit 1
+  }
+else
+  echo "⚠️  Commit does not reference a sub-story (e.g., US1.2)"
+  echo "   Running all e2e tests as a safety check..."
+  npm run test:e2e || {
+    echo "❌ E2E tests failed. Push aborted."
+    exit 1
+  }
+fi
+
+echo "✅ All tests passed. Proceeding with push."
