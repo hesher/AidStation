@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import styles from './performances.module.css';
-import { ElevationProfile } from '../../components/ElevationProfile';
 import {
   getActivities,
   uploadActivity,
