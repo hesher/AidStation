@@ -522,8 +522,9 @@ This is a non-negotiable requirement to ensure:
 - [x] The load race dialog is showing "⚠️ Database not available" - Fixed by installing PostgreSQL locally and updating migration to make PostGIS optional
 - [x] Getting frequent CORS in the console - Fixed by properly configuring @fastify/cors with explicit methods, allowedHeaders, and exposedHeaders
 - [x] There is no way to save the race information and it's not saved automatically - Fixed by improving auto-save to update state on success/failure, showing Save button when race has no ID, and adding visual indicators for unsaved state
-- Can't add aid station information manually to race
-- Can't save race information with missing values - Should validate all required fields are not empty before allowing to save ( installHook.js:1 Failed to save race: Expected string, received null, Expected number, received null, Expected number, received null, Expected string, received null, Expected number, received null, Expected string, received null )
+- Can't load the page. It's stuck with this error message: (index):1  GET http://localhost:3000/_next/static/chunks/app-pages-internals.js net::ERR_ABORTED 404 (Not Found) and the page is showing infinite "Loading AidStation:Checking for previous race data."
+- [x] Can't add aid station information manually to race - Fixed by adding inline editing capabilities to AidStationTable component with add/edit/delete functionality
+- [x] Can't save race information with missing values - Fixed by updating Zod schemas and TypeScript interfaces to allow nullable values for aid station fields (distanceKm, elevationM, etc.)
 
 ### Fast Follows
 - [x] Improve Race Search AI prompt to avoid making up data (as sometimes seen in made up checkpoints, made up distances and climbs). For example, it assumes an even split of distance between aid stations instead of finding real information on the website. If it fails to find, keep it empty - Fixed by strengthening the AI prompt with strict guidelines against fabricating data, and updating types to allow null values for unknown distances

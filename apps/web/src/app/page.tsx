@@ -164,6 +164,14 @@ export default function Home() {
     }
   }, [raceData]);
 
+  // Handle aid stations change (from editing)
+  const handleAidStationsChange = useCallback((aidStations: AidStation[]) => {
+    if (raceData) {
+      setRaceData({ ...raceData, aidStations });
+      setHasUnsavedChanges(true);
+    }
+  }, [raceData]);
+
   // Handle save race
   const handleSaveRace = useCallback(async () => {
     if (!raceData) return;
@@ -347,6 +355,19 @@ export default function Home() {
               <AidStationTable
                 aidStations={raceData.aidStations}
                 onStationClick={handleAidStationClick}
+                onAidStationsChange={handleAidStationsChange}
+                editable
+              />
+            </section>
+          )}
+
+          {/* No Aid Stations - Add Button */}
+          {(!raceData.aidStations || raceData.aidStations.length === 0) && (
+            <section className={styles.section}>
+              <AidStationTable
+                aidStations={[]}
+                onAidStationsChange={handleAidStationsChange}
+                editable
               />
             </section>
           )}

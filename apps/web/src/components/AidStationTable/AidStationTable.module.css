@@ -152,6 +152,148 @@
   color: #888;
 }
 
+/* Title row with edit button */
+.titleRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.addButton {
+  background: #4caf50;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: background-color 0.2s ease;
+}
+
+.addButton:hover {
+  background: #43a047;
+}
+
+.editHint {
+  font-size: 0.75rem;
+  color: #888;
+  margin: -8px 0 16px 0;
+  font-style: italic;
+}
+
+/* Editable row styles */
+.editableRow {
+  cursor: pointer;
+}
+
+.editableRow:hover {
+  background: rgba(76, 175, 80, 0.1);
+}
+
+/* Editing row */
+.editingRow {
+  background: rgba(33, 150, 243, 0.1);
+}
+
+.editingRow:hover {
+  background: rgba(33, 150, 243, 0.15);
+}
+
+/* Edit inputs */
+.editInput {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid #4caf50;
+  color: white;
+  padding: 6px 10px;
+  border-radius: 4px;
+  font-size: 0.875rem;
+  width: 150px;
+}
+
+.editInput:focus {
+  outline: none;
+  border-color: #81c784;
+  box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.2);
+}
+
+.editInputNumber {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid #4caf50;
+  color: white;
+  padding: 6px 8px;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  width: 70px;
+  text-align: right;
+  font-family: 'Monaco', 'Menlo', monospace;
+}
+
+.editInputNumber:focus {
+  outline: none;
+  border-color: #81c784;
+  box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.2);
+}
+
+/* Action buttons column */
+.thActions {
+  min-width: 80px;
+  text-align: center !important;
+}
+
+.tdActions {
+  text-align: center;
+  white-space: nowrap;
+}
+
+.saveButton,
+.cancelButton,
+.deleteButton {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 6px 8px;
+  border-radius: 4px;
+  font-size: 1rem;
+  transition: background-color 0.2s ease;
+}
+
+.saveButton {
+  color: #4caf50;
+}
+
+.saveButton:hover {
+  background: rgba(76, 175, 80, 0.2);
+}
+
+.cancelButton {
+  color: #f44336;
+}
+
+.cancelButton:hover {
+  background: rgba(244, 67, 54, 0.2);
+}
+
+.deleteButton {
+  color: #ff9800;
+}
+
+.deleteButton:hover {
+  background: rgba(255, 152, 0, 0.2);
+}
+
+/* Clickable badge in edit mode */
+.badgeClickable {
+  cursor: pointer;
+  transition: transform 0.1s ease, box-shadow 0.1s ease;
+}
+
+.badgeClickable:hover {
+  transform: scale(1.05);
+  box-shadow: 0 0 8px rgba(76, 175, 80, 0.3);
+}
+
 /* Responsive adjustments */
 @media (max-width: 768px) {
   .container {

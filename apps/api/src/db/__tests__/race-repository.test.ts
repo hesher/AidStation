@@ -210,7 +210,9 @@ describe('Race Repository Business Logic', () => {
 
       // Verify stations are in order
       for (let i = 1; i < stations.length; i++) {
-        expect(stations[i].distanceKm).toBeGreaterThan(stations[i - 1].distanceKm);
+        const currentDist = stations[i].distanceKm ?? 0;
+        const prevDist = stations[i - 1].distanceKm ?? 0;
+        expect(currentDist).toBeGreaterThan(prevDist);
       }
     });
 
@@ -223,12 +225,14 @@ describe('Race Repository Business Logic', () => {
 
       // Calculate distances from previous
       const enrichedStations = stations.map((station, index) => {
+        const dist = station.distanceKm ?? 0;
         if (index === 0) {
-          return { ...station, distanceFromPrevKm: station.distanceKm };
+          return { ...station, distanceFromPrevKm: dist };
         }
+        const prevDist = stations[index - 1].distanceKm ?? 0;
         return {
           ...station,
-          distanceFromPrevKm: station.distanceKm - stations[index - 1].distanceKm,
+          distanceFromPrevKm: dist - prevDist,
         };
       });
 

@@ -437,7 +437,7 @@ function generatePredictions(
     aidStations: Array<{
       id: string;
       name: string;
-      distanceKm: number;
+      distanceKm: number | null;
       distanceFromPrevKm: number | null;
       elevationGainFromPrevM: number | null;
       elevationLossFromPrevM: number | null;
@@ -491,7 +491,8 @@ function generatePredictions(
 
   for (let i = 0; i < raceData.aidStations.length; i++) {
     const station = raceData.aidStations[i];
-    const segmentDistance = station.distanceFromPrevKm ?? (station.distanceKm - prevDistanceKm);
+    const stationDistanceKm = station.distanceKm ?? 0;
+    const segmentDistance = station.distanceFromPrevKm ?? (stationDistanceKm - prevDistanceKm);
 
     // Calculate terrain factor based on elevation
     const elevGain = station.elevationGainFromPrevM ?? 0;
@@ -519,7 +520,7 @@ function generatePredictions(
     }
 
     // Calculate fatigue factor based on distance covered
-    const distanceRatio = station.distanceKm / (raceData.race.distanceKm ?? 100);
+    const distanceRatio = stationDistanceKm / (raceData.race.distanceKm ?? 100);
     const fatigueFactor = 1.0 + (perf.fatigueFactor - 1.0) * distanceRatio;
 
     // Calculate nighttime factor
@@ -559,7 +560,7 @@ function generatePredictions(
     predictions.push({
       aidStationId: station.id,
       aidStationName: station.name,
-      distanceKm: station.distanceKm,
+      distanceKm: stationDistanceKm,
       predictedArrivalMinutes: Math.round(cumulativeMinutes),
       predictedArrivalTime,
       cutoffHoursFromStart: station.cutoffHoursFromStart ?? undefined,
@@ -575,7 +576,7 @@ function generatePredictions(
       },
     });
 
-    prevDistanceKm = station.distanceKm;
+    prevDistanceKm = stationDistanceKm;
   }
 
   const predictedFinishTime = new Date(startTime.getTime() + cumulativeMinutes * 60 * 1000);

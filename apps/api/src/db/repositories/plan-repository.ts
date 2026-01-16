@@ -233,7 +233,7 @@ export async function getRaceForPrediction(raceId: string): Promise<{
   aidStations: Array<{
     id: string;
     name: string;
-    distanceKm: number;
+    distanceKm: number | null;
     distanceFromPrevKm: number | null;
     elevationM: number | null;
     elevationGainFromPrevM: number | null;

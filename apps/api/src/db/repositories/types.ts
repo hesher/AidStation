@@ -17,14 +17,14 @@ export type NewAidStation = typeof aidStations.$inferInsert;
  */
 export interface RaceData {
   name: string;
-  date?: string;
-  location?: string;
-  country?: string;
-  distanceKm?: number;
-  elevationGainM?: number;
-  elevationLossM?: number;
-  startTime?: string;
-  overallCutoffHours?: number;
+  date?: string | null;
+  location?: string | null;
+  country?: string | null;
+  distanceKm?: number | null;
+  elevationGainM?: number | null;
+  elevationLossM?: number | null;
+  startTime?: string | null;
+  overallCutoffHours?: number | null;
   courseGpx?: string;
   isPublic?: boolean;
   ownerId?: string;
@@ -37,18 +37,18 @@ export interface RaceData {
  */
 export interface AidStationData {
   name: string;
-  distanceKm: number;
-  distanceFromPrevKm?: number;
-  elevationM?: number;
-  elevationGainFromPrevM?: number;
-  elevationLossFromPrevM?: number;
-  hasDropBag?: boolean;
-  hasCrew?: boolean;
-  hasPacer?: boolean;
-  cutoffTime?: string;
-  cutoffHoursFromStart?: number;
-  latitude?: number;
-  longitude?: number;
+  distanceKm?: number | null;
+  distanceFromPrevKm?: number | null;
+  elevationM?: number | null;
+  elevationGainFromPrevM?: number | null;
+  elevationLossFromPrevM?: number | null;
+  hasDropBag?: boolean | null;
+  hasCrew?: boolean | null;
+  hasPacer?: boolean | null;
+  cutoffTime?: string | null;
+  cutoffHoursFromStart?: number | null;
+  latitude?: number | null;
+  longitude?: number | null;
 }
 
 /**

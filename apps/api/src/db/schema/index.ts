@@ -44,7 +44,7 @@ export const aidStations = pgTable('aid_stations', {
   id: uuid('id').primaryKey().defaultRandom(),
   raceId: uuid('race_id').references(() => races.id).notNull(),
   name: text('name').notNull(),
-  distanceKm: real('distance_km').notNull(),
+  distanceKm: real('distance_km'),
   distanceFromPrevKm: real('distance_from_prev_km'),
   elevationM: real('elevation_m'),
   elevationGainFromPrevM: real('elevation_gain_from_prev_m'),
