@@ -127,7 +127,7 @@ test.describe('User Story 1: Onboarding Experience', () => {
 
     // Verify race card is displayed
     await expect(page.getByTestId('race-card')).toBeVisible();
-    await expect(page.getByText('Western States Endurance Run')).toBeVisible();
+    await expect(page.getByTestId('race-card').getByText('Western States Endurance Run')).toBeVisible();
 
     // Verify race details are shown
     await expect(page.getByText('161.0 km')).toBeVisible();
@@ -204,11 +204,11 @@ test.describe('User Story 1: Onboarding Experience', () => {
     // Verify aid station table exists
     await expect(page.getByTestId('aid-station-table')).toBeVisible();
 
-    // Verify table headers
-    await expect(page.getByText('Station')).toBeVisible();
-    await expect(page.getByText('Distance')).toBeVisible();
-    await expect(page.getByText('Elevation')).toBeVisible();
-    await expect(page.getByText('Services')).toBeVisible();
+    // Verify table headers using column header role for specificity
+    await expect(page.getByRole('columnheader', { name: 'Station' })).toBeVisible();
+    await expect(page.getByRole('columnheader', { name: 'Distance' })).toBeVisible();
+    await expect(page.getByRole('columnheader', { name: 'Elevation' })).toBeVisible();
+    await expect(page.getByRole('columnheader', { name: 'Services' })).toBeVisible();
 
     // Verify aid stations are rendered
     await expect(page.getByTestId('aid-station-row-0')).toBeVisible();
@@ -216,11 +216,11 @@ test.describe('User Story 1: Onboarding Experience', () => {
     await expect(page.getByTestId('aid-station-row-2')).toBeVisible();
     await expect(page.getByTestId('aid-station-row-3')).toBeVisible();
 
-    // Verify station names
-    await expect(page.getByText('Start')).toBeVisible();
-    await expect(page.getByText('Aid 1')).toBeVisible();
-    await expect(page.getByText('Aid 2')).toBeVisible();
-    await expect(page.getByText('Finish')).toBeVisible();
+    // Verify station names are in the table rows
+    await expect(page.getByTestId('aid-station-row-0').getByText('Start')).toBeVisible();
+    await expect(page.getByTestId('aid-station-row-1').getByText('Aid 1')).toBeVisible();
+    await expect(page.getByTestId('aid-station-row-2').getByText('Aid 2')).toBeVisible();
+    await expect(page.getByTestId('aid-station-row-3').getByText('Finish')).toBeVisible();
   });
 
   test('should display course map when coordinates are available', async ({ page }) => {

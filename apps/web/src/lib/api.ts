@@ -199,3 +199,214 @@ export async function checkHealth(): Promise<{ healthy: boolean; message?: strin
     };
   }
 }
+
+// Activity types
+interface ActivityData {
+  id: string;
+  name?: string;
+  activityDate?: string;
+  distanceKm?: number;
+  elevationGainM?: number;
+  movingTimeSeconds?: number;
+  averagePaceMinKm?: number;
+  gradeAdjustedPaceMinKm?: number;
+  status: string;
+  createdAt: string;
+}
+
+interface ActivitiesResponse {
+  success: boolean;
+  data?: {
+    activities: ActivityData[];
+    total: number;
+  };
+  error?: string;
+}
+
+interface ActivityResponse {
+  success: boolean;
+  data?: ActivityData;
+  error?: string;
+}
+
+interface PerformanceProfileData {
+  flatPaceMinKm?: number;
+  climbingPaceMinKm?: number;
+  descendingPaceMinKm?: number;
+  fatigueFactor?: number;
+  activitiesCount: number;
+  lastUpdated?: string;
+}
+
+interface PerformanceProfileResponse {
+  success: boolean;
+  data?: PerformanceProfileData;
+  error?: string;
+}
+
+/**
+ * Get all activities for the current user
+ */
+export async function getActivities(limit = 50, offset = 0): Promise<ActivitiesResponse> {
+  try {
+    const response = await fetch(
+      `${API_BASE_URL}/activities?limit=${limit}&offset=${offset}`,
+      {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+      }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      return {
+        success: false,
+        error: data.error || 'Failed to get activities',
+      };
+    }
+
+    return data;
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Network error occurred',
+    };
+  }
+}
+
+/**
+ * Upload a GPX activity
+ */
+export async function uploadActivity(
+  gpxContent: string,
+  name?: string,
+  activityDate?: string
+): Promise<ActivityResponse> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/activities`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include',
+      body: JSON.stringify({
+        gpxContent,
+        name,
+        activityDate,
+      }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      return {
+        success: false,
+        error: data.error || 'Failed to upload activity',
+      };
+    }
+
+    return data;
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Network error occurred',
+    };
+  }
+}
+
+/**
+ * Get a single activity by ID
+ */
+export async function getActivity(id: string): Promise<ActivityResponse> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/activities/${id}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include',
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      return {
+        success: false,
+        error: data.error || 'Failed to get activity',
+      };
+    }
+
+    return data;
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Network error occurred',
+    };
+  }
+}
+
+/**
+ * Delete an activity
+ */
+export async function deleteActivity(id: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/activities/${id}`, {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include',
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      return {
+        success: false,
+        error: data.error || 'Failed to delete activity',
+      };
+    }
+
+    return data;
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Network error occurred',
+    };
+  }
+}
+
+/**
+ * Get the user's performance profile
+ */
+export async function getPerformanceProfile(): Promise<PerformanceProfileResponse> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/performance/profile`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include',
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      return {
+        success: false,
+        error: data.error || 'Failed to get performance profile',
+      };
+    }
+
+    return data;
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Network error occurred',
+    };
+  }
+}

@@ -167,6 +167,10 @@ export default function Home() {
       >
         📁 Load Saved Race
       </button>
+
+      <a href="/performances" className={styles.performancesLink}>
+        📊 My Past Performances
+      </a>
     </div>
   );
 

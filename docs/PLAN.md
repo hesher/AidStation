@@ -397,21 +397,25 @@ This is a non-negotiable requirement to ensure:
 **Sub-Story Test:** ✅ Performance analyzer unit tests (25 tests written)
 
 ### 5.3 Recency Weighting Algorithm
-- [ ] Implement exponential decay weighting for recent vs. old activities
-- [ ] Configurable half-life for recency bias (default: 90 days)
-- [ ] Weight formula: `weight = e^(-days_ago / half_life)`
-- [ ] Store weighted performance metrics
+- [x] Implement exponential decay weighting for recent vs. old activities
+- [x] Configurable half-life for recency bias (default: 90 days)
+- [x] Weight formula: `weight = e^(-days_ago / half_life)`
+- [x] Store weighted performance metrics
+
+**Sub-Story Test:** ✅ Implemented in activity-repository.ts and Python tasks
 
 ### 5.4 Performance Dashboard UI
-- [ ] Create "Past Performances" page
-- [ ] List uploaded activities with key metrics
-- [ ] Show performance summary:
+- [x] Create "Past Performances" page
+- [x] List uploaded activities with key metrics
+- [x] Show performance summary:
   - Average flat pace
   - Average climbing pace (per % grade)
   - Average descending pace
   - Fatigue curve visualization
 - [ ] Visualize activities on map
 - [ ] Show elevation profile with pace overlay
+
+**Sub-Story Test:** ✅ Past Performances UI page created with upload functionality
 
 **E2E Test (User Story 4 Complete):**
 - User uploads 3 GPX files → All are processed
