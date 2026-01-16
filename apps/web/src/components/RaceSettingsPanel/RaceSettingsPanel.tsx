@@ -27,6 +27,9 @@ export function RaceSettingsPanel({
 }: RaceSettingsPanelProps) {
   const [isPublic, setIsPublic] = useState(race.isPublic ?? false);
 
+  // Race needs saving if it has unsaved changes OR if it has never been saved (no ID)
+  const needsSave = hasUnsavedChanges || !race.id;
+
   const handleToggleVisibility = useCallback(() => {
     const newValue = !isPublic;
     setIsPublic(newValue);
@@ -74,9 +77,9 @@ export function RaceSettingsPanel({
         {/* Save Button */}
         <div className={styles.actions}>
           <button
-            className={`${styles.saveButton} ${hasUnsavedChanges ? styles.saveButtonActive : ''}`}
+            className={`${styles.saveButton} ${needsSave ? styles.saveButtonActive : ''}`}
             onClick={onSave}
-            disabled={isSaving || !hasUnsavedChanges}
+            disabled={isSaving || !needsSave}
             data-testid="save-race-button"
           >
             {isSaving ? (
@@ -86,7 +89,7 @@ export function RaceSettingsPanel({
               </>
             ) : (
               <>
-                💾 Save Race
+                💾 {race.id ? 'Save Race' : 'Save New Race'}
               </>
             )}
           </button>

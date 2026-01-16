@@ -6,16 +6,16 @@
 
 export interface AidStation {
   name: string;
-  distanceKm: number;
-  distanceFromPrevKm?: number;
-  elevationM?: number;
+  distanceKm: number | null;
+  distanceFromPrevKm?: number | null;
+  elevationM?: number | null;
   elevationGainFromPrevM?: number;
   elevationLossFromPrevM?: number;
-  hasDropBag?: boolean;
-  hasCrew?: boolean;
-  hasPacer?: boolean;
-  cutoffTime?: string;
-  cutoffHoursFromStart?: number;
+  hasDropBag?: boolean | null;
+  hasCrew?: boolean | null;
+  hasPacer?: boolean | null;
+  cutoffTime?: string | null;
+  cutoffHoursFromStart?: number | null;
 }
 
 export interface CourseCoordinate {

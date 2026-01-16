@@ -63,9 +63,22 @@ export default function Home() {
 
       // Save the race to persist it for page refresh
       // This runs in the background, doesn't block UI
-      saveRace(result.data).catch((err) => {
+      try {
+        const saveResult = await saveRace(result.data);
+        if (saveResult.success && saveResult.data) {
+          // Update race data with the saved version (includes ID)
+          setRaceData(saveResult.data);
+          setHasUnsavedChanges(false);
+        } else {
+          // Save failed - mark as having unsaved changes so user can retry
+          console.warn('Failed to save race:', saveResult.error);
+          setHasUnsavedChanges(true);
+        }
+      } catch (err) {
+        // Save failed - mark as having unsaved changes so user can retry
         console.warn('Failed to save race:', err);
-      });
+        setHasUnsavedChanges(true);
+      }
     } else {
       setError(result.error || 'Failed to find race');
       setAppState('error');
@@ -234,7 +247,10 @@ export default function Home() {
           <div className={styles.currentRaceIndicator} data-testid="current-race-indicator">
             <span className={styles.currentRaceLabel}>Current:</span>
             <span className={styles.currentRaceName}>{raceData.name}</span>
-            {hasUnsavedChanges && (
+            {!raceData.id && (
+              <span className={styles.notSavedDot} title="Race not saved">⚠️</span>
+            )}
+            {raceData.id && hasUnsavedChanges && (
               <span className={styles.unsavedDot} title="Unsaved changes">●</span>
             )}
           </div>

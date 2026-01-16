@@ -148,24 +148,46 @@ export function CourseMap({ coordinates, aidStations, onAidStationClick }: Cours
     markersRef.current = [];
 
     // For each aid station, try to find its position on the course
-    aidStations.forEach((station, index) => {
-      // Find the closest coordinate based on distance
-      let stationCoord: CourseCoordinate | undefined;
+      aidStations.forEach((station, index) => {
+        // Find the closest coordinate based on distance
+        let stationCoord: CourseCoordinate | undefined;
 
-      if (station.distanceKm !== undefined && coordinates.length > 0) {
-        // Find the coordinate closest to this distance along the course
-        // This is a simplified approach - in production you'd want to
-        // interpolate along the actual course line
-        const totalDistance = coordinates[coordinates.length - 1]?.distanceKm || 0;
-        if (totalDistance > 0) {
-          const ratio = station.distanceKm / totalDistance;
+        if (station.distanceKm !== null && station.distanceKm !== undefined && coordinates.length > 0) {
+          // Get the total distance - use the race's total distance or estimate from coordinates
+          // We estimate by treating the coordinate index as a fraction of total distance
+          // Find position along the course based on ratio of station distance to total race distance
+          // For now, we use a simple approximation: station index ratio along the course
+
+          // Get total race distance from the last aid station (if available) or use max known distance
+          const maxDistance = aidStations.reduce((max, s) => {
+            return s.distanceKm !== null && s.distanceKm !== undefined && s.distanceKm > max
+              ? s.distanceKm
+              : max;
+          }, 0);
+
+          if (maxDistance > 0) {
+            const ratio = station.distanceKm / maxDistance;
+            const targetIndex = Math.min(
+              Math.floor(ratio * (coordinates.length - 1)),
+              coordinates.length - 1
+            );
+            stationCoord = coordinates[targetIndex];
+          } else {
+            // Fallback: distribute stations evenly along the course
+            const targetIndex = Math.min(
+              Math.floor((index / aidStations.length) * (coordinates.length - 1)),
+              coordinates.length - 1
+            );
+            stationCoord = coordinates[targetIndex];
+          }
+        } else if (coordinates.length > 0) {
+          // Station has no distance - distribute evenly along course
           const targetIndex = Math.min(
-            Math.floor(ratio * (coordinates.length - 1)),
+            Math.floor(((index + 1) / (aidStations.length + 1)) * (coordinates.length - 1)),
             coordinates.length - 1
           );
           stationCoord = coordinates[targetIndex];
         }
-      }
 
       if (stationCoord && map.current) {
         // Create custom marker element

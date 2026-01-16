@@ -14,19 +14,19 @@ interface AidStationTableProps {
 }
 
 export function AidStationTable({ aidStations, onStationClick }: AidStationTableProps) {
-  const formatDistance = (km?: number) => {
-    if (km === undefined) return '--';
+  const formatDistance = (km?: number | null) => {
+    if (km === undefined || km === null) return '--';
     return `${km.toFixed(1)} km`;
   };
 
-  const formatElevation = (m?: number) => {
-    if (m === undefined) return '--';
+  const formatElevation = (m?: number | null) => {
+    if (m === undefined || m === null) return '--';
     return `${Math.round(m)} m`;
   };
 
-  const formatCutoff = (time?: string, hours?: number) => {
+  const formatCutoff = (time?: string | null, hours?: number | null) => {
     if (time) return time;
-    if (hours !== undefined) {
+    if (hours !== undefined && hours !== null) {
       const h = Math.floor(hours);
       const m = Math.round((hours - h) * 60);
       if (m === 0) return `${h}:00`;
@@ -35,7 +35,7 @@ export function AidStationTable({ aidStations, onStationClick }: AidStationTable
     return '--';
   };
 
-  const ServiceBadge = ({ available, label }: { available?: boolean; label: string }) => (
+  const ServiceBadge = ({ available, label }: { available?: boolean | null; label: string }) => (
     <span className={`${styles.badge} ${available ? styles.badgeActive : styles.badgeInactive}`}>
       {label}
     </span>

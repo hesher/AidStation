@@ -346,6 +346,11 @@
   animation: pulse 1.5s ease-in-out infinite;
 }
 
+.notSavedDot {
+  font-size: 0.75rem;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
 @keyframes pulse {
   0%, 100% {
     opacity: 1;
