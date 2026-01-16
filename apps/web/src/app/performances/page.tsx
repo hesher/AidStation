@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import styles from './performances.module.css';
+import { ElevationProfile } from '../../components/ElevationProfile';
 import {
   getActivities,
   uploadActivity,
@@ -20,6 +21,19 @@ interface Activity {
   gradeAdjustedPaceMinKm?: number;
   status: string;
   createdAt: string;
+  analysisResults?: {
+    segments?: Array<{
+      startKm: number;
+      endKm: number;
+      elevationGain: number;
+      paceMinKm: number;
+    }>;
+    elevationProfile?: Array<{
+      distance: number;
+      elevation: number;
+      pace?: number;
+    }>;
+  };
 }
 
 interface PerformanceProfile {

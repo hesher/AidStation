@@ -9,3 +9,4 @@ export { AidStationTable } from './AidStationTable';
 export { CourseMap } from './CourseMap';
 export { RaceBrowser } from './RaceBrowser';
 export { RaceSettingsPanel } from './RaceSettingsPanel';
+export { ElevationProfile } from './ElevationProfile';

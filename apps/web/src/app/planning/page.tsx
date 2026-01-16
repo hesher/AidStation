@@ -115,6 +115,12 @@ export default function PlanningPage() {
   const [selectedRaceId, setSelectedRaceId] = useState<string>('');
   const [planName, setPlanName] = useState('');
 
+  // Pace adjustment state
+  const [showPaceSettings, setShowPaceSettings] = useState(false);
+  const [basePaceMinutes, setBasePaceMinutes] = useState(6);
+  const [basePaceSeconds, setBasePaceSeconds] = useState(30);
+  const [nighttimeSlowdown, setNighttimeSlowdown] = useState(15);
+
   const loadData = useCallback(async () => {
     try {
       setIsLoading(true);
@@ -418,6 +424,73 @@ export default function PlanningPage() {
                     {formatTime(selectedPlan.predictedFinishTime)}
                   </span>
                 </div>
+              </div>
+
+              {/* Pace Settings Panel */}
+              <div className={styles.paceSettingsSection}>
+                <button
+                  onClick={() => setShowPaceSettings(!showPaceSettings)}
+                  className={styles.paceSettingsToggle}
+                >
+                  ⚙️ {showPaceSettings ? 'Hide' : 'Show'} Pace Settings
+                </button>
+
+                {showPaceSettings && (
+                  <div className={styles.paceSettingsPanel}>
+                    <div className={styles.paceSettingRow}>
+                      <label className={styles.paceLabel}>
+                        Base Pace
+                        <span className={styles.paceHint}>Your flat terrain pace</span>
+                      </label>
+                      <div className={styles.paceInputGroup}>
+                        <input
+                          type="number"
+                          min={3}
+                          max={15}
+                          value={basePaceMinutes}
+                          onChange={(e) => setBasePaceMinutes(parseInt(e.target.value) || 6)}
+                          className={styles.paceInput}
+                        />
+                        <span className={styles.paceColon}>:</span>
+                        <input
+                          type="number"
+                          min={0}
+                          max={59}
+                          value={basePaceSeconds}
+                          onChange={(e) => setBasePaceSeconds(parseInt(e.target.value) || 0)}
+                          className={styles.paceInput}
+                        />
+                        <span className={styles.paceUnit}>/km</span>
+                      </div>
+                    </div>
+
+                    <div className={styles.paceSettingRow}>
+                      <label className={styles.paceLabel}>
+                        Nighttime Slowdown
+                        <span className={styles.paceHint}>Additional slowdown after dark</span>
+                      </label>
+                      <div className={styles.sliderGroup}>
+                        <input
+                          type="range"
+                          min={0}
+                          max={30}
+                          value={nighttimeSlowdown}
+                          onChange={(e) => setNighttimeSlowdown(parseInt(e.target.value))}
+                          className={styles.slider}
+                        />
+                        <span className={styles.sliderValue}>{nighttimeSlowdown}%</span>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => handleRegeneratePredictions(selectedPlan.id)}
+                      disabled={isGenerating}
+                      className={styles.applyPaceButton}
+                    >
+                      {isGenerating ? 'Applying...' : '✓ Apply Settings'}
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* Aid Station Timeline */}
