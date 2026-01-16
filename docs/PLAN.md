@@ -461,8 +461,8 @@ This is a non-negotiable requirement to ensure:
   - Cumulative elapsed time
 - [x] Visual timeline with cutoff indicators
 - [x] Color-coded aid station cards (green/orange/red)
-- [ ] Editable pace adjustments (override predictions)
-- [ ] Export plan as PDF/printable format
+- [x] Editable pace adjustments (override predictions)
+- [x] Export plan as PDF/printable format
 
 ### 6.5 Nighttime & Fatigue Modeling
 - [x] Calculate which sections occur at night (based on start time)

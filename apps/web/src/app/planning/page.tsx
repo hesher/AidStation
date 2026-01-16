@@ -394,6 +394,12 @@ export default function PlanningPage() {
                   >
                     {isGenerating ? 'Generating...' : '🔄 Regenerate Predictions'}
                   </button>
+                  <button
+                    onClick={() => window.print()}
+                    className={styles.exportButton}
+                  >
+                    📄 Export PDF
+                  </button>
                 </div>
               </div>
 
