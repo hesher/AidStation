@@ -146,6 +146,41 @@ export async function getRace(id: string): Promise<RaceResponse> {
 }
 
 /**
+ * Update a race in the database
+ */
+export async function updateRace(
+  id: string,
+  updates: Partial<RaceData>
+): Promise<RaceResponse> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/races/${id}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include',
+      body: JSON.stringify(updates),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      return {
+        success: false,
+        error: data.error || 'Failed to update race',
+      };
+    }
+
+    return data;
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Network error occurred',
+    };
+  }
+}
+
+/**
  * Check API health
  */
 export async function checkHealth(): Promise<{ healthy: boolean; message?: string }> {

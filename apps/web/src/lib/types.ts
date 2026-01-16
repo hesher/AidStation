@@ -37,6 +37,7 @@ export interface RaceData {
   overallCutoffHours?: number;
   description?: string;
   websiteUrl?: string;
+  isPublic?: boolean;
   aidStations?: AidStation[];
   courseCoordinates?: CourseCoordinate[];
 }

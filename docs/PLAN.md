@@ -359,15 +359,15 @@ This is a non-negotiable requirement to ensure:
 - [x] Create "Load Race" confirmation dialog
 
 ### 4.4 Unsaved Changes Protection
-- [ ] Track dirty state for current race
+- [x] Track dirty state for current race
 - [x] Implement "Discard Changes?" confirmation dialog
 - [ ] Auto-save functionality (optional enhancement)
 
 ### 4.5 Current Race Indicator
-- [ ] Display currently loaded race name in header/navbar
-- [ ] Show saved/unsaved status indicator
+- [x] Display currently loaded race name in header/navbar
+- [x] Show saved/unsaved status indicator
 
-**E2E Test (User Story 3 Complete):**
+**E2E Test (User Story 3 Complete):** ✅
 - User saves race as private → Only they can see it
 - User saves race as public → All users can find it
 - User with unsaved changes tries to load new race → Confirmation dialog appears

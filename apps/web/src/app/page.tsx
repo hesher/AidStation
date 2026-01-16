@@ -6,7 +6,8 @@ import { RaceCard } from '@/components/RaceCard';
 import { AidStationTable } from '@/components/AidStationTable';
 import { CourseMap } from '@/components/CourseMap';
 import { RaceBrowser } from '@/components/RaceBrowser';
-import { searchRace, getCurrentRace, saveRace } from '@/lib/api';
+import { RaceSettingsPanel } from '@/components/RaceSettingsPanel';
+import { searchRace, getCurrentRace, saveRace, updateRace } from '@/lib/api';
 import { RaceData, AidStation } from '@/lib/types';
 
 type AppState = 'initializing' | 'idle' | 'searching' | 'success' | 'error';
@@ -19,6 +20,7 @@ export default function Home() {
   const [selectedStation, setSelectedStation] = useState<number | null>(null);
   const [isRaceBrowserOpen, setIsRaceBrowserOpen] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   // Initialize app - check for previous race on load
   useEffect(() => {
@@ -88,6 +90,43 @@ export default function Home() {
     setAppState('success');
     setHasUnsavedChanges(false);
   }, []);
+
+  // Handle visibility change
+  const handleVisibilityChange = useCallback((isPublic: boolean) => {
+    if (raceData) {
+      setRaceData({ ...raceData, isPublic });
+      setHasUnsavedChanges(true);
+    }
+  }, [raceData]);
+
+  // Handle save race
+  const handleSaveRace = useCallback(async () => {
+    if (!raceData) return;
+
+    setIsSaving(true);
+
+    try {
+      let result;
+      if (raceData.id) {
+        // Update existing race
+        result = await updateRace(raceData.id, raceData);
+      } else {
+        // Save new race
+        result = await saveRace(raceData);
+      }
+
+      if (result.success && result.data) {
+        setRaceData(result.data);
+        setHasUnsavedChanges(false);
+      } else {
+        console.error('Failed to save race:', result.error);
+      }
+    } catch (err) {
+      console.error('Error saving race:', err);
+    } finally {
+      setIsSaving(false);
+    }
+  }, [raceData]);
 
   // Render the search/onboarding form
   const renderSearchForm = () => (
@@ -172,15 +211,42 @@ export default function Home() {
     return (
       <div className={styles.raceContent} data-testid="race-content">
         <div className={styles.header}>
-          <button onClick={handleNewSearch} className={styles.backButton}>
-            ← Search New Race
-          </button>
+          <div className={styles.headerLeft}>
+            <button onClick={handleNewSearch} className={styles.backButton}>
+              ← Search New Race
+            </button>
+            <button
+              onClick={() => setIsRaceBrowserOpen(true)}
+              className={styles.loadButton}
+            >
+              📁 Load Race
+            </button>
+          </div>
+          {/* Current Race Indicator */}
+          <div className={styles.currentRaceIndicator} data-testid="current-race-indicator">
+            <span className={styles.currentRaceLabel}>Current:</span>
+            <span className={styles.currentRaceName}>{raceData.name}</span>
+            {hasUnsavedChanges && (
+              <span className={styles.unsavedDot} title="Unsaved changes">●</span>
+            )}
+          </div>
         </div>
 
         <div className={styles.raceLayout}>
           {/* Race Overview Card */}
           <section className={styles.section}>
             <RaceCard race={raceData} />
+          </section>
+
+          {/* Race Settings Panel */}
+          <section className={styles.section}>
+            <RaceSettingsPanel
+              race={raceData}
+              onVisibilityChange={handleVisibilityChange}
+              onSave={handleSaveRace}
+              isSaving={isSaving}
+              hasUnsavedChanges={hasUnsavedChanges}
+            />
           </section>
 
           {/* Course Map */}
