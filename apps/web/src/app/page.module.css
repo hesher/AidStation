@@ -140,19 +140,20 @@
 .loadRaceButton {
   display: inline-block;
   padding: 0.875rem 1.5rem;
-  background: var(--color-secondary);
-  color: #1a1a2e;
+  background: transparent;
+  color: #888;
   font-size: 1rem;
   font-weight: 500;
-  border: none;
+  border: 1px solid #30475e;
   border-radius: 8px;
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
 .loadRaceButton:hover {
-  background: var(--color-primary);
-  color: white;
+  background: rgba(255, 255, 255, 0.05);
+  border-color: #64b5f6;
+  color: #fff;
 }
 
 .performancesLink {

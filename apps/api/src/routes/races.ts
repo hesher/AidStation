@@ -64,17 +64,35 @@ const saveRaceSchema = z.object({
 
 const updateRaceSchema = z.object({
   name: z.string().min(1).optional(),
-  date: z.string().optional(),
-  location: z.string().optional(),
-  country: z.string().optional(),
-  distanceKm: z.number().optional(),
-  elevationGainM: z.number().optional(),
-  elevationLossM: z.number().optional(),
-  startTime: z.string().optional(),
-  overallCutoffHours: z.number().optional(),
-  description: z.string().optional(),
-  websiteUrl: z.string().optional(),
-  isPublic: z.boolean().optional(),
+  date: z.string().nullish(),
+  location: z.string().nullish(),
+  country: z.string().nullish(),
+  distanceKm: z.number().nullish(),
+  elevationGainM: z.number().nullish(),
+  elevationLossM: z.number().nullish(),
+  startTime: z.string().nullish(),
+  overallCutoffHours: z.number().nullish(),
+  description: z.string().nullish(),
+  websiteUrl: z.string().nullish(),
+  isPublic: z.boolean().nullish(),
+  aidStations: z.array(z.object({
+    name: z.string(),
+    distanceKm: z.number().nullish(),
+    distanceFromPrevKm: z.number().nullish(),
+    elevationM: z.number().nullish(),
+    elevationGainFromPrevM: z.number().nullish(),
+    elevationLossFromPrevM: z.number().nullish(),
+    hasDropBag: z.boolean().nullish(),
+    hasCrew: z.boolean().nullish(),
+    hasPacer: z.boolean().nullish(),
+    cutoffTime: z.string().nullish(),
+    cutoffHoursFromStart: z.number().nullish(),
+  })).nullish(),
+  courseCoordinates: z.array(z.object({
+    lat: z.number(),
+    lon: z.number(),
+    elevation: z.number().optional(),
+  })).nullish(),
 });
 
 // List races query schema - for future use when query validation is added
@@ -629,40 +647,34 @@ export async function raceRoutes(app: FastifyInstance) {
         };
       }
 
-      // Update the race
-      const updatedRace = await updateRace(id, {
-        name: validatedBody.name,
-        date: validatedBody.date,
-        location: validatedBody.location,
-        country: validatedBody.country,
-        distanceKm: validatedBody.distanceKm,
-        elevationGainM: validatedBody.elevationGainM,
-        elevationLossM: validatedBody.elevationLossM,
-        startTime: validatedBody.startTime,
-        overallCutoffHours: validatedBody.overallCutoffHours,
-        isPublic: validatedBody.isPublic,
-        metadata: {
-          description: validatedBody.description,
-          websiteUrl: validatedBody.websiteUrl,
+      // Update the race with aid stations
+      const race = await updateRace(
+        id,
+        {
+          name: validatedBody.name,
+          date: validatedBody.date,
+          location: validatedBody.location,
+          country: validatedBody.country,
+          distanceKm: validatedBody.distanceKm,
+          elevationGainM: validatedBody.elevationGainM,
+          elevationLossM: validatedBody.elevationLossM,
+          startTime: validatedBody.startTime,
+          overallCutoffHours: validatedBody.overallCutoffHours,
+          isPublic: validatedBody.isPublic,
+          metadata: {
+            description: validatedBody.description,
+            websiteUrl: validatedBody.websiteUrl,
+            courseCoordinates: validatedBody.courseCoordinates,
+          },
         },
-      });
-
-      if (!updatedRace) {
-        reply.status(500);
-        return {
-          success: false,
-          error: 'Failed to update race',
-        };
-      }
-
-      // Get full race with aid stations
-      const race = await getRaceById(id);
+        validatedBody.aidStations as AidStationData[] | undefined
+      );
 
       if (!race) {
         reply.status(500);
         return {
           success: false,
-          error: 'Failed to retrieve updated race',
+          error: 'Failed to update race',
         };
       }
 

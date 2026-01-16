@@ -96,8 +96,9 @@ export async function getRaceById(id: string): Promise<RaceWithAidStations | nul
  */
 export async function updateRace(
   id: string,
-  raceData: Partial<RaceData>
-): Promise<typeof races.$inferSelect | null> {
+  raceData: Partial<RaceData>,
+  aidStationList?: AidStationData[]
+): Promise<RaceWithAidStations | null> {
   const [updatedRace] = await db
     .update(races)
     .set({
@@ -117,7 +118,54 @@ export async function updateRace(
     .where(eq(races.id, id))
     .returning();
 
-  return updatedRace || null;
+  if (!updatedRace) {
+    return null;
+  }
+
+  // Update aid stations if provided
+  let updatedAidStations: typeof aidStations.$inferSelect[] = [];
+  if (aidStationList !== undefined) {
+    // Delete existing aid stations for this race
+    await db.delete(aidStations).where(eq(aidStations.raceId, id));
+
+    // Insert new aid stations if provided
+    if (aidStationList.length > 0) {
+      updatedAidStations = await db
+        .insert(aidStations)
+        .values(
+          aidStationList.map((station, index) => ({
+            raceId: id,
+            name: station.name,
+            distanceKm: station.distanceKm,
+            distanceFromPrevKm: station.distanceFromPrevKm,
+            elevationM: station.elevationM,
+            elevationGainFromPrevM: station.elevationGainFromPrevM,
+            elevationLossFromPrevM: station.elevationLossFromPrevM,
+            hasDropBag: station.hasDropBag ?? false,
+            hasCrew: station.hasCrew ?? false,
+            hasPacer: station.hasPacer ?? false,
+            cutoffTime: station.cutoffTime,
+            cutoffHoursFromStart: station.cutoffHoursFromStart,
+            sortOrder: index,
+            latitude: station.latitude,
+            longitude: station.longitude,
+          }))
+        )
+        .returning();
+    }
+  } else {
+    // Aid stations not provided, fetch existing ones
+    updatedAidStations = await db
+      .select()
+      .from(aidStations)
+      .where(eq(aidStations.raceId, id))
+      .orderBy(aidStations.sortOrder);
+  }
+
+  return {
+    ...updatedRace,
+    aidStations: updatedAidStations,
+  };
 }
 
 /**
