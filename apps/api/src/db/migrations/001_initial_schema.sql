@@ -4,7 +4,15 @@
 
 -- Enable required extensions
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-CREATE EXTENSION IF NOT EXISTS "postgis";
+
+-- PostGIS is optional - try to create it but don't fail if not available
+DO $$
+BEGIN
+    CREATE EXTENSION IF NOT EXISTS "postgis";
+EXCEPTION WHEN others THEN
+    RAISE NOTICE 'PostGIS extension not available - geometry features will be disabled';
+END;
+$$;
 
 -- Users table
 CREATE TABLE IF NOT EXISTS users (
@@ -16,7 +24,7 @@ CREATE TABLE IF NOT EXISTS users (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL
 );
 
--- Races table with PostGIS geometry
+-- Races table (works with or without PostGIS)
 CREATE TABLE IF NOT EXISTS races (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     name TEXT NOT NULL,
@@ -29,7 +37,6 @@ CREATE TABLE IF NOT EXISTS races (
     start_time TEXT,
     overall_cutoff_hours REAL,
     course_gpx TEXT,
-    course_geometry GEOMETRY(LineString, 4326),
     is_public BOOLEAN DEFAULT FALSE NOT NULL,
     owner_id UUID REFERENCES users(id) ON DELETE SET NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
@@ -37,8 +44,15 @@ CREATE TABLE IF NOT EXISTS races (
     metadata JSONB
 );
 
--- Create spatial index on race geometry
-CREATE INDEX IF NOT EXISTS idx_races_geometry ON races USING GIST (course_geometry);
+-- Add geometry column if PostGIS is available
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'postgis') THEN
+        EXECUTE 'ALTER TABLE races ADD COLUMN IF NOT EXISTS course_geometry GEOMETRY(LineString, 4326)';
+        EXECUTE 'CREATE INDEX IF NOT EXISTS idx_races_geometry ON races USING GIST (course_geometry)';
+    END IF;
+END;
+$$;
 
 -- Aid stations table
 CREATE TABLE IF NOT EXISTS aid_stations (
@@ -63,7 +77,7 @@ CREATE TABLE IF NOT EXISTS aid_stations (
 
 CREATE INDEX IF NOT EXISTS idx_aid_stations_race ON aid_stations(race_id);
 
--- User activities (GPX uploads)
+-- User activities (GPX uploads) - works with or without PostGIS
 CREATE TABLE IF NOT EXISTS user_activities (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -77,13 +91,21 @@ CREATE TABLE IF NOT EXISTS user_activities (
     average_pace_min_km REAL,
     grade_adjusted_pace_min_km REAL,
     gpx_content TEXT,
-    activity_geometry GEOMETRY(LineString, 4326),
     analysis_results JSONB,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL
 );
 
 CREATE INDEX IF NOT EXISTS idx_user_activities_user ON user_activities(user_id);
-CREATE INDEX IF NOT EXISTS idx_user_activities_geometry ON user_activities USING GIST (activity_geometry);
+
+-- Add geometry column and index if PostGIS is available
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'postgis') THEN
+        EXECUTE 'ALTER TABLE user_activities ADD COLUMN IF NOT EXISTS activity_geometry GEOMETRY(LineString, 4326)';
+        EXECUTE 'CREATE INDEX IF NOT EXISTS idx_user_activities_geometry ON user_activities USING GIST (activity_geometry)';
+    END IF;
+END;
+$$;
 
 -- User performance profiles
 CREATE TABLE IF NOT EXISTS user_performance_profiles (

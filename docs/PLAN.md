@@ -506,7 +506,8 @@ This is a non-negotiable requirement to ensure:
 ## Phase 8: Follow Ups, Fixes, Ideas and Future Work
 
 ### Urgent Fixes
-- [] The load race dialog is showing "⚠️ Database not available"
+- [x] The load race dialog is showing "⚠️ Database not available" - Fixed by installing PostgreSQL locally and updating migration to make PostGIS optional
+- Getting frequest CORS in the console "Access to fetch at 'http://localhost:3001/api/plans?limit=50&offset=0' from origin 'http://localhost:3000' has been blocked by CORS policy: Response to preflight request doesn't pass access control check: No 'Access-Control-Allow-Origin' header is present on the requested resource." (for example)
 
 ### Improvements
 - [ ] Improve Race Search AI prompt to avoid making up data (as sometimes seen in made up checkpoints, made up distances and climbs)
