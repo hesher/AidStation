@@ -18,6 +18,9 @@ import {
   getLastRaceId,
   searchRaces,
   getUniqueCountries,
+  getRaceVersionHistory,
+  getRaceVersion,
+  restoreRaceVersion,
   type AidStationData,
   type SessionData,
 } from '../db/repositories';
@@ -939,6 +942,262 @@ export async function raceRoutes(app: FastifyInstance) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
 
       logFailure(app, 'GPX analysis', errorMessage);
+
+      reply.status(500);
+
+      return {
+        success: false,
+        error: errorMessage,
+      };
+    }
+  });
+
+  /**
+   * GET /api/races/:id/versions
+   *
+   * Get version history for a race
+   */
+  app.get('/races/:id/versions', async (
+    request: FastifyRequest<{ Params: { id: string }; Querystring: { limit?: string; offset?: string } }>,
+    reply: FastifyReply
+  ): Promise<{ success: boolean; data?: { versions: unknown[]; total: number; currentVersion?: number }; error?: string }> => {
+    try {
+      const { id } = request.params;
+      const query = request.query;
+
+      // Validate UUID format
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (!uuidRegex.test(id)) {
+        reply.status(400);
+        return {
+          success: false,
+          error: 'Invalid race ID format',
+        };
+      }
+
+      // Get current race to get current version number
+      let currentRace;
+      try {
+        currentRace = await getRaceById(id);
+      } catch (dbError) {
+        app.log.warn({ error: dbError }, 'Database not available');
+        reply.status(503);
+        return {
+          success: false,
+          error: 'Database not available',
+        };
+      }
+
+      if (!currentRace) {
+        reply.status(404);
+        return {
+          success: false,
+          error: 'Race not found',
+        };
+      }
+
+      const limit = query.limit ? parseInt(query.limit, 10) : 20;
+      const offset = query.offset ? parseInt(query.offset, 10) : 0;
+
+      const result = await getRaceVersionHistory(id, { limit, offset });
+
+      return {
+        success: true,
+        data: {
+          versions: result.versions.map((v) => ({
+            id: v.id,
+            versionNumber: v.versionNumber,
+            name: v.name,
+            date: v.date?.toISOString(),
+            location: v.location,
+            country: v.country,
+            distanceKm: v.distanceKm,
+            elevationGainM: v.elevationGainM,
+            elevationLossM: v.elevationLossM,
+            changeSummary: v.changeSummary,
+            createdAt: v.createdAt.toISOString(),
+            aidStationCount: v.aidStationsSnapshot?.length ?? 0,
+          })),
+          total: result.total,
+          currentVersion: (currentRace as unknown as { version_number?: number }).version_number ?? 1,
+        },
+      };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+
+      logFailure(app, 'Get race versions', errorMessage, { id: (request.params as { id: string }).id });
+
+      reply.status(500);
+
+      return {
+        success: false,
+        error: errorMessage,
+      };
+    }
+  });
+
+  /**
+   * GET /api/races/:id/versions/:version
+   *
+   * Get a specific version of a race
+   */
+  app.get('/races/:id/versions/:version', async (
+    request: FastifyRequest<{ Params: { id: string; version: string } }>,
+    reply: FastifyReply
+  ): Promise<RaceResponse> => {
+    try {
+      const { id, version } = request.params;
+      const versionNumber = parseInt(version, 10);
+
+      // Validate UUID format
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (!uuidRegex.test(id)) {
+        reply.status(400);
+        return {
+          success: false,
+          error: 'Invalid race ID format',
+        };
+      }
+
+      if (isNaN(versionNumber) || versionNumber < 1) {
+        reply.status(400);
+        return {
+          success: false,
+          error: 'Invalid version number',
+        };
+      }
+
+      const raceVersion = await getRaceVersion(id, versionNumber);
+
+      if (!raceVersion) {
+        reply.status(404);
+        return {
+          success: false,
+          error: 'Version not found',
+        };
+      }
+
+      return {
+        success: true,
+        data: {
+          id: raceVersion.id,
+          name: raceVersion.name,
+          date: raceVersion.date?.toISOString(),
+          location: raceVersion.location,
+          country: raceVersion.country,
+          distanceKm: raceVersion.distanceKm,
+          elevationGainM: raceVersion.elevationGainM,
+          elevationLossM: raceVersion.elevationLossM,
+          startTime: raceVersion.startTime,
+          overallCutoffHours: raceVersion.overallCutoffHours,
+          aidStations: raceVersion.aidStationsSnapshot?.map((as) => ({
+            name: as.name,
+            distanceKm: as.distanceKm,
+            distanceFromPrevKm: as.distanceFromPrevKm ?? undefined,
+            elevationM: as.elevationM ?? undefined,
+            elevationGainFromPrevM: as.elevationGainFromPrevM ?? undefined,
+            elevationLossFromPrevM: as.elevationLossFromPrevM ?? undefined,
+            hasDropBag: as.hasDropBag ?? undefined,
+            hasCrew: as.hasCrew ?? undefined,
+            hasPacer: as.hasPacer ?? undefined,
+            cutoffTime: as.cutoffTime ?? undefined,
+            cutoffHoursFromStart: as.cutoffHoursFromStart ?? undefined,
+          })) ?? [],
+        },
+      };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+
+      logFailure(app, 'Get race version', errorMessage, { id: (request.params as { id: string }).id });
+
+      reply.status(500);
+
+      return {
+        success: false,
+        error: errorMessage,
+      };
+    }
+  });
+
+  /**
+   * POST /api/races/:id/versions/:version/restore
+   *
+   * Restore a race to a specific version
+   */
+  app.post('/races/:id/versions/:version/restore', async (
+    request: FastifyRequest<{ Params: { id: string; version: string } }>,
+    reply: FastifyReply
+  ): Promise<RaceResponse> => {
+    try {
+      const { id, version } = request.params;
+      const versionNumber = parseInt(version, 10);
+
+      // Validate UUID format
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (!uuidRegex.test(id)) {
+        reply.status(400);
+        return {
+          success: false,
+          error: 'Invalid race ID format',
+        };
+      }
+
+      if (isNaN(versionNumber) || versionNumber < 1) {
+        reply.status(400);
+        return {
+          success: false,
+          error: 'Invalid version number',
+        };
+      }
+
+      const restoredRace = await restoreRaceVersion(id, versionNumber);
+
+      if (!restoredRace) {
+        reply.status(404);
+        return {
+          success: false,
+          error: 'Version not found or could not be restored',
+        };
+      }
+
+      logSuccess(app, 'Race version restored', { raceId: id, restoredVersion: versionNumber });
+
+      const metadata = restoredRace.metadata as Record<string, unknown> | null;
+      const courseCoordinates = metadata?.courseCoordinates as Array<{ lat: number; lon: number; elevation?: number }> | undefined;
+
+      return {
+        success: true,
+        data: {
+          id: restoredRace.id,
+          name: restoredRace.name,
+          date: restoredRace.date?.toISOString(),
+          location: restoredRace.location,
+          country: restoredRace.country,
+          distanceKm: restoredRace.distanceKm,
+          elevationGainM: restoredRace.elevationGainM,
+          elevationLossM: restoredRace.elevationLossM,
+          startTime: restoredRace.startTime,
+          overallCutoffHours: restoredRace.overallCutoffHours,
+          aidStations: restoredRace.aidStations.map((as) => ({
+            name: as.name,
+            distanceKm: as.distanceKm,
+            distanceFromPrevKm: as.distanceFromPrevKm ?? undefined,
+            elevationM: as.elevationM ?? undefined,
+            elevationGainFromPrevM: as.elevationGainFromPrevM ?? undefined,
+            elevationLossFromPrevM: as.elevationLossFromPrevM ?? undefined,
+            hasDropBag: as.hasDropBag ?? undefined,
+            hasCrew: as.hasCrew ?? undefined,
+            hasPacer: as.hasPacer ?? undefined,
+            cutoffTime: as.cutoffTime ?? undefined,
+            cutoffHoursFromStart: as.cutoffHoursFromStart ?? undefined,
+          })),
+          courseCoordinates,
+        },
+      };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+
+      logFailure(app, 'Restore race version', errorMessage, { id: (request.params as { id: string }).id });
 
       reply.status(500);
 

@@ -374,3 +374,245 @@ export async function getUniqueCountries(): Promise<string[]> {
 
   return Array.from(countries).sort();
 }
+
+/**
+ * Race version type for version history queries
+ */
+export interface RaceVersion {
+  id: string;
+  raceId: string;
+  versionNumber: number;
+  name: string;
+  date: Date | null;
+  location: string | null;
+  country: string | null;
+  distanceKm: number | null;
+  elevationGainM: number | null;
+  elevationLossM: number | null;
+  startTime: string | null;
+  overallCutoffHours: number | null;
+  courseGpx: string | null;
+  isPublic: boolean | null;
+  metadata: Record<string, unknown> | null;
+  aidStationsSnapshot: AidStationData[] | null;
+  changeSummary: string | null;
+  changedBy: string | null;
+  createdAt: Date;
+}
+
+/**
+ * Get version history for a race
+ * Returns all previous versions in descending order (newest first)
+ */
+export async function getRaceVersionHistory(
+  raceId: string,
+  options?: { limit?: number; offset?: number }
+): Promise<{ versions: RaceVersion[]; total: number }> {
+  const { limit = 20, offset = 0 } = options ?? {};
+
+  try {
+    // Query version count
+    const countResult = await db.execute(
+      sql`SELECT COUNT(*) as count FROM race_versions WHERE race_id = ${raceId}::uuid`
+    );
+    const total = parseInt((countResult.rows[0] as { count: string })?.count ?? '0', 10);
+
+    // Query versions
+    const result = await db.execute(sql`
+      SELECT 
+        id,
+        race_id,
+        version_number,
+        name,
+        date,
+        location,
+        country,
+        distance_km,
+        elevation_gain_m,
+        elevation_loss_m,
+        start_time,
+        overall_cutoff_hours,
+        course_gpx,
+        is_public,
+        metadata,
+        aid_stations_snapshot,
+        change_summary,
+        changed_by,
+        created_at
+      FROM race_versions
+      WHERE race_id = ${raceId}::uuid
+      ORDER BY version_number DESC
+      LIMIT ${limit}
+      OFFSET ${offset}
+    `);
+
+    const versions: RaceVersion[] = (result.rows as Array<{
+      id: string;
+      race_id: string;
+      version_number: number;
+      name: string;
+      date: string | null;
+      location: string | null;
+      country: string | null;
+      distance_km: number | null;
+      elevation_gain_m: number | null;
+      elevation_loss_m: number | null;
+      start_time: string | null;
+      overall_cutoff_hours: number | null;
+      course_gpx: string | null;
+      is_public: boolean | null;
+      metadata: Record<string, unknown> | null;
+      aid_stations_snapshot: AidStationData[] | null;
+      change_summary: string | null;
+      changed_by: string | null;
+      created_at: string;
+    }>).map(row => ({
+      id: row.id,
+      raceId: row.race_id,
+      versionNumber: row.version_number,
+      name: row.name,
+      date: row.date ? new Date(row.date) : null,
+      location: row.location,
+      country: row.country,
+      distanceKm: row.distance_km,
+      elevationGainM: row.elevation_gain_m,
+      elevationLossM: row.elevation_loss_m,
+      startTime: row.start_time,
+      overallCutoffHours: row.overall_cutoff_hours,
+      courseGpx: row.course_gpx,
+      isPublic: row.is_public,
+      metadata: row.metadata,
+      aidStationsSnapshot: row.aid_stations_snapshot,
+      changeSummary: row.change_summary,
+      changedBy: row.changed_by,
+      createdAt: new Date(row.created_at),
+    }));
+
+    return { versions, total };
+  } catch {
+    // Table might not exist yet (migration not run)
+    return { versions: [], total: 0 };
+  }
+}
+
+/**
+ * Get a specific version of a race
+ */
+export async function getRaceVersion(
+  raceId: string,
+  versionNumber: number
+): Promise<RaceVersion | null> {
+  try {
+    const result = await db.execute(sql`
+      SELECT 
+        id,
+        race_id,
+        version_number,
+        name,
+        date,
+        location,
+        country,
+        distance_km,
+        elevation_gain_m,
+        elevation_loss_m,
+        start_time,
+        overall_cutoff_hours,
+        course_gpx,
+        is_public,
+        metadata,
+        aid_stations_snapshot,
+        change_summary,
+        changed_by,
+        created_at
+      FROM race_versions
+      WHERE race_id = ${raceId}::uuid AND version_number = ${versionNumber}
+    `);
+
+    if (result.rows.length === 0) {
+      return null;
+    }
+
+    const row = result.rows[0] as {
+      id: string;
+      race_id: string;
+      version_number: number;
+      name: string;
+      date: string | null;
+      location: string | null;
+      country: string | null;
+      distance_km: number | null;
+      elevation_gain_m: number | null;
+      elevation_loss_m: number | null;
+      start_time: string | null;
+      overall_cutoff_hours: number | null;
+      course_gpx: string | null;
+      is_public: boolean | null;
+      metadata: Record<string, unknown> | null;
+      aid_stations_snapshot: AidStationData[] | null;
+      change_summary: string | null;
+      changed_by: string | null;
+      created_at: string;
+    };
+
+    return {
+      id: row.id,
+      raceId: row.race_id,
+      versionNumber: row.version_number,
+      name: row.name,
+      date: row.date ? new Date(row.date) : null,
+      location: row.location,
+      country: row.country,
+      distanceKm: row.distance_km,
+      elevationGainM: row.elevation_gain_m,
+      elevationLossM: row.elevation_loss_m,
+      startTime: row.start_time,
+      overallCutoffHours: row.overall_cutoff_hours,
+      courseGpx: row.course_gpx,
+      isPublic: row.is_public,
+      metadata: row.metadata,
+      aidStationsSnapshot: row.aid_stations_snapshot,
+      changeSummary: row.change_summary,
+      changedBy: row.changed_by,
+      createdAt: new Date(row.created_at),
+    };
+  } catch {
+    // Table might not exist yet
+    return null;
+  }
+}
+
+/**
+ * Restore a race to a specific version
+ * This creates a new version (with the current state) and then restores
+ */
+export async function restoreRaceVersion(
+  raceId: string,
+  versionNumber: number
+): Promise<RaceWithAidStations | null> {
+  const version = await getRaceVersion(raceId, versionNumber);
+  if (!version) {
+    return null;
+  }
+
+  // Update the race with the version data
+  const updatedRace = await updateRace(
+    raceId,
+    {
+      name: version.name,
+      date: version.date?.toISOString() ?? null,
+      location: version.location ?? undefined,
+      country: version.country ?? undefined,
+      distanceKm: version.distanceKm ?? undefined,
+      elevationGainM: version.elevationGainM ?? undefined,
+      elevationLossM: version.elevationLossM ?? undefined,
+      startTime: version.startTime ?? undefined,
+      overallCutoffHours: version.overallCutoffHours ?? undefined,
+      courseGpx: version.courseGpx ?? undefined,
+      isPublic: version.isPublic ?? undefined,
+      metadata: version.metadata ?? undefined,
+    },
+    version.aidStationsSnapshot ?? undefined
+  );
+
+  return updatedRace;
+}

@@ -385,7 +385,7 @@ This is a non-negotiable requirement to ensure:
 - [x] Create save race API (`POST /api/races`) - Implemented in Phase 3
 - [x] Create update race API (`PUT /api/races/:id`)
 - [x] Create delete race API (`DELETE /api/races/:id`)
-- [ ] Implement race versioning (track changes)
+- [x] Implement race versioning (track changes)
 
 ### 4.2 Public/Private Race Visibility
 - [x] Add `is_public` flag to races table (already in schema)
@@ -552,9 +552,12 @@ This is a non-negotiable requirement to ensure:
   - **Fixed**: The link on the performances page was mislabeled "Back to Race Planning" but actually linked to `/` (home), not `/planning`. Updated the navigation to have correct labels and added a direct link to `/planning`.
 - [x] when clicking "create plan" in "planning" i get a big red banner "authentication required"
   - **Fixed**: Updated plans routes to use session-based authentication via `aidstation_session` cookie (same as activities routes), instead of requiring a `userId` cookie that was never set. Now plans routes use `getOrCreateSessionUser()` to automatically create/retrieve the user based on session.
+  - QA Reported Bugs: https://docs.google.com/document/d/1k-fngp9HjCNqbjLxypC7IZSjw_oaHwo_kKXzasRxww4/edit?usp=sharing
 
 
 ### Fast Follows
+- When the user uploads a GPX file in Race Search - It should update the Elevation Gain, loss
+- The aid station edits should calculate distance from previous and total distance from start based on the GPX course uploaded and not let manual adjustments when there's course data
 
 
 ### Future Work
