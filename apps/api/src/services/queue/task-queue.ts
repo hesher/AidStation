@@ -188,11 +188,12 @@ export class TaskQueue {
      */
     static async analyzeUserActivity(
         activityId: string,
-        gpxContent: string
+        fileContent: string,
+        fileType: 'gpx' | 'fit' = 'gpx'
     ): Promise<CeleryTaskResult<ActivityAnalysisResult>> {
         return celeryClient.submitAndWait<ActivityAnalysisResult>(
             GPX_TASKS.ANALYZE_USER_ACTIVITY,
-            [activityId, gpxContent],
+            [activityId, fileContent, fileType],
             {},
             60000
         );
@@ -203,11 +204,12 @@ export class TaskQueue {
      */
     static async submitUserActivityAnalysis(
         activityId: string,
-        gpxContent: string
+        fileContent: string,
+        fileType: 'gpx' | 'fit' = 'gpx'
     ): Promise<TaskSubmission> {
         const taskId = await celeryClient.submitTask(
             GPX_TASKS.ANALYZE_USER_ACTIVITY,
-            [activityId, gpxContent],
+            [activityId, fileContent, fileType],
             {}
         );
         return { taskId, submitted: true };

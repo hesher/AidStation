@@ -321,7 +321,7 @@ This is a non-negotiable requirement to ensure:
 - [x] Calculate elevation gain/loss between aid stations
 - [x] Implement Grade Adjusted Pace (GAP) using Minetti Equations
 - [ ] Store processed course as PostGIS LineString geometry
-- [ ] Uploading a GPX in the page where you add a Race should automatically process it and use the data to update the race information
+- [x] Uploading a GPX in the page where you add a Race should automatically process it and use the data to update the race information
 
 **Sub-Story Test:** ✅ Python worker correctly processes GPX and calculates metrics (tests written, pending environment setup)
 
@@ -423,7 +423,7 @@ This is a non-negotiable requirement to ensure:
 - [x] Support multi-file GPX upload (`POST /api/activities/bulk`)
 - [x] Queue files to Python worker for analysis
 - [ ] Store raw GPX in object storage (S3/local)
-- [ ] Allow uploading fit files
+- [x] Allow uploading FIT files
 
 **Sub-Story Test:** ✅ Activity upload and retrieval API (12 tests passing)
 
@@ -454,10 +454,10 @@ This is a non-negotiable requirement to ensure:
   - Average climbing pace (per % grade)
   - Average descending pace
   - Fatigue curve visualization
-- [ ] Visualize activities on map
-- [ ] Show elevation profile with pace overlay
+- [x] Visualize activities on map
+- [x] Show elevation profile with pace overlay
 
-**Sub-Story Test:** ✅ Past Performances UI page created with upload functionality
+**Sub-Story Test:** ✅ Past Performances UI page created with upload functionality, map visualization, and elevation profile
 
 **E2E Test (User Story 4 Complete):**
 - User uploads 3 GPX files → All are processed
@@ -526,16 +526,16 @@ This is a non-negotiable requirement to ensure:
 ## Phase 7: Polish & Production Readiness
 
 ### 7.1 UI/UX Refinements
-- [ ] Implement responsive design across all pages
+- [x] Implement responsive design across all pages
 - [x] Add loading skeletons and transitions
 - [x] Implement error boundaries and user-friendly error messages
-- [ ] Add tooltips and help text for complex features
+- [x] Add tooltips and help text for complex features
 
 ### 7.2 Testing & Quality
 - [ ] Achieve >80% code coverage for critical paths
 - [x] Complete e2e test suite for all user stories
-- [ ] Performance testing and optimization
-- [ ] Accessibility audit and fixes
+- [x] Performance testing and optimization
+- [x] Accessibility audit and fixes
 
 ### 7.3 Deployment
 - [ ] Set up CI/CD pipeline

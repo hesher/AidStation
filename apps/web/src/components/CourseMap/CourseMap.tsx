@@ -6,7 +6,7 @@
 
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, memo } from 'react';
 import mapboxgl from 'mapbox-gl';
 import { CourseCoordinate, AidStation } from '@/lib/types';
 import styles from './CourseMap.module.css';
@@ -20,11 +20,50 @@ interface CourseMapProps {
 
 const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
 
-export function CourseMap({ coordinates, aidStations, onAidStationClick }: CourseMapProps) {
+// Maximum number of coordinate points to render on the map
+// More points = smoother line but slower performance
+const MAX_COORDINATE_POINTS = 1000;
+
+/**
+ * Simplify coordinates array to reduce rendering load
+ * Uses uniform sampling to keep the line shape while reducing point count
+ */
+function simplifyCoordinates(coords: CourseCoordinate[], maxPoints: number): CourseCoordinate[] {
+  if (coords.length <= maxPoints) {
+    return coords;
+  }
+
+  const result: CourseCoordinate[] = [];
+  const step = (coords.length - 1) / (maxPoints - 1);
+
+  // Always include first point
+  result.push(coords[0]);
+
+  // Sample points at regular intervals
+  for (let i = 1; i < maxPoints - 1; i++) {
+    const index = Math.round(i * step);
+    if (index > 0 && index < coords.length - 1) {
+      result.push(coords[index]);
+    }
+  }
+
+  // Always include last point
+  result.push(coords[coords.length - 1]);
+
+  return result;
+}
+
+function CourseMapComponent({ coordinates, aidStations, onAidStationClick }: CourseMapProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const markersRef = useRef<mapboxgl.Marker[]>([]);
   const [mapError, setMapError] = useState<string | null>(null);
+
+  // Simplify coordinates for performance if there are too many points
+  const displayCoordinates = React.useMemo(
+    () => simplifyCoordinates(coordinates, MAX_COORDINATE_POINTS),
+    [coordinates]
+  );
 
   useEffect(() => {
     if (!mapContainer.current) return;
@@ -34,7 +73,7 @@ export function CourseMap({ coordinates, aidStations, onAidStationClick }: Cours
       return;
     }
 
-    if (coordinates.length === 0) {
+    if (displayCoordinates.length === 0) {
       setMapError('No course coordinates available');
       return;
     }
@@ -43,7 +82,7 @@ export function CourseMap({ coordinates, aidStations, onAidStationClick }: Cours
 
     // Calculate bounds for the course
     const bounds = new mapboxgl.LngLatBounds();
-    coordinates.forEach(coord => {
+    displayCoordinates.forEach(coord => {
       bounds.extend([coord.lon, coord.lat]);
     });
 
@@ -66,7 +105,7 @@ export function CourseMap({ coordinates, aidStations, onAidStationClick }: Cours
           properties: {},
           geometry: {
             type: 'LineString',
-            coordinates: coordinates.map(c => [c.lon, c.lat]),
+            coordinates: displayCoordinates.map(c => [c.lon, c.lat]),
           },
         },
       });
@@ -103,8 +142,8 @@ export function CourseMap({ coordinates, aidStations, onAidStationClick }: Cours
       });
 
       // Add start marker
-      if (coordinates.length > 0) {
-        const startCoord = coordinates[0];
+      if (displayCoordinates.length > 0) {
+        const startCoord = displayCoordinates[0];
         new mapboxgl.Marker({ color: '#2196F3' })
           .setLngLat([startCoord.lon, startCoord.lat])
           .setPopup(new mapboxgl.Popup().setHTML('<strong>🏁 Start</strong>'))
@@ -112,8 +151,8 @@ export function CourseMap({ coordinates, aidStations, onAidStationClick }: Cours
       }
 
       // Add finish marker
-      if (coordinates.length > 1) {
-        const finishCoord = coordinates[coordinates.length - 1];
+      if (displayCoordinates.length > 1) {
+        const finishCoord = displayCoordinates[displayCoordinates.length - 1];
         new mapboxgl.Marker({ color: '#F44336' })
           .setLngLat([finishCoord.lon, finishCoord.lat])
           .setPopup(new mapboxgl.Popup().setHTML('<strong>🎉 Finish</strong>'))
@@ -137,7 +176,7 @@ export function CourseMap({ coordinates, aidStations, onAidStationClick }: Cours
       // Clean up map
       map.current?.remove();
     };
-  }, [coordinates]);
+  }, [displayCoordinates]);
 
   // Add aid station markers separately so they can update independently
   useEffect(() => {
@@ -252,5 +291,43 @@ export function CourseMap({ coordinates, aidStations, onAidStationClick }: Cours
     </div>
   );
 }
+
+// Memoize the component to prevent unnecessary re-renders
+// Only re-render if coordinates, aidStations, or callback actually change
+export const CourseMap = memo(CourseMapComponent, (prevProps, nextProps) => {
+  // Custom comparison for performance
+  // Return true if props are equal (should NOT re-render)
+  
+  // Check if coordinates array reference or length changed
+  if (prevProps.coordinates !== nextProps.coordinates) {
+    // Do a shallow length check - if length differs, definitely re-render
+    if (prevProps.coordinates.length !== nextProps.coordinates.length) {
+      return false;
+    }
+    // If first/last coords differ, re-render (course changed)
+    if (prevProps.coordinates.length > 0 && nextProps.coordinates.length > 0) {
+      const prevFirst = prevProps.coordinates[0];
+      const nextFirst = nextProps.coordinates[0];
+      const prevLast = prevProps.coordinates[prevProps.coordinates.length - 1];
+      const nextLast = nextProps.coordinates[nextProps.coordinates.length - 1];
+      if (prevFirst.lat !== nextFirst.lat || prevFirst.lon !== nextFirst.lon ||
+          prevLast.lat !== nextLast.lat || prevLast.lon !== nextLast.lon) {
+        return false;
+      }
+    }
+  }
+  
+  // Check if aidStations array changed
+  if (prevProps.aidStations !== nextProps.aidStations) {
+    const prevStations = prevProps.aidStations || [];
+    const nextStations = nextProps.aidStations || [];
+    if (prevStations.length !== nextStations.length) {
+      return false;
+    }
+  }
+  
+  // Props are considered equal
+  return true;
+});
 
 export default CourseMap;

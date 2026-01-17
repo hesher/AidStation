@@ -1,14 +1,24 @@
 'use client';
 
 import { useState, useCallback, useEffect, useRef } from 'react';
+import dynamic from 'next/dynamic';
 import styles from './page.module.css';
 import { RaceCard } from '@/components/RaceCard';
 import { AidStationTable } from '@/components/AidStationTable';
-import { CourseMap } from '@/components/CourseMap';
 import { RaceBrowser } from '@/components/RaceBrowser';
 import { RaceSettingsPanel } from '@/components/RaceSettingsPanel';
-import { searchRace, getCurrentRace, saveRace, updateRace } from '@/lib/api';
+import { Skeleton, SkeletonMap } from '@/components/Skeleton';
+import { searchRace, getCurrentRace, saveRace, updateRace, analyzeGpx } from '@/lib/api';
 import { RaceData, AidStation } from '@/lib/types';
+
+// Lazy load heavy map component to improve initial page load
+const CourseMap = dynamic(
+  () => import('@/components/CourseMap').then((mod) => mod.CourseMap),
+  {
+    loading: () => <SkeletonMap />,
+    ssr: false,
+  }
+);
 
 type AppState = 'initializing' | 'idle' | 'searching' | 'success' | 'error';
 
@@ -190,7 +200,7 @@ export default function Home() {
         return;
       }
 
-      // Extract track points from GPX
+      // Extract track points from GPX for immediate visualization
       const coordinates: Array<{ lat: number; lon: number; elevation?: number }> = [];
 
       // Try to get track points first (most common)
@@ -243,12 +253,69 @@ export default function Home() {
         return;
       }
 
-      // Update race data with new course coordinates
-      setRaceData({
+      // Update race data with new course coordinates immediately for visualization
+      const updatedRaceData = {
         ...raceData,
         courseCoordinates: coordinates,
-      });
+      };
+      setRaceData(updatedRaceData);
       setHasUnsavedChanges(true);
+
+      // Now analyze the GPX using the Python worker for advanced metrics
+      const analysisResult = await analyzeGpx(
+        gpxContent,
+        raceData.aidStations?.map(s => ({
+          name: s.name,
+          distanceKm: s.distanceKm ?? undefined,
+        }))
+      );
+
+      if (analysisResult.success && analysisResult.data) {
+        const { courseStats, aidStations: analyzedAidStations, coordinates: processedCoords } = analysisResult.data;
+
+        // Update race data with calculated metrics
+        const finalRaceData = {
+          ...updatedRaceData,
+          // Use processed coordinates if available (smoother), otherwise keep the original
+          courseCoordinates: processedCoords && processedCoords.length > 0 
+            ? processedCoords 
+            : coordinates,
+        };
+
+        // Update race metrics from course stats
+        if (courseStats) {
+          finalRaceData.distanceKm = courseStats.total_distance_km;
+          finalRaceData.elevationGainM = courseStats.total_elevation_gain_m;
+          finalRaceData.elevationLossM = courseStats.total_elevation_loss_m;
+        }
+
+        // Update aid station data with calculated distances if available
+        if (analyzedAidStations && analyzedAidStations.length > 0 && finalRaceData.aidStations) {
+          // Match analyzed aid stations with existing ones by name
+          const updatedAidStations = finalRaceData.aidStations.map(station => {
+            const analyzed = analyzedAidStations.find(
+              a => a.name.toLowerCase() === station.name.toLowerCase()
+            );
+            if (analyzed) {
+              return {
+                ...station,
+                distanceKm: analyzed.distance_km,
+                distanceFromPrevKm: analyzed.distance_from_prev_km,
+                elevationM: analyzed.elevation_m,
+                elevationGainFromPrevM: analyzed.elevation_gain_from_prev_m,
+                elevationLossFromPrevM: analyzed.elevation_loss_from_prev_m,
+              };
+            }
+            return station;
+          });
+          finalRaceData.aidStations = updatedAidStations;
+        }
+
+        setRaceData(finalRaceData);
+      } else if (analysisResult.error) {
+        // Log the error but don't fail - we still have the basic coordinates
+        console.warn('GPX analysis warning:', analysisResult.error);
+      }
 
       // Clear the input so the same file can be re-uploaded
       e.target.value = '';
@@ -296,8 +363,12 @@ export default function Home() {
         Enter the name of an ultra-marathon or endurance race, and we&apos;ll help you plan your strategy.
       </p>
 
-      <form onSubmit={handleSearch} className={styles.searchForm}>
+      <form onSubmit={handleSearch} className={styles.searchForm} role="search">
+        <label htmlFor="race-search" className="sr-only">
+          Search for a race
+        </label>
         <input
+          id="race-search"
           type="text"
           value={raceName}
           onChange={(e) => setRaceName(e.target.value)}
@@ -305,7 +376,11 @@ export default function Home() {
           className={styles.searchInput}
           disabled={appState === 'searching'}
           data-testid="race-search-input"
+          aria-describedby="race-search-hint"
         />
+        <span id="race-search-hint" className="sr-only">
+          Enter the name of an ultra-marathon or endurance race
+        </span>
         <button
           type="submit"
           className={styles.searchButton}

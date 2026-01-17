@@ -31,8 +31,13 @@ export default function RootLayout({
         </Script>
       </head>
       <body>
+        <a href="#main-content" className="skip-link">
+          Skip to main content
+        </a>
         <NavBar />
-        {children}
+        <div id="main-content">
+          {children}
+        </div>
       </body>
     </html>
   );

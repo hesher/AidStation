@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import styles from './planning.module.css';
+import { InfoIcon } from '@/components/Tooltip';
+import { HelpCard, PLANNING_HELP_TOPICS } from '@/components/HelpCard';
 import {
   getPlans,
   createPlan,
@@ -263,7 +265,7 @@ export default function PlanningPage() {
       {error && (
         <div className={styles.errorBanner}>
           {error}
-          <button onClick={() => setError(null)}>×</button>
+          <button onClick={() => setError(null)} aria-label="Dismiss error">×</button>
         </div>
       )}
 
@@ -273,22 +275,46 @@ export default function PlanningPage() {
           {/* Performance Summary */}
           {performance && performance.activitiesCount > 0 && (
             <section className={styles.performanceCard}>
-              <h3>Your Performance Profile</h3>
+              <h3>
+                Your Performance Profile
+                <InfoIcon
+                  tooltip="Your personalized pacing data calculated from past activities. Recent activities are weighted more heavily (recency bias)."
+                  position="right"
+                />
+              </h3>
               <div className={styles.perfStats}>
                 <div className={styles.perfStat}>
-                  <span className={styles.perfLabel}>Flat Pace</span>
+                  <span className={styles.perfLabel}>
+                    Flat Pace
+                    <InfoIcon
+                      tooltip="Your average pace on flat terrain (less than 3% grade). Used as baseline for race predictions."
+                      position="bottom"
+                    />
+                  </span>
                   <span className={styles.perfValue}>
                     {formatPace(performance.flatPaceMinKm)}
                   </span>
                 </div>
                 <div className={styles.perfStat}>
-                  <span className={styles.perfLabel}>Climb Pace</span>
+                  <span className={styles.perfLabel}>
+                    Climb Pace
+                    <InfoIcon
+                      tooltip="Your average pace on uphill terrain. Adjusted using Grade Adjusted Pace (GAP) calculations."
+                      position="bottom"
+                    />
+                  </span>
                   <span className={styles.perfValue}>
                     {formatPace(performance.climbingPaceMinKm)}
                   </span>
                 </div>
                 <div className={styles.perfStat}>
-                  <span className={styles.perfLabel}>Activities</span>
+                  <span className={styles.perfLabel}>
+                    Activities
+                    <InfoIcon
+                      tooltip="Number of past activities analyzed to build your performance profile."
+                      position="bottom"
+                    />
+                  </span>
                   <span className={styles.perfValue}>
                     {performance.activitiesCount}
                   </span>
@@ -299,13 +325,18 @@ export default function PlanningPage() {
 
           {/* Create New Plan */}
           <section className={styles.createSection}>
-            <h3>Create New Plan</h3>
-            <div className={styles.createForm}>
+            <h3 id="create-plan-heading">Create New Plan</h3>
+            <div className={styles.createForm} role="form" aria-labelledby="create-plan-heading">
+              <label htmlFor="race-select" className="sr-only">
+                Select a race
+              </label>
               <select
+                id="race-select"
                 value={selectedRaceId}
                 onChange={(e) => setSelectedRaceId(e.target.value)}
                 className={styles.raceSelect}
                 disabled={isCreating}
+                aria-describedby="race-select-hint"
               >
                 <option value="">Select a race...</option>
                 {races.map((race) => (
@@ -314,7 +345,14 @@ export default function PlanningPage() {
                   </option>
                 ))}
               </select>
+              <span id="race-select-hint" className="sr-only">
+                Choose a saved race to create a race plan
+              </span>
+              <label htmlFor="plan-name" className="sr-only">
+                Plan name (optional)
+              </label>
               <input
+                id="plan-name"
                 type="text"
                 placeholder="Plan name (optional)"
                 value={planName}
@@ -441,11 +479,15 @@ export default function PlanningPage() {
                   ⚙️ {showPaceSettings ? 'Hide' : 'Show'} Pace Settings
                 </button>
 
-                {showPaceSettings && (
+              {showPaceSettings && (
                   <div className={styles.paceSettingsPanel}>
                     <div className={styles.paceSettingRow}>
                       <label className={styles.paceLabel}>
                         Base Pace
+                        <InfoIcon
+                          tooltip="Your target pace on flat terrain. This is the foundation for all predictions and will be adjusted based on terrain and fatigue."
+                          position="right"
+                        />
                         <span className={styles.paceHint}>Your flat terrain pace</span>
                       </label>
                       <div className={styles.paceInputGroup}>
@@ -473,6 +515,10 @@ export default function PlanningPage() {
                     <div className={styles.paceSettingRow}>
                       <label className={styles.paceLabel}>
                         Nighttime Slowdown
+                        <InfoIcon
+                          tooltip="Most runners slow down 10-20% after dark due to reduced visibility, temperature drops, and fatigue. Adjust based on your experience racing at night."
+                          position="right"
+                        />
                         <span className={styles.paceHint}>Additional slowdown after dark</span>
                       </label>
                       <div className={styles.sliderGroup}>
@@ -503,17 +549,59 @@ export default function PlanningPage() {
               {selectedPlan.aidStationPredictions &&
               selectedPlan.aidStationPredictions.length > 0 ? (
                 <div className={styles.timeline}>
-                  <h3>Aid Station Timeline</h3>
+                  <h3>
+                    Aid Station Timeline
+                    <InfoIcon
+                      tooltip="Predicted arrival times at each aid station based on your performance profile, terrain, and fatigue modeling."
+                      position="right"
+                    />
+                  </h3>
                   <div className={styles.timelineTable}>
                     <div className={styles.timelineHeader}>
-                      <span>Status</span>
+                      <span>
+                        Status
+                        <InfoIcon
+                          tooltip="🟢 Safe: >30min buffer. 🟡 Warning: 15-30min. 🔴 Danger: <15min. ❌ Missed cutoff."
+                          position="bottom"
+                        />
+                      </span>
                       <span>Station</span>
                       <span>Distance</span>
-                      <span>Arrival</span>
-                      <span>Elapsed</span>
-                      <span>Cutoff</span>
-                      <span>Buffer</span>
-                      <span>Pace</span>
+                      <span>
+                        Arrival
+                        <InfoIcon
+                          tooltip="Predicted time of day when you will arrive at this aid station."
+                          position="bottom"
+                        />
+                      </span>
+                      <span>
+                        Elapsed
+                        <InfoIcon
+                          tooltip="Total race time from start to this aid station."
+                          position="bottom"
+                        />
+                      </span>
+                      <span>
+                        Cutoff
+                        <InfoIcon
+                          tooltip="Maximum allowed time to reach this station before being pulled from the race."
+                          position="bottom"
+                        />
+                      </span>
+                      <span>
+                        Buffer
+                        <InfoIcon
+                          tooltip="Time margin between your predicted arrival and the cutoff. More buffer = safer."
+                          position="bottom"
+                        />
+                      </span>
+                      <span>
+                        Pace
+                        <InfoIcon
+                          tooltip="Predicted pace for the segment leading to this station, adjusted for terrain and fatigue."
+                          position="bottom"
+                        />
+                      </span>
                     </div>
                     {selectedPlan.aidStationPredictions.map((station, index) => (
                       <div
@@ -595,6 +683,9 @@ export default function PlanningPage() {
           )}
         </section>
       </div>
+
+      {/* Help section explaining key concepts */}
+      <HelpCard topics={PLANNING_HELP_TOPICS} title="Understanding Your Race Plan" />
 
     </main>
   );

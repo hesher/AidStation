@@ -4,7 +4,7 @@
  * Displays an overview of race information in a card format.
  */
 
-import React from 'react';
+import React, { memo } from 'react';
 import { RaceData } from '@/lib/types';
 import styles from './RaceCard.module.css';
 
@@ -12,7 +12,7 @@ interface RaceCardProps {
   race: RaceData;
 }
 
-export function RaceCard({ race }: RaceCardProps) {
+function RaceCardComponent({ race }: RaceCardProps) {
   const formatDate = (dateString?: string) => {
     if (!dateString) return 'Date TBD';
     try {
@@ -117,5 +117,23 @@ export function RaceCard({ race }: RaceCardProps) {
     </div>
   );
 }
+
+// Memoize to prevent re-renders when race data hasn't changed
+export const RaceCard = memo(RaceCardComponent, (prevProps, nextProps) => {
+  // Return true if props are equal (should NOT re-render)
+  const prevRace = prevProps.race;
+  const nextRace = nextProps.race;
+  
+  // Compare key race properties
+  return (
+    prevRace.id === nextRace.id &&
+    prevRace.name === nextRace.name &&
+    prevRace.date === nextRace.date &&
+    prevRace.distanceKm === nextRace.distanceKm &&
+    prevRace.elevationGainM === nextRace.elevationGainM &&
+    prevRace.elevationLossM === nextRace.elevationLossM &&
+    prevRace.aidStations?.length === nextRace.aidStations?.length
+  );
+});
 
 export default RaceCard;

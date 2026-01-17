@@ -6,7 +6,7 @@
 
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, memo } from 'react';
 import styles from './ElevationProfile.module.css';
 
 interface DataPoint {
@@ -23,7 +23,7 @@ interface ElevationProfileProps {
   className?: string;
 }
 
-export function ElevationProfile({
+function ElevationProfileComponent({
   data,
   width = 600,
   height = 200,
@@ -209,3 +209,33 @@ export function ElevationProfile({
     </div>
   );
 }
+
+// Memoize the component to prevent unnecessary re-renders
+// Only re-renders when data, dimensions, or showPace actually change
+export const ElevationProfile = memo(ElevationProfileComponent, (prevProps, nextProps) => {
+  // Return true if props are equal (should NOT re-render)
+  if (prevProps.width !== nextProps.width) return false;
+  if (prevProps.height !== nextProps.height) return false;
+  if (prevProps.showPace !== nextProps.showPace) return false;
+  if (prevProps.className !== nextProps.className) return false;
+  
+  // Check data array
+  if (prevProps.data !== nextProps.data) {
+    if (prevProps.data.length !== nextProps.data.length) return false;
+    // Do a shallow check on first and last elements
+    if (prevProps.data.length > 0) {
+      const prevFirst = prevProps.data[0];
+      const nextFirst = nextProps.data[0];
+      const prevLast = prevProps.data[prevProps.data.length - 1];
+      const nextLast = nextProps.data[nextProps.data.length - 1];
+      if (prevFirst.distance !== nextFirst.distance || 
+          prevFirst.elevation !== nextFirst.elevation ||
+          prevLast.distance !== nextLast.distance ||
+          prevLast.elevation !== nextLast.elevation) {
+        return false;
+      }
+    }
+  }
+  
+  return true;
+});

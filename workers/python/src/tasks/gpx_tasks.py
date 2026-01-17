@@ -229,9 +229,11 @@ def calculate_aid_station_metrics(
 
 
 @app.task(name="analyze_user_activity", bind=True)
-def analyze_user_activity(self, activity_id: str, gpx_content: str) -> Dict[str, Any]:
+def analyze_user_activity(
+    self, activity_id: str, file_content: str, file_type: str = "gpx"
+) -> Dict[str, Any]:
     """
-    Analyze a user's GPX activity for performance metrics.
+    Analyze a user's GPX or FIT activity for performance metrics.
 
     Extracts detailed performance data including:
     - Pace by gradient category
@@ -241,19 +243,35 @@ def analyze_user_activity(self, activity_id: str, gpx_content: str) -> Dict[str,
 
     Args:
         activity_id: Unique ID for the activity
-        gpx_content: Raw GPX file content
+        file_content: Raw file content (GPX as string, FIT as base64-encoded string)
+        file_type: Type of file - "gpx" or "fit" (default: "gpx")
 
     Returns:
         Dict containing complete activity analysis
     """
+    from ..analysis import parse_fit_to_gpx
+
     logger.info(
         f"[Task {self.request.id}] Starting analyze_user_activity for activity_id={activity_id}"
     )
     logger.info(
-        f"[Task {self.request.id}] GPX content length: {len(gpx_content)} chars"
+        f"[Task {self.request.id}] File content length: {len(file_content)} chars, type: {file_type}"
     )
 
     try:
+        # Convert FIT to GPX if needed
+        if file_type.lower() == "fit":
+            import base64
+
+            logger.info(f"[Task {self.request.id}] Converting FIT file to GPX format...")
+            fit_bytes = base64.b64decode(file_content)
+            gpx_content = parse_fit_to_gpx(fit_bytes)
+            logger.info(
+                f"[Task {self.request.id}] FIT converted to GPX: {len(gpx_content)} chars"
+            )
+        else:
+            gpx_content = file_content
+
         logger.info(f"[Task {self.request.id}] Creating ActivityPerformanceAnalyzer...")
         analyzer = ActivityPerformanceAnalyzer(gpx_content, activity_id)
 

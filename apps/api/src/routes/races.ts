@@ -21,6 +21,7 @@ import {
   type AidStationData,
   type SessionData,
 } from '../db/repositories';
+import { TaskQueue, CourseAnalysisResult } from '../services/queue/task-queue';
 
 // Request validation schemas
 const searchRaceSchema = z.object({
@@ -841,6 +842,98 @@ export async function raceRoutes(app: FastifyInstance) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
 
       app.log.error({ error: errorMessage }, 'Failed to get countries');
+
+      reply.status(500);
+
+      return {
+        success: false,
+        error: errorMessage,
+      };
+    }
+  });
+
+  /**
+   * POST /api/races/analyze-gpx
+   *
+   * Analyze a GPX file to extract course metrics (distance, elevation, etc.)
+   * This sends the GPX to the Python worker for processing and returns the results.
+   */
+  app.post('/races/analyze-gpx', async (
+    request: FastifyRequest<{
+      Body: {
+        gpxContent: string;
+        aidStations?: Array<{ name: string; distanceKm?: number; lat?: number; lon?: number }>;
+      };
+    }>,
+    reply: FastifyReply
+  ): Promise<{
+    success: boolean;
+    data?: {
+      courseStats?: CourseAnalysisResult['course_stats'];
+      elevationProfile?: CourseAnalysisResult['elevation_profile'];
+      aidStations?: CourseAnalysisResult['aid_stations'];
+      coordinates?: CourseAnalysisResult['coordinates'];
+    };
+    error?: string;
+  }> => {
+    try {
+      const { gpxContent, aidStations } = request.body;
+
+      if (!gpxContent || typeof gpxContent !== 'string') {
+        reply.status(400);
+        return {
+          success: false,
+          error: 'GPX content is required',
+        };
+      }
+
+      app.log.info({ gpxLength: gpxContent.length, aidStationsCount: aidStations?.length }, 'Analyzing GPX course');
+
+      // Check if Python worker is connected
+      if (!TaskQueue.isConnected()) {
+        app.log.warn('Python worker not connected, returning parsed coordinates only');
+        reply.status(503);
+        return {
+          success: false,
+          error: 'Analysis service not available. GPX was parsed but advanced metrics could not be calculated.',
+        };
+      }
+
+      // Submit GPX to Python worker for analysis
+      const result = await TaskQueue.analyzeGpxCourse(gpxContent, aidStations);
+
+      if (result.status !== 'SUCCESS' || !result.result) {
+        app.log.error({ error: result.error, status: result.status }, 'GPX analysis failed');
+        reply.status(500);
+        return {
+          success: false,
+          error: result.error || 'Failed to analyze GPX file',
+        };
+      }
+
+      const analysisResult = result.result;
+
+      if (!analysisResult.success) {
+        reply.status(500);
+        return {
+          success: false,
+          error: analysisResult.error || 'GPX analysis returned an error',
+        };
+      }
+
+      return {
+        success: true,
+        data: {
+          courseStats: analysisResult.course_stats,
+          elevationProfile: analysisResult.elevation_profile,
+          aidStations: analysisResult.aid_stations,
+          coordinates: analysisResult.coordinates,
+        },
+      };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+
+      app.log.error({ error: errorMessage }, 'Failed to analyze GPX');
 
       reply.status(500);
 

@@ -1,14 +1,37 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import dynamic from 'next/dynamic';
 import styles from './performances.module.css';
+import { Skeleton, SkeletonMap } from '@/components/Skeleton';
+import { InfoIcon } from '@/components/Tooltip';
+import { HelpCard, PERFORMANCES_HELP_TOPICS } from '@/components/HelpCard';
 import {
   getActivities,
   uploadActivity,
   getPerformanceProfile,
   deleteActivity,
   syncActivities,
+  getActivityCoordinates,
+  ActivityCoordinates,
 } from '../../lib/api';
+
+// Lazy load heavy components to improve initial page load
+const CourseMap = dynamic(
+  () => import('@/components/CourseMap').then((mod) => mod.CourseMap),
+  {
+    loading: () => <SkeletonMap />,
+    ssr: false,
+  }
+);
+
+const ElevationProfile = dynamic(
+  () => import('@/components/ElevationProfile').then((mod) => mod.ElevationProfile),
+  {
+    loading: () => <Skeleton width="100%" height={150} />,
+    ssr: false,
+  }
+);
 
 interface Activity {
   id: string;
@@ -43,6 +66,77 @@ interface PerformanceProfile {
   fatigueFactor?: number;
   activitiesCount: number;
   lastUpdated?: string;
+}
+
+// Selected activity view including coordinates
+interface SelectedActivityView {
+  activity: Activity;
+  coordinates: ActivityCoordinates[];
+  isLoading: boolean;
+}
+
+// Compute elevation profile data from coordinates
+function computeElevationProfile(coordinates: ActivityCoordinates[]): Array<{ distance: number; elevation: number }> {
+  if (!coordinates || coordinates.length === 0) return [];
+
+  // Calculate cumulative distance using Haversine formula
+  const toRad = (deg: number) => (deg * Math.PI) / 180;
+
+  const haversineDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+    const R = 6371; // Earth radius in km
+    const dLat = toRad(lat2 - lat1);
+    const dLon = toRad(lon2 - lon1);
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  };
+
+  const profile: Array<{ distance: number; elevation: number }> = [];
+  let cumulativeDistance = 0;
+
+  // Sample every Nth point for performance (max ~500 points for the chart)
+  const step = Math.max(1, Math.floor(coordinates.length / 500));
+
+  for (let i = 0; i < coordinates.length; i += step) {
+    const coord = coordinates[i];
+
+    if (i > 0) {
+      const prevCoord = coordinates[i - step] || coordinates[i - 1];
+      cumulativeDistance += haversineDistance(
+        prevCoord.lat,
+        prevCoord.lon,
+        coord.lat,
+        coord.lon
+      );
+    }
+
+    profile.push({
+      distance: cumulativeDistance,
+      elevation: coord.elevation ?? 0,
+    });
+  }
+
+  // Always include the last point
+  const lastCoord = coordinates[coordinates.length - 1];
+  const lastProfile = profile[profile.length - 1];
+  if (lastProfile && lastCoord && coordinates.length > 1) {
+    const prevCoord = coordinates[coordinates.length - 2];
+    const finalDist =
+      lastProfile.distance +
+      haversineDistance(prevCoord.lat, prevCoord.lon, lastCoord.lat, lastCoord.lon);
+
+    // Only add if not already the last point
+    if (Math.abs(finalDist - lastProfile.distance) > 0.01) {
+      profile.push({
+        distance: finalDist,
+        elevation: lastCoord.elevation ?? 0,
+      });
+    }
+  }
+
+  return profile;
 }
 
 function formatPace(paceMinKm: number | undefined): string {
@@ -85,6 +179,7 @@ export default function PerformancesPage() {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
+  const [selectedActivityView, setSelectedActivityView] = useState<SelectedActivityView | null>(null);
 
   const loadData = useCallback(async () => {
     try {
@@ -128,8 +223,29 @@ export default function PerformancesPage() {
 
     for (const file of Array.from(files)) {
       try {
-        const gpxContent = await file.text();
-        const result = await uploadActivity(gpxContent, file.name);
+        const fileName = file.name.toLowerCase();
+        const isFitFile = fileName.endsWith('.fit');
+
+        let fileContent: string;
+        let fileType: 'gpx' | 'fit';
+
+        if (isFitFile) {
+          // FIT files are binary - read as ArrayBuffer and convert to base64
+          const arrayBuffer = await file.arrayBuffer();
+          const bytes = new Uint8Array(arrayBuffer);
+          let binary = '';
+          for (let i = 0; i < bytes.byteLength; i++) {
+            binary += String.fromCharCode(bytes[i]);
+          }
+          fileContent = btoa(binary);
+          fileType = 'fit';
+        } else {
+          // GPX files are text
+          fileContent = await file.text();
+          fileType = 'gpx';
+        }
+
+        const result = await uploadActivity(fileContent, file.name, undefined, fileType);
 
         if (result.success) {
           uploaded++;
@@ -201,6 +317,36 @@ export default function PerformancesPage() {
     }
   };
 
+  const handleViewMap = async (activity: Activity) => {
+    setSelectedActivityView({
+      activity,
+      coordinates: [],
+      isLoading: true,
+    });
+
+    try {
+      const result = await getActivityCoordinates(activity.id);
+      if (result.success && result.data) {
+        setSelectedActivityView({
+          activity,
+          coordinates: result.data.coordinates,
+          isLoading: false,
+        });
+      } else {
+        setError('Failed to load activity map');
+        setSelectedActivityView(null);
+      }
+    } catch (err) {
+      console.error('Load map error:', err);
+      setError('Failed to load activity map');
+      setSelectedActivityView(null);
+    }
+  };
+
+  const handleCloseMap = () => {
+    setSelectedActivityView(null);
+  };
+
   if (isLoading) {
     return (
       <main className={styles.main}>
@@ -224,35 +370,65 @@ export default function PerformancesPage() {
       {error && (
         <div className={styles.errorBanner}>
           {error}
-          <button onClick={() => setError(null)}>×</button>
+          <button onClick={() => setError(null)} aria-label="Dismiss error">×</button>
         </div>
       )}
 
       {/* Performance Summary Card */}
       <section className={styles.summarySection}>
-        <h2>Performance Summary</h2>
+        <h2>
+          Performance Summary
+          <InfoIcon
+            tooltip="Your aggregated performance metrics calculated from all uploaded activities, with more recent activities weighted more heavily."
+            position="right"
+          />
+        </h2>
         {performanceProfile && performanceProfile.activitiesCount > 0 ? (
           <div className={styles.summaryGrid}>
             <div className={styles.summaryCard}>
-              <span className={styles.cardLabel}>Flat Pace</span>
+              <span className={styles.cardLabel}>
+                Flat Pace
+                <InfoIcon
+                  tooltip="Average pace on flat terrain (0-3% grade). Used as baseline for predictions."
+                  position="bottom"
+                />
+              </span>
               <span className={styles.cardValue}>
                 {formatPace(performanceProfile.flatPaceMinKm)}
               </span>
             </div>
             <div className={styles.summaryCard}>
-              <span className={styles.cardLabel}>Climbing Pace</span>
+              <span className={styles.cardLabel}>
+                Climbing Pace
+                <InfoIcon
+                  tooltip="Average pace on uphill terrain (>3% grade). Slower due to additional effort required."
+                  position="bottom"
+                />
+              </span>
               <span className={styles.cardValue}>
                 {formatPace(performanceProfile.climbingPaceMinKm)}
               </span>
             </div>
             <div className={styles.summaryCard}>
-              <span className={styles.cardLabel}>Descending Pace</span>
+              <span className={styles.cardLabel}>
+                Descending Pace
+                <InfoIcon
+                  tooltip="Average pace on downhill terrain (<-3% grade). Faster due to gravity assistance."
+                  position="bottom"
+                />
+              </span>
               <span className={styles.cardValue}>
                 {formatPace(performanceProfile.descendingPaceMinKm)}
               </span>
             </div>
             <div className={styles.summaryCard}>
-              <span className={styles.cardLabel}>Fatigue Factor</span>
+              <span className={styles.cardLabel}>
+                Fatigue Factor
+                <InfoIcon
+                  tooltip="How much your pace slows over distance. Higher = more slowdown. Calculated from your activity data."
+                  position="bottom"
+                />
+              </span>
               <span className={styles.cardValue}>
                 {performanceProfile.fatigueFactor !== undefined
                   ? `${performanceProfile.fatigueFactor.toFixed(1)}%`
@@ -260,7 +436,13 @@ export default function PerformancesPage() {
               </span>
             </div>
             <div className={styles.summaryCard}>
-              <span className={styles.cardLabel}>Activities Analyzed</span>
+              <span className={styles.cardLabel}>
+                Activities Analyzed
+                <InfoIcon
+                  tooltip="Total number of activities used to calculate your performance profile."
+                  position="bottom"
+                />
+              </span>
               <span className={styles.cardValue}>
                 {performanceProfile.activitiesCount}
               </span>
@@ -286,7 +468,7 @@ export default function PerformancesPage() {
           <input
             type="file"
             id="gpx-upload"
-            accept=".gpx"
+            accept=".gpx,.fit"
             multiple
             onChange={handleFileUpload}
             disabled={isUploading}
@@ -301,7 +483,7 @@ export default function PerformancesPage() {
             ) : (
               <>
                 <span className={styles.uploadIcon}>📁</span>
-                <span>Click to upload GPX files</span>
+                <span>Click to upload GPX or FIT files</span>
                 <span className={styles.uploadHint}>or drag and drop</span>
               </>
             )}
@@ -317,10 +499,28 @@ export default function PerformancesPage() {
             <div className={styles.tableHeader}>
               <span>Name</span>
               <span>Date</span>
-              <span>Distance</span>
-              <span>Elevation</span>
+              <span>
+                Distance
+                <InfoIcon
+                  tooltip="Total distance of the activity calculated from GPS data."
+                  position="bottom"
+                />
+              </span>
+              <span>
+                Elevation
+                <InfoIcon
+                  tooltip="Total elevation gain (climbing) during the activity."
+                  position="bottom"
+                />
+              </span>
               <span>Duration</span>
-              <span>Pace</span>
+              <span>
+                Pace
+                <InfoIcon
+                  tooltip="Average pace (time per km). Does not include stopped time."
+                  position="bottom"
+                />
+              </span>
               <span>Actions</span>
             </div>
             {activities.map((activity) => (
@@ -343,6 +543,13 @@ export default function PerformancesPage() {
                 <span>{formatPace(activity.averagePaceMinKm)}</span>
                 <span className={styles.actions}>
                   <button
+                    onClick={() => handleViewMap(activity)}
+                    className={styles.viewMapButton}
+                    title="View on map"
+                  >
+                    🗺️
+                  </button>
+                  <button
                     onClick={() => handleDeleteActivity(activity.id)}
                     className={styles.deleteButton}
                     title="Delete activity"
@@ -359,6 +566,63 @@ export default function PerformancesPage() {
           </div>
         )}
       </section>
+
+      {/* Activity Map Modal */}
+      {selectedActivityView && (
+        <div className={styles.mapModal} onClick={handleCloseMap}>
+          <div className={styles.mapModalContent} onClick={(e) => e.stopPropagation()}>
+            <div className={styles.mapModalHeader}>
+              <h3>{selectedActivityView.activity.name || 'Activity'}</h3>
+              <div className={styles.mapModalMeta}>
+                {selectedActivityView.activity.distanceKm && (
+                  <span>{selectedActivityView.activity.distanceKm.toFixed(1)} km</span>
+                )}
+                {selectedActivityView.activity.elevationGainM && (
+                  <span>{Math.round(selectedActivityView.activity.elevationGainM)} m ↗</span>
+                )}
+                {selectedActivityView.activity.activityDate && (
+                  <span>{formatDate(selectedActivityView.activity.activityDate)}</span>
+                )}
+              </div>
+              <button onClick={handleCloseMap} className={styles.mapModalClose} aria-label="Close map">
+                ×
+              </button>
+            </div>
+            <div className={styles.mapModalBody}>
+              {selectedActivityView.isLoading ? (
+                <div className={styles.mapLoading}>
+                  <div className={styles.spinner}></div>
+                  <p>Loading activity track...</p>
+                </div>
+              ) : selectedActivityView.coordinates.length > 0 ? (
+                <>
+                  <CourseMap
+                    coordinates={selectedActivityView.coordinates}
+                    aidStations={[]}
+                  />
+                  {/* Elevation Profile with elevation data */}
+                  {selectedActivityView.coordinates.some(c => c.elevation !== undefined) && (
+                    <div className={styles.elevationProfileContainer}>
+                      <ElevationProfile
+                        data={computeElevationProfile(selectedActivityView.coordinates)}
+                        height={150}
+                        showPace={false}
+                      />
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className={styles.mapEmpty}>
+                  <p>No GPS data available for this activity</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Help section explaining key concepts */}
+      <HelpCard topics={PERFORMANCES_HELP_TOPICS} title="Understanding Your Performance Data" />
 
     </main>
   );

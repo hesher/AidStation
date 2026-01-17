@@ -279,25 +279,40 @@ export async function getActivities(limit = 50, offset = 0): Promise<ActivitiesR
 }
 
 /**
- * Upload a GPX activity
+ * Upload a GPX or FIT activity
  */
 export async function uploadActivity(
-  gpxContent: string,
+  fileContent: string,
   name?: string,
-  activityDate?: string
+  activityDate?: string,
+  fileType: 'gpx' | 'fit' = 'gpx'
 ): Promise<ActivityResponse> {
   try {
+    const body: {
+      name?: string;
+      activityDate?: string;
+      gpxContent?: string;
+      fitContent?: string;
+      fileType?: 'gpx' | 'fit';
+    } = {
+      name,
+      activityDate,
+      fileType,
+    };
+
+    if (fileType === 'fit') {
+      body.fitContent = fileContent;
+    } else {
+      body.gpxContent = fileContent;
+    }
+
     const response = await fetch(`${API_BASE_URL}/activities`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       credentials: 'include',
-      body: JSON.stringify({
-        gpxContent,
-        name,
-        activityDate,
-      }),
+      body: JSON.stringify(body),
     });
 
     const data = await response.json();
@@ -368,6 +383,53 @@ export async function deleteActivity(id: string): Promise<{ success: boolean; er
       return {
         success: false,
         error: data.error || 'Failed to delete activity',
+      };
+    }
+
+    return data;
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Network error occurred',
+    };
+  }
+}
+
+// Activity coordinates type
+export interface ActivityCoordinates {
+  lat: number;
+  lon: number;
+  elevation?: number;
+}
+
+interface ActivityCoordinatesResponse {
+  success: boolean;
+  data?: {
+    coordinates: ActivityCoordinates[];
+    count: number;
+  };
+  error?: string;
+}
+
+/**
+ * Get coordinates for an activity (parsed from GPX)
+ */
+export async function getActivityCoordinates(id: string): Promise<ActivityCoordinatesResponse> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/activities/${id}/coordinates`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include',
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      return {
+        success: false,
+        error: data.error || 'Failed to get activity coordinates',
       };
     }
 
@@ -797,6 +859,82 @@ export async function activatePlan(id: string): Promise<{ success: boolean; erro
       return {
         success: false,
         error: data.error || 'Failed to activate plan',
+      };
+    }
+
+    return data;
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Network error occurred',
+    };
+  }
+}
+
+// GPX Analysis types
+export interface GpxAnalysisResult {
+  courseStats?: {
+    total_distance_km: number;
+    total_elevation_gain_m: number;
+    total_elevation_loss_m: number;
+    min_elevation_m: number;
+    max_elevation_m: number;
+    avg_grade_percent: number;
+    steep_sections_count: number;
+  };
+  elevationProfile?: Array<{
+    distance_km: number;
+    elevation_m: number;
+    grade_percent: number;
+  }>;
+  aidStations?: Array<{
+    name: string;
+    distance_km: number;
+    elevation_m: number;
+    distance_from_prev_km: number;
+    elevation_gain_from_prev_m: number;
+    elevation_loss_from_prev_m: number;
+  }>;
+  coordinates?: Array<{
+    lat: number;
+    lon: number;
+    elevation?: number;
+  }>;
+}
+
+interface GpxAnalysisResponse {
+  success: boolean;
+  data?: GpxAnalysisResult;
+  error?: string;
+}
+
+/**
+ * Analyze a GPX file to extract course metrics
+ * This sends the GPX to the Python worker for processing.
+ */
+export async function analyzeGpx(
+  gpxContent: string,
+  aidStations?: Array<{ name: string; distanceKm?: number; lat?: number; lon?: number }>
+): Promise<GpxAnalysisResponse> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/races/analyze-gpx`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include',
+      body: JSON.stringify({
+        gpxContent,
+        aidStations,
+      }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      return {
+        success: false,
+        error: data.error || 'Failed to analyze GPX',
       };
     }
 

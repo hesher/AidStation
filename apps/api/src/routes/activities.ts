@@ -23,8 +23,13 @@ import { TaskQueue } from '../services/queue';
 const uploadActivitySchema = z.object({
   name: z.string().optional(),
   activityDate: z.string().optional(),
-  gpxContent: z.string().min(1, 'GPX content is required'),
-});
+  gpxContent: z.string().optional(),
+  fitContent: z.string().optional(),
+  fileType: z.enum(['gpx', 'fit']).optional(),
+}).refine(
+  (data) => data.gpxContent || data.fitContent,
+  { message: 'Either gpxContent or fitContent is required' }
+);
 
 const uploadMultipleSchema = z.object({
   activities: z.array(z.object({
@@ -98,7 +103,7 @@ export async function activityRoutes(app: FastifyInstance) {
   /**
    * POST /api/activities
    *
-   * Upload a single GPX activity
+   * Upload a single GPX or FIT activity
    */
   app.post('/activities', async (
     request: FastifyRequest<{ Body: UploadActivityBody }>,
@@ -121,15 +126,26 @@ export async function activityRoutes(app: FastifyInstance) {
         };
       }
 
-      // Parse GPX to extract basic info
-      const gpxInfo = parseGpxBasicInfo(validatedBody.gpxContent);
+      // Determine file type and content
+      const isGpx = !!validatedBody.gpxContent;
+      const isFit = !!validatedBody.fitContent;
+      const fileType: 'gpx' | 'fit' = validatedBody.fileType || (isFit ? 'fit' : 'gpx');
+      const fileContent = isGpx ? validatedBody.gpxContent! : validatedBody.fitContent!;
+
+      // Parse GPX to extract basic info (only for GPX files)
+      let gpxInfo: { name?: string; distanceKm?: number; elevationGainM?: number } = {};
+      if (isGpx && validatedBody.gpxContent) {
+        gpxInfo = parseGpxBasicInfo(validatedBody.gpxContent);
+      }
 
       // Create activity record
+      // For FIT files, we store the base64-encoded content in gpxContent field
+      // (the Python worker will handle the conversion)
       const activity = await createActivity({
         userId,
         name: validatedBody.name || gpxInfo.name || 'Untitled Activity',
         activityDate: validatedBody.activityDate,
-        gpxContent: validatedBody.gpxContent,
+        gpxContent: isGpx ? validatedBody.gpxContent : validatedBody.fitContent,
         distanceKm: gpxInfo.distanceKm,
         elevationGainM: gpxInfo.elevationGainM,
         status: 'pending',
@@ -140,13 +156,14 @@ export async function activityRoutes(app: FastifyInstance) {
         if (TaskQueue.isConnected()) {
           const submission = await TaskQueue.submitUserActivityAnalysis(
             activity.id,
-            validatedBody.gpxContent
+            fileContent,
+            fileType
           );
 
           if (submission.submitted) {
             // Update activity status to processing
-            await updateActivityStatus(activity.id, 'processing', { taskId: submission.taskId });
-            app.log.info({ activityId: activity.id, taskId: submission.taskId }, 'Activity queued for analysis');
+            await updateActivityStatus(activity.id, 'processing', { taskId: submission.taskId, fileType });
+            app.log.info({ activityId: activity.id, taskId: submission.taskId, fileType }, 'Activity queued for analysis');
           }
         } else {
           app.log.warn({ activityId: activity.id }, 'Redis not connected, skipping worker analysis');
@@ -391,6 +408,67 @@ export async function activityRoutes(app: FastifyInstance) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
 
       app.log.error({ error: errorMessage }, 'Failed to get activity');
+
+      reply.status(500);
+
+      return {
+        success: false,
+        error: errorMessage,
+      };
+    }
+  });
+
+  /**
+   * GET /api/activities/:id/coordinates
+   *
+   * Get the coordinates for an activity (parsed from GPX)
+   */
+  app.get('/activities/:id/coordinates', async (
+    request: FastifyRequest<{ Params: { id: string } }>,
+    reply: FastifyReply
+  ): Promise<{
+    success: boolean;
+    data?: {
+      coordinates: Array<{ lat: number; lon: number; elevation?: number }>;
+      count: number;
+    };
+    error?: string;
+  }> => {
+    try {
+      const { id } = request.params;
+
+      const activity = await getActivityById(id);
+
+      if (!activity) {
+        reply.status(404);
+        return {
+          success: false,
+          error: 'Activity not found',
+        };
+      }
+
+      if (!activity.gpxContent) {
+        reply.status(404);
+        return {
+          success: false,
+          error: 'No GPX data available for this activity',
+        };
+      }
+
+      // Parse coordinates from GPX
+      const coordinates = parseGpxCoordinates(activity.gpxContent);
+
+      return {
+        success: true,
+        data: {
+          coordinates,
+          count: coordinates.length,
+        },
+      };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+
+      app.log.error({ error: errorMessage }, 'Failed to get activity coordinates');
 
       reply.status(500);
 
@@ -861,6 +939,69 @@ function parseGpxBasicInfo(gpxContent: string): {
     return { name };
   } catch {
     return {};
+  }
+}
+
+/**
+ * Parse coordinates from GPX content
+ */
+function parseGpxCoordinates(gpxContent: string): Array<{ lat: number; lon: number; elevation?: number }> {
+  try {
+    const coordinates: Array<{ lat: number; lon: number; elevation?: number }> = [];
+
+    // Match all trkpt elements with lat/lon attributes
+    const trkptRegex = /<trkpt\s+lat="([^"]+)"\s+lon="([^"]+)"[^>]*>([^]*?)<\/trkpt>/g;
+    let match;
+
+    while ((match = trkptRegex.exec(gpxContent)) !== null) {
+      const lat = parseFloat(match[1]);
+      const lon = parseFloat(match[2]);
+      const content = match[3];
+
+      // Extract elevation if present
+      const eleMatch = content.match(/<ele>([^<]+)<\/ele>/);
+      const elevation = eleMatch ? parseFloat(eleMatch[1]) : undefined;
+
+      if (!isNaN(lat) && !isNaN(lon)) {
+        coordinates.push({ lat, lon, elevation });
+      }
+    }
+
+    // If no trkpt found, try rtept (route points)
+    if (coordinates.length === 0) {
+      const rteptRegex = /<rtept\s+lat="([^"]+)"\s+lon="([^"]+)"[^>]*>([^]*?)<\/rtept>/g;
+      while ((match = rteptRegex.exec(gpxContent)) !== null) {
+        const lat = parseFloat(match[1]);
+        const lon = parseFloat(match[2]);
+        const content = match[3];
+        const eleMatch = content.match(/<ele>([^<]+)<\/ele>/);
+        const elevation = eleMatch ? parseFloat(eleMatch[1]) : undefined;
+
+        if (!isNaN(lat) && !isNaN(lon)) {
+          coordinates.push({ lat, lon, elevation });
+        }
+      }
+    }
+
+    // If still no points, try wpt (waypoints)
+    if (coordinates.length === 0) {
+      const wptRegex = /<wpt\s+lat="([^"]+)"\s+lon="([^"]+)"[^>]*>([^]*?)<\/wpt>/g;
+      while ((match = wptRegex.exec(gpxContent)) !== null) {
+        const lat = parseFloat(match[1]);
+        const lon = parseFloat(match[2]);
+        const content = match[3];
+        const eleMatch = content.match(/<ele>([^<]+)<\/ele>/);
+        const elevation = eleMatch ? parseFloat(eleMatch[1]) : undefined;
+
+        if (!isNaN(lat) && !isNaN(lon)) {
+          coordinates.push({ lat, lon, elevation });
+        }
+      }
+    }
+
+    return coordinates;
+  } catch {
+    return [];
   }
 }
 

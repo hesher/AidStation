@@ -1,0 +1,99 @@
+.helpCard {
+  background: linear-gradient(135deg, var(--help-bg-start, #1a1a2e) 0%, var(--help-bg-end, #16213e) 100%);
+  border: 1px solid var(--help-border, #2a2a4a);
+  border-radius: 8px;
+  overflow: hidden;
+  margin: 1rem 0;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 0.75rem 1rem;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--text-primary, #e0e0e0);
+  font-size: 0.95rem;
+  transition: background-color 0.2s;
+}
+
+.header:hover:not(:disabled) {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+.header:disabled {
+  cursor: default;
+}
+
+.title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 600;
+}
+
+.icon {
+  font-size: 1.1rem;
+}
+
+.chevron {
+  font-size: 0.75rem;
+  transition: transform 0.2s;
+  opacity: 0.6;
+}
+
+.chevronExpanded {
+  transform: rotate(180deg);
+}
+
+.content {
+  padding: 0 1rem 1rem;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.topic {
+  background-color: rgba(255, 255, 255, 0.03);
+  border-radius: 6px;
+  padding: 0.75rem;
+}
+
+.topicTitle {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--accent-color, #60a5fa);
+  margin: 0 0 0.5rem 0;
+}
+
+.topicContent {
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: var(--text-secondary, #a0a0a0);
+  margin: 0;
+}
+
+/* Responsive */
+@media (max-width: 600px) {
+  .header {
+    padding: 0.65rem 0.75rem;
+  }
+
+  .content {
+    padding: 0 0.75rem 0.75rem;
+  }
+
+  .topic {
+    padding: 0.65rem;
+  }
+
+  .topicTitle {
+    font-size: 0.85rem;
+  }
+
+  .topicContent {
+    font-size: 0.8rem;
+  }
+}
