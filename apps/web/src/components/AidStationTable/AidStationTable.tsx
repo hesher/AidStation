@@ -84,15 +84,43 @@ export function AidStationTable({
     [editable, editingRow, onStationClick]
   );
 
+  /**
+   * Recalculate distanceFromPrevKm for all stations based on their distanceKm values.
+   * This ensures that when a user edits a station's distance from start,
+   * the "from previous" column updates automatically.
+   */
+  const recalculateDistancesFromPrev = useCallback((stations: AidStation[]): AidStation[] => {
+    return stations.map((station, index) => {
+      if (index === 0) {
+        // First station: distance from prev equals distance from start
+        return {
+          ...station,
+          distanceFromPrevKm: station.distanceKm ?? null,
+        };
+      } else {
+        // Subsequent stations: calculate from previous station
+        const prevStation = stations[index - 1];
+        const prevDistance = prevStation.distanceKm ?? 0;
+        const currentDistance = station.distanceKm ?? 0;
+        return {
+          ...station,
+          distanceFromPrevKm: currentDistance > 0 ? currentDistance - prevDistance : null,
+        };
+      }
+    });
+  }, []);
+
   const handleSaveEdit = useCallback(() => {
     if (editingRow !== null && editingStation && onAidStationsChange) {
       const updated = [...aidStations];
       updated[editingRow] = editingStation;
-      onAidStationsChange(updated);
+      // Recalculate distanceFromPrevKm for all stations after the edit
+      const recalculated = recalculateDistancesFromPrev(updated);
+      onAidStationsChange(recalculated);
     }
     setEditingRow(null);
     setEditingStation(null);
-  }, [editingRow, editingStation, aidStations, onAidStationsChange]);
+  }, [editingRow, editingStation, aidStations, onAidStationsChange, recalculateDistancesFromPrev]);
 
   const handleCancelEdit = useCallback(() => {
     setEditingRow(null);
@@ -164,44 +192,24 @@ export function AidStationTable({
           />
         </td>
         <td className={styles.tdNumber}>
-          {courseCalculatedFields ? (
-            <span className={styles.calculatedValue} title="Calculated from GPX course">
-              {formatDistance(editingStation.distanceKm)}
-              <span className={styles.calculatedIcon}>📍</span>
-            </span>
-          ) : (
-            <input
-              type="number"
-              value={editingStation.distanceKm ?? ''}
-              onChange={(e) =>
-                handleEditingChange('distanceKm', parseNumber(e.target.value))
-              }
-              className={styles.editInputNumber}
-              step="0.1"
-              onClick={(e) => e.stopPropagation()}
-              placeholder="km"
-            />
-          )}
+          <input
+            type="number"
+            value={editingStation.distanceKm ?? ''}
+            onChange={(e) =>
+              handleEditingChange('distanceKm', parseNumber(e.target.value))
+            }
+            className={styles.editInputNumber}
+            step="0.1"
+            onClick={(e) => e.stopPropagation()}
+            placeholder="km"
+            title="Distance from start (editable)"
+          />
         </td>
         <td className={styles.tdNumber}>
-          {courseCalculatedFields ? (
-            <span className={styles.calculatedValue} title="Calculated from GPX course">
-              {formatDistance(editingStation.distanceFromPrevKm)}
-              <span className={styles.calculatedIcon}>📍</span>
-            </span>
-          ) : (
-            <input
-              type="number"
-              value={editingStation.distanceFromPrevKm ?? ''}
-              onChange={(e) =>
-                handleEditingChange('distanceFromPrevKm', parseNumber(e.target.value))
-              }
-              className={styles.editInputNumber}
-              step="0.1"
-              onClick={(e) => e.stopPropagation()}
-              placeholder="km"
-            />
-          )}
+          <span className={styles.calculatedValue} title="Auto-calculated from distance changes">
+            {formatDistance(editingStation.distanceFromPrevKm)}
+            <span className={styles.calculatedIcon}>🔄</span>
+          </span>
         </td>
         <td className={styles.tdNumber}>
           {courseCalculatedFields ? (

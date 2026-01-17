@@ -548,18 +548,14 @@ This is a non-negotiable requirement to ensure:
 ## Phase 8: Follow Ups, Fixes, Ideas and Future Work
 
 ### Urgent Fixes
-- [x] going from the "past performances" page to the "race planning" page crashes the app with error "GET http://localhost:3001/api/races/current 404 (Not Found)". A hard refresh fixes it.
-  - **Fixed**: The link on the performances page was mislabeled "Back to Race Planning" but actually linked to `/` (home), not `/planning`. Updated the navigation to have correct labels and added a direct link to `/planning`.
-- [x] when clicking "create plan" in "planning" i get a big red banner "authentication required"
-  - **Fixed**: Updated plans routes to use session-based authentication via `aidstation_session` cookie (same as activities routes), instead of requiring a `userId` cookie that was never set. Now plans routes use `getOrCreateSessionUser()` to automatically create/retrieve the user based on session.
   - QA Reported Bugs: https://docs.google.com/document/d/1k-fngp9HjCNqbjLxypC7IZSjw_oaHwo_kKXzasRxww4/edit?usp=sharing
 
 
 ### Fast Follows
-- [x] When the user uploads a GPX file in Race Search - It should update the Elevation Gain, loss
-  - **Already Implemented**: The `handleCourseGpxUpload` function in `page.tsx` updates `elevationGainM` and `elevationLossM` from the GPX analysis results. The `RaceCard` component displays both values.
-- [x] The aid station edits should calculate distance from previous and total distance from start based on the GPX course uploaded and not let manual adjustments when there's course data
-  - **Implemented**: Added `hasCourseData` prop to `AidStationTable` component. When course data exists (GPX coordinates), the distance and elevation fields become read-only and display with a 📍 icon indicating they are calculated from the GPX course. Fields affected: Distance, From Prev, Elevation, Gain ↑, Loss ↓. Other fields (name, services, cutoff) remain editable.
+- [x] Allow changing aid station distance from start (and make it apply to the map and distance from pre)
+  - **Completed**: Users can now edit the "Distance from Start" field for aid stations even when GPX course data is loaded
+  - The "Distance from Previous" column automatically recalculates for all stations when any distance is changed
+  - The map markers update to reflect the new positions
 
 
 ### Future Work

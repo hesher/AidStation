@@ -418,6 +418,13 @@ export const CourseMap = memo(CourseMapComponent, (prevProps, nextProps) => {
     if (prevStations.length !== nextStations.length) {
       return false;
     }
+    // Check if any station's distance changed (affects marker position)
+    for (let i = 0; i < prevStations.length; i++) {
+      if (prevStations[i].distanceKm !== nextStations[i].distanceKm ||
+          prevStations[i].name !== nextStations[i].name) {
+        return false;
+      }
+    }
   }
   
   // Props are considered equal
