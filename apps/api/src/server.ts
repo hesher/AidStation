@@ -9,7 +9,12 @@ import { planRoutes } from './routes/plans';
 import { taskRoutes } from './routes/tasks';
 
 const app = Fastify({
-  logger: true,
+  logger: {
+    level: process.env.LOG_LEVEL || 'info',
+    transport: process.env.NODE_ENV !== 'production'
+      ? { target: 'pino-pretty', options: { colorize: true, translateTime: 'HH:MM:ss' } }
+      : undefined,
+  },
   bodyLimit: 50 * 1024 * 1024, // 50 MB limit for GPX file uploads
 });
 

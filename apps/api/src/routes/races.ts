@@ -22,6 +22,7 @@ import {
   type SessionData,
 } from '../db/repositories';
 import { TaskQueue, CourseAnalysisResult } from '../services/queue/task-queue';
+import { logSuccess, logFailure } from '../utils/logger';
 
 // Request validation schemas
 const searchRaceSchema = z.object({
@@ -243,6 +244,8 @@ export async function raceRoutes(app: FastifyInstance) {
           : undefined,
       };
 
+      logSuccess(app, 'Race search', { raceName: result.name, query: validatedBody.query });
+
       return {
         success: true,
         data: enrichedResult,
@@ -250,7 +253,7 @@ export async function raceRoutes(app: FastifyInstance) {
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
 
-      app.log.error({ error: errorMessage }, 'Race search failed');
+      logFailure(app, 'Race search', errorMessage);
 
       reply.status(error instanceof z.ZodError ? 400 : 500);
 
@@ -321,6 +324,8 @@ export async function raceRoutes(app: FastifyInstance) {
       };
       await upsertSession(userId, race.id, sessionData);
 
+      logSuccess(app, 'Race created', { raceId: race.id, raceName: race.name });
+
       // Set session cookie
       reply.setCookie(SESSION_COOKIE, sessionId, {
         path: '/',
@@ -362,7 +367,7 @@ export async function raceRoutes(app: FastifyInstance) {
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
 
-      app.log.error({ error: errorMessage }, 'Failed to save race');
+      logFailure(app, 'Race create', errorMessage);
 
       reply.status(error instanceof z.ZodError ? 400 : 500);
 
@@ -467,7 +472,7 @@ export async function raceRoutes(app: FastifyInstance) {
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
 
-      app.log.error({ error: errorMessage }, 'Failed to get current race');
+      logFailure(app, 'Get current race', errorMessage);
 
       reply.status(500);
 
@@ -555,7 +560,7 @@ export async function raceRoutes(app: FastifyInstance) {
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
 
-      app.log.error({ error: errorMessage }, 'Failed to get race');
+      logFailure(app, 'Get race', error instanceof Error ? error : errorMessage, { id: request.params.id });
 
       reply.status(500);
 
@@ -592,7 +597,7 @@ export async function raceRoutes(app: FastifyInstance) {
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
 
-      app.log.error({ error: errorMessage }, 'Failed to delete race');
+      logFailure(app, 'Delete race', errorMessage, { id: request.params.id });
 
       reply.status(500);
 
@@ -714,7 +719,7 @@ export async function raceRoutes(app: FastifyInstance) {
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
 
-      app.log.error({ error: errorMessage }, 'Failed to update race');
+      logFailure(app, 'Update race', errorMessage, { id: request.params.id });
 
       reply.status(error instanceof z.ZodError ? 400 : 500);
 
@@ -801,7 +806,7 @@ export async function raceRoutes(app: FastifyInstance) {
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
 
-      app.log.error({ error: errorMessage }, 'Failed to list races');
+      logFailure(app, 'List races', errorMessage);
 
       reply.status(500);
 
@@ -841,7 +846,7 @@ export async function raceRoutes(app: FastifyInstance) {
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
 
-      app.log.error({ error: errorMessage }, 'Failed to get countries');
+      logFailure(app, 'Get countries', errorMessage);
 
       reply.status(500);
 
@@ -933,7 +938,7 @@ export async function raceRoutes(app: FastifyInstance) {
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
 
-      app.log.error({ error: errorMessage }, 'Failed to analyze GPX');
+      logFailure(app, 'GPX analysis', errorMessage);
 
       reply.status(500);
 

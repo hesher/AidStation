@@ -2,6 +2,8 @@ import { FastifyInstance } from 'fastify';
 
 export async function healthRoutes(fastify: FastifyInstance) {
   fastify.get('/health', async (_request, _reply) => {
+    fastify.log.debug('Health check requested');
+
     return {
       status: 'healthy',
       timestamp: new Date().toISOString(),
@@ -11,6 +13,8 @@ export async function healthRoutes(fastify: FastifyInstance) {
   });
 
   fastify.get('/health/ready', async (_request, _reply) => {
+    fastify.log.debug('Readiness check requested');
+
     // TODO: Add database and Redis connectivity checks
     return {
       status: 'ready',

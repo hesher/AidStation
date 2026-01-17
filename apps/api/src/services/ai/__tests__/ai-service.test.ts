@@ -4,7 +4,7 @@
  * Unit tests for the AI abstraction layer and providers.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { OpenAIProvider } from '../openai-provider';
 import { getAIProvider, createAIProvider, setDefaultAIProvider, searchRace } from '../index';
 import type { AIProvider, RaceSearchResult } from '../types';

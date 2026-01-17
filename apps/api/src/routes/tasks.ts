@@ -7,6 +7,7 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { z } from 'zod';
 import { TaskQueue } from '../services/queue';
+import { logSuccess, logFailure } from '../utils/logger';
 
 // Request validation schemas
 const taskIdParamSchema = z.object({
@@ -46,6 +47,8 @@ export async function taskRoutes(app: FastifyInstance) {
 
             const status = await TaskQueue.getTaskStatus(taskId);
 
+            logSuccess(app, 'Task status retrieved', { taskId, status: status.status });
+
             return {
                 success: true,
                 data: status,
@@ -53,7 +56,7 @@ export async function taskRoutes(app: FastifyInstance) {
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : 'Unknown error';
 
-            app.log.error({ error: errorMessage }, 'Failed to get task status');
+            logFailure(app, 'Get task status', errorMessage, { taskId: request.params.taskId });
 
             reply.status(error instanceof z.ZodError ? 400 : 500);
 

@@ -18,6 +18,7 @@ import {
   updateUserPerformanceProfile,
 } from '../db/repositories';
 import { TaskQueue } from '../services/queue';
+import { logSuccess, logFailure } from '../utils/logger';
 
 // Request validation schemas
 const uploadActivitySchema = z.object({
@@ -182,6 +183,8 @@ export async function activityRoutes(app: FastifyInstance) {
         maxAge: 60 * 60 * 24 * 365,
       });
 
+      logSuccess(app, 'Activity uploaded', { activityId: activity.id, name: activity.name });
+
       return {
         success: true,
         data: {
@@ -198,7 +201,7 @@ export async function activityRoutes(app: FastifyInstance) {
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
 
-      app.log.error({ error: errorMessage }, 'Failed to upload activity');
+      logFailure(app, 'Activity upload', errorMessage);
 
       reply.status(error instanceof z.ZodError ? 400 : 500);
 
@@ -275,6 +278,8 @@ export async function activityRoutes(app: FastifyInstance) {
         maxAge: 60 * 60 * 24 * 365,
       });
 
+      logSuccess(app, 'Bulk activities uploaded', { count: uploadedActivities.length });
+
       return {
         success: true,
         data: {
@@ -285,7 +290,7 @@ export async function activityRoutes(app: FastifyInstance) {
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
 
-      app.log.error({ error: errorMessage }, 'Failed to bulk upload activities');
+      logFailure(app, 'Bulk activity upload', errorMessage);
 
       reply.status(error instanceof z.ZodError ? 400 : 500);
 
@@ -337,6 +342,8 @@ export async function activityRoutes(app: FastifyInstance) {
         maxAge: 60 * 60 * 24 * 365,
       });
 
+      logSuccess(app, 'Activities listed', { count: result.activities.length, total: result.total });
+
       return {
         success: true,
         data: {
@@ -358,7 +365,7 @@ export async function activityRoutes(app: FastifyInstance) {
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
 
-      app.log.error({ error: errorMessage }, 'Failed to get activities');
+      logFailure(app, 'List activities', errorMessage);
 
       reply.status(500);
 
@@ -391,6 +398,8 @@ export async function activityRoutes(app: FastifyInstance) {
         };
       }
 
+      logSuccess(app, 'Activity retrieved', { activityId: activity.id });
+
       return {
         success: true,
         data: {
@@ -407,7 +416,7 @@ export async function activityRoutes(app: FastifyInstance) {
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
 
-      app.log.error({ error: errorMessage }, 'Failed to get activity');
+      logFailure(app, 'Get activity', errorMessage, { id: request.params.id });
 
       reply.status(500);
 
@@ -458,6 +467,8 @@ export async function activityRoutes(app: FastifyInstance) {
       // Parse coordinates from GPX
       const coordinates = parseGpxCoordinates(activity.gpxContent);
 
+      logSuccess(app, 'Activity coordinates retrieved', { activityId: id, count: coordinates.length });
+
       return {
         success: true,
         data: {
@@ -468,7 +479,7 @@ export async function activityRoutes(app: FastifyInstance) {
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
 
-      app.log.error({ error: errorMessage }, 'Failed to get activity coordinates');
+      logFailure(app, 'Get activity coordinates', errorMessage, { id: request.params.id });
 
       reply.status(500);
 
@@ -501,11 +512,13 @@ export async function activityRoutes(app: FastifyInstance) {
         };
       }
 
+      logSuccess(app, 'Activity deleted', { activityId: id });
+
       return { success: true };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
 
-      app.log.error({ error: errorMessage }, 'Failed to delete activity');
+      logFailure(app, 'Delete activity', errorMessage, { id: request.params.id });
 
       reply.status(500);
 
@@ -697,7 +710,7 @@ export async function activityRoutes(app: FastifyInstance) {
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
 
-      app.log.error({ error: errorMessage }, 'Failed to sync activity');
+      logFailure(app, 'Sync activity', errorMessage, { id: request.params.id });
 
       reply.status(500);
 
@@ -832,6 +845,8 @@ export async function activityRoutes(app: FastifyInstance) {
         maxAge: 60 * 60 * 24 * 365,
       });
 
+      logSuccess(app, 'Activities synced', { synced, updated });
+
       return {
         success: true,
         data: { synced, updated },
@@ -839,7 +854,7 @@ export async function activityRoutes(app: FastifyInstance) {
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
 
-      app.log.error({ error: errorMessage }, 'Failed to sync activities');
+      logFailure(app, 'Sync all activities', errorMessage);
 
       reply.status(500);
 
@@ -895,6 +910,8 @@ export async function activityRoutes(app: FastifyInstance) {
         };
       }
 
+      logSuccess(app, 'Performance profile retrieved', { activitiesCount: activities.total });
+
       return {
         success: true,
         data: {
@@ -909,7 +926,7 @@ export async function activityRoutes(app: FastifyInstance) {
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
 
-      app.log.error({ error: errorMessage }, 'Failed to get performance profile');
+      logFailure(app, 'Get performance profile', errorMessage);
 
       reply.status(500);
 

@@ -20,6 +20,7 @@ import {
   getOrCreateSessionUser,
   AidStationPrediction,
 } from '../db/repositories';
+import { logSuccess, logFailure } from '../utils/logger';
 
 // Session cookie name
 const SESSION_COOKIE = 'aidstation_session';
@@ -84,6 +85,8 @@ export async function planRoutes(app: FastifyInstance) {
         startTime: body.startTime ? new Date(body.startTime) : undefined,
       });
 
+      logSuccess(app, 'Plan created', { planId: plan.id, name: plan.name });
+
       return reply.status(201).send({
         success: true,
         data: plan,
@@ -96,7 +99,7 @@ export async function planRoutes(app: FastifyInstance) {
           details: error.errors,
         });
       }
-      console.error('Create plan error:', error);
+      logFailure(app, 'Plan create', error instanceof Error ? error : 'Unknown error');
       return reply.status(500).send({
         success: false,
         error: 'Failed to create plan',
@@ -129,12 +132,14 @@ export async function planRoutes(app: FastifyInstance) {
         offset: query.offset ? parseInt(query.offset, 10) : undefined,
       });
 
+      logSuccess(app, 'Plans listed', { count: plans.length, total });
+
       return reply.send({
         success: true,
         data: { plans, total },
       });
     } catch (error) {
-      console.error('Get plans error:', error);
+      logFailure(app, 'List plans', error instanceof Error ? error : 'Unknown error');
       return reply.status(500).send({
         success: false,
         error: 'Failed to fetch plans',
@@ -178,12 +183,14 @@ export async function planRoutes(app: FastifyInstance) {
         });
       }
 
+      logSuccess(app, 'Plan retrieved', { planId: plan.id });
+
       return reply.send({
         success: true,
         data: plan,
       });
     } catch (error) {
-      console.error('Get plan error:', error);
+      logFailure(app, 'Get plan', error instanceof Error ? error : 'Unknown error');
       return reply.status(500).send({
         success: false,
         error: 'Failed to fetch plan',
@@ -213,12 +220,14 @@ export async function planRoutes(app: FastifyInstance) {
 
       const plans = await getPlansByRace(userId, raceId);
 
+      logSuccess(app, 'Plans listed for race', { raceId, count: plans.length });
+
       return reply.send({
         success: true,
         data: { plans },
       });
     } catch (error) {
-      console.error('Get plans by race error:', error);
+      logFailure(app, 'List plans by race', error instanceof Error ? error : 'Unknown error');
       return reply.status(500).send({
         success: false,
         error: 'Failed to fetch plans',
@@ -267,6 +276,8 @@ export async function planRoutes(app: FastifyInstance) {
         startTime: body.startTime ? new Date(body.startTime) : undefined,
       });
 
+      logSuccess(app, 'Plan updated', { planId: id });
+
       return reply.send({
         success: true,
         data: updated,
@@ -279,7 +290,7 @@ export async function planRoutes(app: FastifyInstance) {
           details: error.errors,
         });
       }
-      console.error('Update plan error:', error);
+      logFailure(app, 'Update plan', error instanceof Error ? error : 'Unknown error', { id: (request.params as { id: string }).id });
       return reply.status(500).send({
         success: false,
         error: 'Failed to update plan',
@@ -324,12 +335,14 @@ export async function planRoutes(app: FastifyInstance) {
 
       await deletePlan(id);
 
+      logSuccess(app, 'Plan deleted', { planId: id });
+
       return reply.send({
         success: true,
         message: 'Plan deleted',
       });
     } catch (error) {
-      console.error('Delete plan error:', error);
+      logFailure(app, 'Delete plan', error instanceof Error ? error : 'Unknown error', { id: (request.params as { id: string }).id });
       return reply.status(500).send({
         success: false,
         error: 'Failed to delete plan',
@@ -398,12 +411,14 @@ export async function planRoutes(app: FastifyInstance) {
       // Update plan with predictions
       const updatedPlan = await updatePlanPredictions(id, predictions);
 
+      logSuccess(app, 'Predictions generated', { planId: id, stationCount: predictions.aidStationPredictions.length });
+
       return reply.send({
         success: true,
         data: updatedPlan,
       });
     } catch (error) {
-      console.error('Generate predictions error:', error);
+      logFailure(app, 'Generate predictions', error instanceof Error ? error : 'Unknown error', { id: (request.params as { id: string }).id });
       return reply.status(500).send({
         success: false,
         error: 'Failed to generate predictions',
@@ -448,12 +463,14 @@ export async function planRoutes(app: FastifyInstance) {
 
       await setActivePlan(id, userId, plan.raceId);
 
+      logSuccess(app, 'Plan activated', { planId: id });
+
       return reply.send({
         success: true,
         message: 'Plan activated',
       });
     } catch (error) {
-      console.error('Activate plan error:', error);
+      logFailure(app, 'Activate plan', error instanceof Error ? error : 'Unknown error', { id: (request.params as { id: string }).id });
       return reply.status(500).send({
         success: false,
         error: 'Failed to activate plan',
