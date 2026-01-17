@@ -4,21 +4,21 @@
  * Unit tests for the AI abstraction layer and providers.
  */
 
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { OpenAIProvider } from '../openai-provider';
 import { getAIProvider, createAIProvider, setDefaultAIProvider, searchRace } from '../index';
 import type { AIProvider, RaceSearchResult } from '../types';
 
-// Mock OpenAI
+// Mock OpenAI with a proper class mock - inline to avoid hoisting issues
 vi.mock('openai', () => {
   return {
-    default: vi.fn().mockImplementation(() => ({
-      chat: {
+    default: class MockOpenAI {
+      chat = {
         completions: {
           create: vi.fn(),
         },
-      },
-    })),
+      };
+    },
   };
 });
 

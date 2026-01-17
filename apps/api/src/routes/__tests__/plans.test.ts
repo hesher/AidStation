@@ -26,6 +26,20 @@ vi.mock('../../db/repositories', () => {
   const mockPlansInternal = new Map<string, Record<string, unknown>>();
   let planIdCounterInternal = 0;
 
+  // Track the current session user based on session cookie
+  const sessionUsers = new Map<string, string>();
+
+  const mockGetOrCreateSessionUser = async (sessionId: string) => {
+    // If we have a session ID, check if we already have a user for it
+    if (sessionUsers.has(sessionId)) {
+      return sessionUsers.get(sessionId)!;
+    }
+    // Create a new user for this session
+    const userId = `user-${sessionId}`;
+    sessionUsers.set(sessionId, userId);
+    return userId;
+  };
+
   const mockCreatePlan = async (data: { userId: string; raceId: string; name: string }) => {
     const id = `plan-${++planIdCounterInternal}`;
     const plan = {
@@ -139,10 +153,12 @@ vi.mock('../../db/repositories', () => {
   // Export a clear function for tests to reset state
   const clearMocks = () => {
     mockPlansInternal.clear();
+    sessionUsers.clear();
     planIdCounterInternal = 0;
   };
 
   return {
+    getOrCreateSessionUser: mockGetOrCreateSessionUser,
     createPlan: mockCreatePlan,
     getPlanById: mockGetPlanById,
     getPlansByUser: mockGetPlansByUser,
@@ -186,13 +202,13 @@ describe('Plan Routes', () => {
     if (clearMocks) clearMocks();
   });
 
-  // Helper to create a plan via API
-  const createPlanViaAPI = async (userId: string, raceId: string, name: string) => {
+  // Helper to create a plan via API - use aidstation_session cookie
+  const createPlanViaAPI = async (sessionId: string, raceId: string, name: string) => {
     const response = await app.inject({
       method: 'POST',
       url: '/api/plans',
       headers: {
-        Cookie: `userId=${userId}`,
+        Cookie: `aidstation_session=${sessionId}`,
       },
       payload: {
         raceId,
@@ -208,7 +224,7 @@ describe('Plan Routes', () => {
         method: 'POST',
         url: '/api/plans',
         headers: {
-          Cookie: `userId=${testUserId}`,
+          Cookie: `aidstation_session=${testUserId}`,
         },
         payload: {
           raceId: testRace.id,
@@ -223,7 +239,8 @@ describe('Plan Routes', () => {
       expect(body.data.raceId).toBe(testRace.id);
     });
 
-    it('should return 401 without userId cookie', async () => {
+    it('should auto-create session user when no cookie provided', async () => {
+      // With session-based auth, a new user is created automatically
       const response = await app.inject({
         method: 'POST',
         url: '/api/plans',
@@ -232,7 +249,9 @@ describe('Plan Routes', () => {
         },
       });
 
-      expect(response.statusCode).toBe(401);
+      expect(response.statusCode).toBe(201);
+      const body = JSON.parse(response.body);
+      expect(body.success).toBe(true);
     });
 
     it('should return 400 for invalid raceId format', async () => {
@@ -240,7 +259,7 @@ describe('Plan Routes', () => {
         method: 'POST',
         url: '/api/plans',
         headers: {
-          Cookie: `userId=${testUserId}`,
+          Cookie: `aidstation_session=${testUserId}`,
         },
         payload: {
           raceId: 'not-a-uuid',
@@ -255,7 +274,7 @@ describe('Plan Routes', () => {
         method: 'POST',
         url: '/api/plans',
         headers: {
-          Cookie: `userId=${testUserId}`,
+          Cookie: `aidstation_session=${testUserId}`,
         },
         payload: {
           raceId: '00000000-0000-0000-0000-000000000000',
@@ -272,7 +291,7 @@ describe('Plan Routes', () => {
         method: 'GET',
         url: '/api/plans',
         headers: {
-          Cookie: `userId=${testUserId}`,
+          Cookie: `aidstation_session=${testUserId}`,
         },
       });
 
@@ -291,7 +310,7 @@ describe('Plan Routes', () => {
         method: 'GET',
         url: '/api/plans',
         headers: {
-          Cookie: `userId=${testUserId}`,
+          Cookie: `aidstation_session=${testUserId}`,
         },
       });
 
@@ -301,13 +320,17 @@ describe('Plan Routes', () => {
       expect(body.data.plans.length).toBeGreaterThan(0);
     });
 
-    it('should return 401 without authentication', async () => {
+    it('should auto-create session user when no cookie provided', async () => {
+      // With session-based auth, a new user is created automatically
       const response = await app.inject({
         method: 'GET',
         url: '/api/plans',
       });
 
-      expect(response.statusCode).toBe(401);
+      expect(response.statusCode).toBe(200);
+      const body = JSON.parse(response.body);
+      expect(body.success).toBe(true);
+      expect(body.data.plans).toEqual([]);
     });
   });
 
@@ -321,7 +344,7 @@ describe('Plan Routes', () => {
         method: 'GET',
         url: `/api/plans/${planId}`,
         headers: {
-          Cookie: `userId=${testUserId}`,
+          Cookie: `aidstation_session=${testUserId}`,
         },
       });
 
@@ -336,7 +359,7 @@ describe('Plan Routes', () => {
         method: 'GET',
         url: '/api/plans/non-existent-id',
         headers: {
-          Cookie: `userId=${testUserId}`,
+          Cookie: `aidstation_session=${testUserId}`,
         },
       });
 
@@ -352,7 +375,7 @@ describe('Plan Routes', () => {
         method: 'GET',
         url: `/api/plans/${planId}`,
         headers: {
-          Cookie: `userId=${testUserId}`,
+          Cookie: `aidstation_session=${testUserId}`,
         },
       });
 
@@ -370,7 +393,7 @@ describe('Plan Routes', () => {
         method: 'PUT',
         url: `/api/plans/${planId}`,
         headers: {
-          Cookie: `userId=${testUserId}`,
+          Cookie: `aidstation_session=${testUserId}`,
         },
         payload: {
           name: 'Updated Name',
@@ -389,7 +412,7 @@ describe('Plan Routes', () => {
         method: 'PUT',
         url: '/api/plans/non-existent-id',
         headers: {
-          Cookie: `userId=${testUserId}`,
+          Cookie: `aidstation_session=${testUserId}`,
         },
         payload: {
           name: 'New Name',
@@ -408,7 +431,7 @@ describe('Plan Routes', () => {
         method: 'PUT',
         url: `/api/plans/${planId}`,
         headers: {
-          Cookie: `userId=${testUserId}`,
+          Cookie: `aidstation_session=${testUserId}`,
         },
         payload: {
           name: 'Hijacked!',
@@ -429,7 +452,7 @@ describe('Plan Routes', () => {
         method: 'DELETE',
         url: `/api/plans/${planId}`,
         headers: {
-          Cookie: `userId=${testUserId}`,
+          Cookie: `aidstation_session=${testUserId}`,
         },
       });
 
@@ -442,7 +465,7 @@ describe('Plan Routes', () => {
         method: 'GET',
         url: `/api/plans/${planId}`,
         headers: {
-          Cookie: `userId=${testUserId}`,
+          Cookie: `aidstation_session=${testUserId}`,
         },
       });
       expect(getResponse.statusCode).toBe(404);
@@ -453,7 +476,7 @@ describe('Plan Routes', () => {
         method: 'DELETE',
         url: '/api/plans/non-existent-id',
         headers: {
-          Cookie: `userId=${testUserId}`,
+          Cookie: `aidstation_session=${testUserId}`,
         },
       });
 
@@ -469,7 +492,7 @@ describe('Plan Routes', () => {
         method: 'DELETE',
         url: `/api/plans/${planId}`,
         headers: {
-          Cookie: `userId=${testUserId}`,
+          Cookie: `aidstation_session=${testUserId}`,
         },
       });
 
@@ -487,7 +510,7 @@ describe('Plan Routes', () => {
         method: 'GET',
         url: `/api/plans/race/${testRace.id}`,
         headers: {
-          Cookie: `userId=${testUserId}`,
+          Cookie: `aidstation_session=${testUserId}`,
         },
       });
 
@@ -508,7 +531,7 @@ describe('Plan Routes', () => {
         method: 'POST',
         url: `/api/plans/${planId}/predict`,
         headers: {
-          Cookie: `userId=${testUserId}`,
+          Cookie: `aidstation_session=${testUserId}`,
         },
       });
 
@@ -524,7 +547,7 @@ describe('Plan Routes', () => {
         method: 'POST',
         url: '/api/plans/non-existent-id/predict',
         headers: {
-          Cookie: `userId=${testUserId}`,
+          Cookie: `aidstation_session=${testUserId}`,
         },
       });
 
@@ -542,7 +565,7 @@ describe('Plan Routes', () => {
         method: 'POST',
         url: `/api/plans/${planId}/activate`,
         headers: {
-          Cookie: `userId=${testUserId}`,
+          Cookie: `aidstation_session=${testUserId}`,
         },
       });
 
