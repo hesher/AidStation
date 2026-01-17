@@ -145,7 +145,7 @@ export async function activityRoutes(app: FastifyInstance) {
         userId,
         name: validatedBody.name || gpxInfo.name || 'Untitled Activity',
         activityDate: validatedBody.activityDate,
-        gpxContent: isGpx ? validatedBody.gpxContent : validatedBody.fitContent,
+        gpxContent: fileContent,
         distanceKm: gpxInfo.distanceKm,
         elevationGainM: gpxInfo.elevationGainM,
         status: 'pending',
@@ -162,7 +162,7 @@ export async function activityRoutes(app: FastifyInstance) {
 
           if (submission.submitted) {
             // Update activity status to processing
-            await updateActivityStatus(activity.id, 'processing', { taskId: submission.taskId, fileType });
+            await updateActivityStatus(activity.id, 'processing', { taskId: submission.taskId });
             app.log.info({ activityId: activity.id, taskId: submission.taskId, fileType }, 'Activity queued for analysis');
           }
         } else {
