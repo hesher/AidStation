@@ -16,6 +16,8 @@ interface CourseMapProps {
   coordinates: CourseCoordinate[];
   aidStations?: AidStation[];
   onAidStationClick?: (station: AidStation, index: number) => void;
+  enable3D?: boolean;
+  terrainExaggeration?: number;
 }
 
 const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
@@ -23,6 +25,9 @@ const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
 // Maximum number of coordinate points to render on the map
 // More points = smoother line but slower performance
 const MAX_COORDINATE_POINTS = 1000;
+
+// Default terrain exaggeration factor
+const DEFAULT_TERRAIN_EXAGGERATION = 1.5;
 
 /**
  * Simplify coordinates array to reduce rendering load
@@ -53,11 +58,18 @@ function simplifyCoordinates(coords: CourseCoordinate[], maxPoints: number): Cou
   return result;
 }
 
-function CourseMapComponent({ coordinates, aidStations, onAidStationClick }: CourseMapProps) {
+function CourseMapComponent({ 
+  coordinates, 
+  aidStations, 
+  onAidStationClick,
+  enable3D = true,
+  terrainExaggeration = DEFAULT_TERRAIN_EXAGGERATION
+}: CourseMapProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const markersRef = useRef<mapboxgl.Marker[]>([]);
   const [mapError, setMapError] = useState<string | null>(null);
+  const [is3DEnabled, setIs3DEnabled] = useState(enable3D);
 
   // Simplify coordinates for performance if there are too many points
   const displayCoordinates = React.useMemo(
@@ -92,10 +104,40 @@ function CourseMapComponent({ coordinates, aidStations, onAidStationClick }: Cou
       style: 'mapbox://styles/mapbox/outdoors-v12',
       bounds: bounds,
       fitBoundsOptions: { padding: 50 },
+      pitch: is3DEnabled ? 45 : 0,
+      bearing: 0,
     });
 
     map.current.on('load', () => {
       if (!map.current) return;
+
+      // Add 3D terrain if enabled
+      if (is3DEnabled) {
+        // Add terrain source
+        map.current.addSource('mapbox-dem', {
+          type: 'raster-dem',
+          url: 'mapbox://mapbox.mapbox-terrain-dem-v1',
+          tileSize: 512,
+          maxzoom: 14,
+        });
+
+        // Set terrain with exaggeration
+        map.current.setTerrain({
+          source: 'mapbox-dem',
+          exaggeration: terrainExaggeration,
+        });
+
+        // Add sky layer for better 3D aesthetics
+        map.current.addLayer({
+          id: 'sky',
+          type: 'sky',
+          paint: {
+            'sky-type': 'atmosphere',
+            'sky-atmosphere-sun': [0.0, 90.0],
+            'sky-atmosphere-sun-intensity': 15,
+          },
+        });
+      }
 
       // Add the course line
       map.current.addSource('course', {
@@ -161,7 +203,7 @@ function CourseMapComponent({ coordinates, aidStations, onAidStationClick }: Cou
     });
 
     // Add navigation controls
-    map.current.addControl(new mapboxgl.NavigationControl(), 'top-right');
+    map.current.addControl(new mapboxgl.NavigationControl({ visualizePitch: true }), 'top-right');
     map.current.addControl(new mapboxgl.ScaleControl(), 'bottom-left');
     map.current.addControl(
       new mapboxgl.FullscreenControl(),
@@ -176,7 +218,7 @@ function CourseMapComponent({ coordinates, aidStations, onAidStationClick }: Cou
       // Clean up map
       map.current?.remove();
     };
-  }, [displayCoordinates]);
+  }, [displayCoordinates, is3DEnabled, terrainExaggeration]);
 
   // Add aid station markers separately so they can update independently
   useEffect(() => {
@@ -260,6 +302,49 @@ function CourseMapComponent({ coordinates, aidStations, onAidStationClick }: Cou
     });
   }, [aidStations, coordinates, onAidStationClick]);
 
+  // Toggle 3D mode
+  const toggle3D = () => {
+    if (!map.current) return;
+    
+    const new3DState = !is3DEnabled;
+    setIs3DEnabled(new3DState);
+
+    if (new3DState) {
+      // Enable 3D terrain
+      if (!map.current.getSource('mapbox-dem')) {
+        map.current.addSource('mapbox-dem', {
+          type: 'raster-dem',
+          url: 'mapbox://mapbox.mapbox-terrain-dem-v1',
+          tileSize: 512,
+          maxzoom: 14,
+        });
+      }
+      map.current.setTerrain({
+        source: 'mapbox-dem',
+        exaggeration: terrainExaggeration,
+      });
+      if (!map.current.getLayer('sky')) {
+        map.current.addLayer({
+          id: 'sky',
+          type: 'sky',
+          paint: {
+            'sky-type': 'atmosphere',
+            'sky-atmosphere-sun': [0.0, 90.0],
+            'sky-atmosphere-sun-intensity': 15,
+          },
+        });
+      }
+      map.current.easeTo({ pitch: 45, duration: 1000 });
+    } else {
+      // Disable 3D terrain
+      map.current.setTerrain(null);
+      if (map.current.getLayer('sky')) {
+        map.current.removeLayer('sky');
+      }
+      map.current.easeTo({ pitch: 0, duration: 1000 });
+    }
+  };
+
   if (mapError) {
     return (
       <div className={styles.container} data-testid="course-map">
@@ -274,6 +359,15 @@ function CourseMapComponent({ coordinates, aidStations, onAidStationClick }: Cou
   return (
     <div className={styles.container} data-testid="course-map">
       <div ref={mapContainer} className={styles.map} />
+      <button
+        className={`${styles.terrainToggle} ${is3DEnabled ? styles.active : ''}`}
+        onClick={toggle3D}
+        title={is3DEnabled ? 'Disable 3D terrain' : 'Enable 3D terrain'}
+        aria-label={is3DEnabled ? 'Disable 3D terrain view' : 'Enable 3D terrain view'}
+      >
+        <span className={styles.terrainToggleIcon}>🏔️</span>
+        <span>{is3DEnabled ? '3D On' : '3D Off'}</span>
+      </button>
       <div className={styles.legend}>
         <span className={styles.legendItem}>
           <span className={styles.legendMarker} style={{ backgroundColor: '#2196F3' }} />

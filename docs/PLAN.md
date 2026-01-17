@@ -332,7 +332,7 @@ This is a non-negotiable requirement to ensure:
 - [x] Implement loading state during AI search
 - [x] Integrate Mapbox GL JS for course visualization
 - [x] Draw course on map with aid station markers
-- [ ] Implement 3D terrain visualization for elevation context
+- [x] Implement 3D terrain visualization for elevation context
 - [x] Create aid station data table component with columns:
   - Station Name
   - Distance from Start

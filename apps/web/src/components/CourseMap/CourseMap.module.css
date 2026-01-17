@@ -128,3 +128,38 @@
   color: #fff;
   background: rgba(255, 255, 255, 0.1);
 }
+
+/* 3D Toggle Button */
+.terrainToggle {
+  position: absolute;
+  bottom: 60px;
+  right: 10px;
+  z-index: 10;
+  background: rgba(26, 26, 46, 0.9);
+  border: 1px solid #30475e;
+  border-radius: 8px;
+  padding: 8px 12px;
+  color: #e0e0e0;
+  font-size: 0.8rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s ease;
+  backdrop-filter: blur(10px);
+}
+
+.terrainToggle:hover {
+  background: rgba(48, 71, 94, 0.9);
+  border-color: #4CAF50;
+}
+
+.terrainToggle.active {
+  background: rgba(76, 175, 80, 0.3);
+  border-color: #4CAF50;
+  color: #4CAF50;
+}
+
+.terrainToggleIcon {
+  font-size: 1rem;
+}
