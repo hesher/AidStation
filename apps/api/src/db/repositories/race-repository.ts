@@ -4,10 +4,76 @@
  * Handles database operations for races and aid stations.
  */
 
-import { eq, desc } from 'drizzle-orm';
+import { eq, desc, sql } from 'drizzle-orm';
 import { db } from '../connection';
 import { races, aidStations } from '../schema';
 import type { RaceData, AidStationData, RaceWithAidStations } from './types';
+
+/**
+ * Parse GPX content and extract coordinates as a LineString WKT
+ * Returns null if GPX parsing fails or no track points found
+ */
+function gpxToLineStringWKT(gpxContent: string): string | null {
+  try {
+    const coordinates: Array<[number, number]> = [];
+
+    // Match all trkpt elements with lat/lon attributes
+    const trkptRegex = /<trkpt\s+lat="([^"]+)"\s+lon="([^"]+)"[^>]*>/g;
+    let match;
+
+    while ((match = trkptRegex.exec(gpxContent)) !== null) {
+      const lat = parseFloat(match[1]);
+      const lon = parseFloat(match[2]);
+      if (!isNaN(lat) && !isNaN(lon)) {
+        coordinates.push([lon, lat]); // PostGIS uses lon/lat order
+      }
+    }
+
+    // If no track points, try route points
+    if (coordinates.length === 0) {
+      const rteptRegex = /<rtept\s+lat="([^"]+)"\s+lon="([^"]+)"[^>]*>/g;
+      while ((match = rteptRegex.exec(gpxContent)) !== null) {
+        const lat = parseFloat(match[1]);
+        const lon = parseFloat(match[2]);
+        if (!isNaN(lat) && !isNaN(lon)) {
+          coordinates.push([lon, lat]);
+        }
+      }
+    }
+
+    if (coordinates.length < 2) {
+      return null; // Need at least 2 points for a LineString
+    }
+
+    // Build WKT LineString
+    const coordStr = coordinates.map(([lon, lat]) => `${lon} ${lat}`).join(', ');
+    return `LINESTRING(${coordStr})`;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Update the course_geometry column if PostGIS is available
+ * Fails silently if PostGIS is not installed
+ */
+async function updateCourseGeometry(raceId: string, gpxContent: string): Promise<void> {
+  try {
+    const wkt = gpxToLineStringWKT(gpxContent);
+    if (!wkt) {
+      return; // No valid geometry to store
+    }
+
+    // Use raw SQL to update the geometry column
+    // This will fail silently if PostGIS is not installed or column doesn't exist
+    await db.execute(
+      sql`UPDATE races SET course_geometry = ST_GeomFromText(${wkt}, 4326) WHERE id = ${raceId}::uuid`
+    );
+  } catch {
+    // PostGIS not available or geometry column doesn't exist - fail silently
+    // The app will continue to work without geometry data
+  }
+}
 
 /**
  * Create a new race with aid stations
@@ -61,6 +127,11 @@ export async function createRace(
         }))
       )
       .returning();
+  }
+
+  // Update PostGIS geometry if GPX content was provided
+  if (raceData.courseGpx) {
+    await updateCourseGeometry(insertedRace.id, raceData.courseGpx);
   }
 
   return {
@@ -120,6 +191,11 @@ export async function updateRace(
 
   if (!updatedRace) {
     return null;
+  }
+
+  // Update PostGIS geometry if GPX content was updated
+  if (raceData.courseGpx) {
+    await updateCourseGeometry(id, raceData.courseGpx);
   }
 
   // Update aid stations if provided

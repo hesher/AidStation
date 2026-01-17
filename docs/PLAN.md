@@ -321,7 +321,8 @@ This is a non-negotiable requirement to ensure:
 - [x] Calculate distances between aid stations
 - [x] Calculate elevation gain/loss between aid stations
 - [x] Implement Grade Adjusted Pace (GAP) using Minetti Equations
-- [ ] Store processed course as PostGIS LineString geometry
+- [x] Store processed course as PostGIS LineString geometry
+  - **Note**: Implemented in race-repository.ts. When a race with GPX content is created/updated, the geometry is parsed and stored in the `course_geometry` column. Fails gracefully if PostGIS is not available.
 - [x] Uploading a GPX in the page where you add a Race should automatically process it and use the data to update the race information
 
 **Sub-Story Test:** ✅ Python worker correctly processes GPX and calculates metrics (tests written, pending environment setup)
