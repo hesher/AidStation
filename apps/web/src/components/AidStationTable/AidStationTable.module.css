@@ -294,6 +294,25 @@
   box-shadow: 0 0 8px rgba(76, 175, 80, 0.3);
 }
 
+/* Calculated value display (when GPX course data is available) */
+.calculatedValue {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  background: rgba(33, 150, 243, 0.1);
+  border: 1px solid rgba(33, 150, 243, 0.3);
+  border-radius: 4px;
+  color: #90caf9;
+  font-family: 'Monaco', 'Menlo', monospace;
+  font-size: 0.8rem;
+}
+
+.calculatedIcon {
+  font-size: 0.7rem;
+  opacity: 0.7;
+}
+
 /* Responsive adjustments */
 @media (max-width: 768px) {
   .container {

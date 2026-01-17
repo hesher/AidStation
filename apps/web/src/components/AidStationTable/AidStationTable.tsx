@@ -13,6 +13,8 @@ interface AidStationTableProps {
   onStationClick?: (station: AidStation, index: number) => void;
   onAidStationsChange?: (aidStations: AidStation[]) => void;
   editable?: boolean;
+  /** When true, distance and elevation fields are calculated from GPX course data and cannot be manually edited */
+  hasCourseData?: boolean;
 }
 
 export function AidStationTable({
@@ -20,6 +22,7 @@ export function AidStationTable({
   onStationClick,
   onAidStationsChange,
   editable = false,
+  hasCourseData = false,
 }: AidStationTableProps) {
   const [editingRow, setEditingRow] = useState<number | null>(null);
   const [editingStation, setEditingStation] = useState<AidStation | null>(null);
@@ -141,6 +144,9 @@ export function AidStationTable({
   const renderEditRow = (index: number) => {
     if (!editingStation) return null;
 
+    // Fields that are auto-calculated from GPX course data
+    const courseCalculatedFields = hasCourseData;
+
     return (
       <tr
         key={`editing-${index}`}
@@ -158,66 +164,105 @@ export function AidStationTable({
           />
         </td>
         <td className={styles.tdNumber}>
-          <input
-            type="number"
-            value={editingStation.distanceKm ?? ''}
-            onChange={(e) =>
-              handleEditingChange('distanceKm', parseNumber(e.target.value))
-            }
-            className={styles.editInputNumber}
-            step="0.1"
-            onClick={(e) => e.stopPropagation()}
-            placeholder="km"
-          />
+          {courseCalculatedFields ? (
+            <span className={styles.calculatedValue} title="Calculated from GPX course">
+              {formatDistance(editingStation.distanceKm)}
+              <span className={styles.calculatedIcon}>📍</span>
+            </span>
+          ) : (
+            <input
+              type="number"
+              value={editingStation.distanceKm ?? ''}
+              onChange={(e) =>
+                handleEditingChange('distanceKm', parseNumber(e.target.value))
+              }
+              className={styles.editInputNumber}
+              step="0.1"
+              onClick={(e) => e.stopPropagation()}
+              placeholder="km"
+            />
+          )}
         </td>
         <td className={styles.tdNumber}>
-          <input
-            type="number"
-            value={editingStation.distanceFromPrevKm ?? ''}
-            onChange={(e) =>
-              handleEditingChange('distanceFromPrevKm', parseNumber(e.target.value))
-            }
-            className={styles.editInputNumber}
-            step="0.1"
-            onClick={(e) => e.stopPropagation()}
-            placeholder="km"
-          />
+          {courseCalculatedFields ? (
+            <span className={styles.calculatedValue} title="Calculated from GPX course">
+              {formatDistance(editingStation.distanceFromPrevKm)}
+              <span className={styles.calculatedIcon}>📍</span>
+            </span>
+          ) : (
+            <input
+              type="number"
+              value={editingStation.distanceFromPrevKm ?? ''}
+              onChange={(e) =>
+                handleEditingChange('distanceFromPrevKm', parseNumber(e.target.value))
+              }
+              className={styles.editInputNumber}
+              step="0.1"
+              onClick={(e) => e.stopPropagation()}
+              placeholder="km"
+            />
+          )}
         </td>
         <td className={styles.tdNumber}>
-          <input
-            type="number"
-            value={editingStation.elevationM ?? ''}
-            onChange={(e) =>
-              handleEditingChange('elevationM', parseNumber(e.target.value))
-            }
-            className={styles.editInputNumber}
-            onClick={(e) => e.stopPropagation()}
-            placeholder="m"
-          />
+          {courseCalculatedFields ? (
+            <span className={styles.calculatedValue} title="Calculated from GPX course">
+              {formatElevation(editingStation.elevationM)}
+              <span className={styles.calculatedIcon}>📍</span>
+            </span>
+          ) : (
+            <input
+              type="number"
+              value={editingStation.elevationM ?? ''}
+              onChange={(e) =>
+                handleEditingChange('elevationM', parseNumber(e.target.value))
+              }
+              className={styles.editInputNumber}
+              onClick={(e) => e.stopPropagation()}
+              placeholder="m"
+            />
+          )}
         </td>
         <td className={`${styles.tdNumber} ${styles.gain}`}>
-          <input
-            type="number"
-            value={editingStation.elevationGainFromPrevM ?? ''}
-            onChange={(e) =>
-              handleEditingChange('elevationGainFromPrevM', parseNumber(e.target.value))
-            }
-            className={styles.editInputNumber}
-            onClick={(e) => e.stopPropagation()}
-            placeholder="m"
-          />
+          {courseCalculatedFields ? (
+            <span className={styles.calculatedValue} title="Calculated from GPX course">
+              {editingStation.elevationGainFromPrevM !== undefined
+                ? `+${Math.round(editingStation.elevationGainFromPrevM)}`
+                : '--'}
+              <span className={styles.calculatedIcon}>📍</span>
+            </span>
+          ) : (
+            <input
+              type="number"
+              value={editingStation.elevationGainFromPrevM ?? ''}
+              onChange={(e) =>
+                handleEditingChange('elevationGainFromPrevM', parseNumber(e.target.value))
+              }
+              className={styles.editInputNumber}
+              onClick={(e) => e.stopPropagation()}
+              placeholder="m"
+            />
+          )}
         </td>
         <td className={`${styles.tdNumber} ${styles.loss}`}>
-          <input
-            type="number"
-            value={editingStation.elevationLossFromPrevM ?? ''}
-            onChange={(e) =>
-              handleEditingChange('elevationLossFromPrevM', parseNumber(e.target.value))
-            }
-            className={styles.editInputNumber}
-            onClick={(e) => e.stopPropagation()}
-            placeholder="m"
-          />
+          {courseCalculatedFields ? (
+            <span className={styles.calculatedValue} title="Calculated from GPX course">
+              {editingStation.elevationLossFromPrevM !== undefined
+                ? `-${Math.round(editingStation.elevationLossFromPrevM)}`
+                : '--'}
+              <span className={styles.calculatedIcon}>📍</span>
+            </span>
+          ) : (
+            <input
+              type="number"
+              value={editingStation.elevationLossFromPrevM ?? ''}
+              onChange={(e) =>
+                handleEditingChange('elevationLossFromPrevM', parseNumber(e.target.value))
+              }
+              className={styles.editInputNumber}
+              onClick={(e) => e.stopPropagation()}
+              placeholder="m"
+            />
+          )}
         </td>
         <td className={styles.tdServices}>
           <ServiceBadge

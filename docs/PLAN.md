@@ -556,8 +556,10 @@ This is a non-negotiable requirement to ensure:
 
 
 ### Fast Follows
-- When the user uploads a GPX file in Race Search - It should update the Elevation Gain, loss
-- The aid station edits should calculate distance from previous and total distance from start based on the GPX course uploaded and not let manual adjustments when there's course data
+- [x] When the user uploads a GPX file in Race Search - It should update the Elevation Gain, loss
+  - **Already Implemented**: The `handleCourseGpxUpload` function in `page.tsx` updates `elevationGainM` and `elevationLossM` from the GPX analysis results. The `RaceCard` component displays both values.
+- [x] The aid station edits should calculate distance from previous and total distance from start based on the GPX course uploaded and not let manual adjustments when there's course data
+  - **Implemented**: Added `hasCourseData` prop to `AidStationTable` component. When course data exists (GPX coordinates), the distance and elevation fields become read-only and display with a 📍 icon indicating they are calculated from the GPX course. Fields affected: Distance, From Prev, Elevation, Gain ↑, Loss ↓. Other fields (name, services, cutoff) remain editable.
 
 
 ### Future Work

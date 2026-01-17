@@ -522,6 +522,7 @@ export default function Home() {
                 onStationClick={handleAidStationClick}
                 onAidStationsChange={handleAidStationsChange}
                 editable
+                hasCourseData={!!(raceData.courseCoordinates && raceData.courseCoordinates.length > 0)}
               />
             </section>
           )}
@@ -533,6 +534,7 @@ export default function Home() {
                 aidStations={[]}
                 onAidStationsChange={handleAidStationsChange}
                 editable
+                hasCourseData={!!(raceData.courseCoordinates && raceData.courseCoordinates.length > 0)}
               />
             </section>
           )}
