@@ -564,6 +564,15 @@ This is a non-negotiable requirement to ensure:
 
 ### Future Work
 
+**Deferred Infrastructure Items (Phase 5 & 7):**
+- Store raw GPX in object storage (S3/local) - Currently storing in PostgreSQL, S3 for production scale
+- Extract time-series data to TimescaleDB hypertable - Currently using standard PostgreSQL, TimescaleDB for advanced time-series analytics
+- Achieve >80% code coverage - Current: 67 tests passing, focus on E2E coverage
+- Set up CI/CD pipeline
+- Configure production environment
+- Set up monitoring and logging
+- Create deployment documentation
+
 ---
 
 ## Project Structure
