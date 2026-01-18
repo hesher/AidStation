@@ -530,6 +530,96 @@ export async function activityRoutes(app: FastifyInstance) {
   });
 
   /**
+   * POST /api/activities/:id/reanalyze
+   *
+   * Force re-analysis of an activity (useful when analysis code changes)
+   */
+  app.post('/activities/:id/reanalyze', async (
+    request: FastifyRequest<{ Params: { id: string } }>,
+    reply: FastifyReply
+  ): Promise<ActivityResponse> => {
+    try {
+      const { id } = request.params;
+      const sessionId = getSessionId(request);
+
+      // Verify user session exists (but we don't need the userId for this operation)
+      try {
+        await getOrCreateSessionUser(sessionId);
+      } catch (dbError) {
+        app.log.warn({ error: dbError }, 'Database not available');
+        reply.status(503);
+        return {
+          success: false,
+          error: 'Database not available',
+        };
+      }
+
+      const activity = await getActivityById(id);
+
+      if (!activity) {
+        reply.status(404);
+        return {
+          success: false,
+          error: 'Activity not found',
+        };
+      }
+
+      if (!activity.gpxContent) {
+        reply.status(400);
+        return {
+          success: false,
+          error: 'No GPX content available for this activity',
+        };
+      }
+
+      // Force re-queue for analysis
+      if (TaskQueue.isConnected()) {
+        const submission = await TaskQueue.submitUserActivityAnalysis(
+          activity.id,
+          activity.gpxContent
+        );
+
+        if (submission.submitted) {
+          await updateActivityStatus(activity.id, 'processing', { taskId: submission.taskId });
+          
+          app.log.info({ activityId: activity.id, taskId: submission.taskId }, 'Activity queued for re-analysis');
+          
+          return {
+            success: true,
+            data: {
+              id: activity.id,
+              name: activity.name ?? undefined,
+              activityDate: activity.activityDate?.toISOString(),
+              distanceKm: activity.distanceKm ?? undefined,
+              elevationGainM: activity.elevationGainM ?? undefined,
+              movingTimeSeconds: activity.movingTimeSeconds ?? undefined,
+              averagePaceMinKm: activity.averagePaceMinKm ?? undefined,
+              status: 'processing',
+            },
+          };
+        }
+      }
+
+      reply.status(503);
+      return {
+        success: false,
+        error: 'Task queue not available',
+      };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+
+      logFailure(app, 'Reanalyze activity', errorMessage, { id: request.params.id });
+
+      reply.status(500);
+
+      return {
+        success: false,
+        error: errorMessage,
+      };
+    }
+  });
+
+  /**
    * POST /api/activities/:id/sync
    *
    * Sync a single activity's analysis results from the worker
@@ -629,6 +719,22 @@ export async function activityRoutes(app: FastifyInstance) {
           fatigue_curve: Array<{ distance_km: number; gap_min_km: number }>;
           fatigue_factor: number;
           segment_count: number;
+          pace_by_distance_5k?: Array<{
+            segment_start_km: number;
+            segment_end_km: number;
+            actual_pace_min_km: number;
+            grade_adjusted_pace_min_km: number;
+            elevation_gain_m: number;
+            elevation_loss_m: number;
+            distance_km: number;
+          }>;
+          normalized_pace_profile?: {
+            pace_by_progress_pct: Record<string, number>;
+            gap_by_progress_pct: Record<string, number>;
+            baseline_pace_min_km: number;
+            baseline_gap_min_km: number;
+            activity_distance_km: number;
+          };
         };
         error?: string;
       }>(taskId);
@@ -797,6 +903,22 @@ export async function activityRoutes(app: FastifyInstance) {
             fatigue_curve: Array<{ distance_km: number; gap_min_km: number }>;
             fatigue_factor: number;
             segment_count: number;
+            pace_by_distance_5k?: Array<{
+              segment_start_km: number;
+              segment_end_km: number;
+              actual_pace_min_km: number;
+              grade_adjusted_pace_min_km: number;
+              elevation_gain_m: number;
+              elevation_loss_m: number;
+              distance_km: number;
+            }>;
+            normalized_pace_profile?: {
+              pace_by_progress_pct: Record<string, number>;
+              gap_by_progress_pct: Record<string, number>;
+              baseline_pace_min_km: number;
+              baseline_gap_min_km: number;
+              activity_distance_km: number;
+            };
           };
           error?: string;
         }>(taskId);
@@ -821,6 +943,9 @@ export async function activityRoutes(app: FastifyInstance) {
               fatigueCurve: analysis.fatigue_curve,
               fatigueFactor: analysis.fatigue_factor,
               segmentCount: analysis.segment_count,
+              // NEW: Store segment-based pace data for improved predictions
+              paceByDistance5k: analysis.pace_by_distance_5k,
+              normalizedPaceProfile: analysis.normalized_pace_profile,
               analyzedAt: new Date().toISOString(),
             },
           });
@@ -1054,6 +1179,24 @@ async function recalculatePerformanceProfile(
       steep_downhill: { sum: 0, count: 0 },
     };
 
+    // NEW: Accumulator for pace decay by progress percentage (from normalized pace profiles)
+    const paceDecayByPct: Record<string, { sum: number; count: number }> = {
+      '0-10': { sum: 0, count: 0 },
+      '10-20': { sum: 0, count: 0 },
+      '20-30': { sum: 0, count: 0 },
+      '30-40': { sum: 0, count: 0 },
+      '40-50': { sum: 0, count: 0 },
+      '50-60': { sum: 0, count: 0 },
+      '60-70': { sum: 0, count: 0 },
+      '70-80': { sum: 0, count: 0 },
+      '80-90': { sum: 0, count: 0 },
+      '90-100': { sum: 0, count: 0 },
+    };
+
+    // NEW: Accumulator for absolute distance-based pace (0-5km, 5-10km, etc.)
+    // This is what we'll actually use for predictions
+    const paceByDistanceKm: Record<string, { sumPace: number; sumGap: number; count: number }> = {};
+
     let totalFatigueFactor = 0;
     let fatigueCount = 0;
 
@@ -1061,12 +1204,20 @@ async function recalculatePerformanceProfile(
       const analysisResults = activity.analysisResults as Record<string, unknown>;
       const paceByGradient = analysisResults.paceByGradient as Record<string, number | null>;
       const fatigueFactor = analysisResults.fatigueFactor as number | undefined;
+      const normalizedPaceProfile = analysisResults.normalizedPaceProfile as Record<string, unknown> | undefined;
+      const paceByDistance5k = analysisResults.paceByDistance5k as Array<{
+        segment_start_km: number;
+        segment_end_km: number;
+        actual_pace_min_km: number;
+        grade_adjusted_pace_min_km: number;
+      }> | undefined;
 
       // Calculate recency weight
       const activityDate = activity.activityDate || activity.createdAt;
       const daysAgo = (Date.now() - activityDate.getTime()) / (1000 * 60 * 60 * 24);
       const weight = Math.exp(-daysAgo / 90); // 90-day half-life
 
+      // Aggregate gradient paces
       for (const [gradient, pace] of Object.entries(paceByGradient)) {
         if (pace !== null && pace !== undefined && gradientPaces[gradient]) {
           gradientPaces[gradient].sum += pace * weight;
@@ -1078,6 +1229,83 @@ async function recalculatePerformanceProfile(
         totalFatigueFactor += fatigueFactor * weight;
         fatigueCount += weight;
       }
+
+      // NEW: Aggregate pace by absolute distance (5km buckets)
+      // This gives us: "At km 5, you typically run X pace; at km 10, you run Y pace"
+      if (paceByDistance5k && Array.isArray(paceByDistance5k)) {
+        for (const segment of paceByDistance5k) {
+          // Create bucket key like "0-5", "5-10", "10-15", etc.
+          const bucketKey = `${segment.segment_start_km}-${segment.segment_end_km}`;
+          
+          if (!paceByDistanceKm[bucketKey]) {
+            paceByDistanceKm[bucketKey] = { sumPace: 0, sumGap: 0, count: 0 };
+          }
+          
+          paceByDistanceKm[bucketKey].sumPace += segment.actual_pace_min_km * weight;
+          paceByDistanceKm[bucketKey].sumGap += segment.grade_adjusted_pace_min_km * weight;
+          paceByDistanceKm[bucketKey].count += weight;
+        }
+      }
+
+      // NEW: Aggregate normalized pace profiles (GAP-based multipliers by race progress)
+      if (normalizedPaceProfile) {
+        const gapByProgressPct = normalizedPaceProfile.gap_by_progress_pct as Record<string, number> | undefined;
+        const activityDistanceKm = normalizedPaceProfile.activity_distance_km as number | undefined;
+
+        if (gapByProgressPct && activityDistanceKm) {
+          // Weight longer activities more (they provide more reliable pacing data)
+          const distanceWeight = weight * Math.log10(activityDistanceKm + 1);
+
+          for (const [pctKey, multiplier] of Object.entries(gapByProgressPct)) {
+            if (paceDecayByPct[pctKey]) {
+              paceDecayByPct[pctKey].sum += multiplier * distanceWeight;
+              paceDecayByPct[pctKey].count += distanceWeight;
+            }
+          }
+        }
+      }
+    }
+
+    // NEW: Calculate pace decay profile from aggregated data
+    const paceDecayByProgressPct: Record<string, number> = {};
+    for (const [pctKey, data] of Object.entries(paceDecayByPct)) {
+      if (data.count > 0) {
+        paceDecayByProgressPct[pctKey] = Math.round((data.sum / data.count) * 1000) / 1000;
+      }
+    }
+
+    // NEW: Calculate absolute distance-based pace table
+    // This is sorted by distance and gives us the actual pace at each 5km mark
+    const paceByDistanceTable: Array<{
+      distanceKm: number;
+      paceMinKm: number;
+      gapMinKm: number;
+      sampleCount: number;
+    }> = [];
+    
+    // Sort buckets by distance and calculate averages
+    const sortedBuckets = Object.entries(paceByDistanceKm)
+      .map(([key, data]) => {
+        const [start, end] = key.split('-').map(Number);
+        return {
+          startKm: start,
+          endKm: end,
+          midpointKm: (start + end) / 2,
+          paceMinKm: data.count > 0 ? data.sumPace / data.count : 0,
+          gapMinKm: data.count > 0 ? data.sumGap / data.count : 0,
+          sampleCount: data.count,
+        };
+      })
+      .filter(b => b.sampleCount > 0)
+      .sort((a, b) => a.startKm - b.startKm);
+    
+    for (const bucket of sortedBuckets) {
+      paceByDistanceTable.push({
+        distanceKm: bucket.midpointKm,
+        paceMinKm: Math.round(bucket.paceMinKm * 100) / 100,
+        gapMinKm: Math.round(bucket.gapMinKm * 100) / 100,
+        sampleCount: Math.round(bucket.sampleCount * 100) / 100,
+      });
     }
 
     // Calculate final averages
@@ -1107,6 +1335,10 @@ async function recalculatePerformanceProfile(
         gradientPaces: Object.fromEntries(
           Object.entries(gradientPaces).map(([k, v]) => [k, v.count > 0 ? v.sum / v.count : null])
         ),
+        // NEW: Store pace decay profile by race progress percentage
+        paceDecayByProgressPct: Object.keys(paceDecayByProgressPct).length > 0 ? paceDecayByProgressPct : null,
+        // NEW: Store absolute distance-based pace table for predictions
+        paceByDistanceTable: paceByDistanceTable.length > 0 ? paceByDistanceTable : null,
         activitiesAnalyzed: analyzedActivities.length,
         lastRecalculatedAt: new Date().toISOString(),
       },
@@ -1119,6 +1351,8 @@ async function recalculatePerformanceProfile(
       climbingPace,
       descendingPace,
       avgFatigueFactor,
+      hasPaceDecayProfile: Object.keys(paceDecayByProgressPct).length > 0,
+      paceByDistanceEntries: paceByDistanceTable.length,
     }, 'Performance profile recalculated');
   } catch (error) {
     app.log.error({ error, userId }, 'Failed to recalculate performance profile');
