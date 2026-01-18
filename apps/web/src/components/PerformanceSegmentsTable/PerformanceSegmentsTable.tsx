@@ -61,6 +61,8 @@ function getTerrainEmoji(type: TerrainSegment['terrainType']): string {
       return '⬇️';
     case 'flat':
       return '➡️';
+    case 'rolling_hills':
+      return '🌊';
     default:
       return '';
   }
@@ -74,6 +76,8 @@ function getTerrainLabel(type: TerrainSegment['terrainType']): string {
       return 'Descent';
     case 'flat':
       return 'Flat';
+    case 'rolling_hills':
+      return 'Rolling';
     default:
       return type;
   }
@@ -123,7 +127,7 @@ export function PerformanceSegmentsTable({
               <th className={styles.thType}>Type</th>
               <th className={styles.thGrade}>Grade</th>
               <th className={styles.thNumber}>Distance</th>
-              <th className={styles.thNumber}>Elev Δ</th>
+              <th className={styles.thNumber}>Elev</th>
               <th className={styles.thNumber}>Gradient</th>
               <th className={styles.thNumber}>Pace</th>
               <th className={styles.thNumber}>GAP</th>

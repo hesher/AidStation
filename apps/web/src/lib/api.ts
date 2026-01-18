@@ -53,7 +53,7 @@ export async function exportPlanAsPdf(id: string): Promise<{ success: boolean; e
 // Terrain Segments types for performance breakdown
 export interface TerrainSegment {
   segmentIndex: number;
-  terrainType: 'climb' | 'descent' | 'flat';
+  terrainType: 'climb' | 'descent' | 'flat' | 'rolling_hills';
   gradeCategory: string;
   startDistanceKm: number;
   endDistanceKm: number;

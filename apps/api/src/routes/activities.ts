@@ -604,6 +604,19 @@ export async function activityRoutes(app: FastifyInstance) {
     try {
       const { id } = request.params;
 
+      // Get the activity first to get the user ID for recalculating the profile
+      const activity = await getActivityById(id);
+
+      if (!activity) {
+        reply.status(404);
+        return {
+          success: false,
+          error: 'Activity not found',
+        };
+      }
+
+      const userId = activity.userId;
+
       const deleted = await deleteActivity(id);
 
       if (!deleted) {
@@ -612,6 +625,17 @@ export async function activityRoutes(app: FastifyInstance) {
           success: false,
           error: 'Activity not found',
         };
+      }
+
+      // Recalculate performance profile after deletion
+      if (userId) {
+        try {
+          await recalculatePerformanceProfile(userId, app);
+          app.log.info({ userId, activityId: id }, 'Performance profile recalculated after activity deletion');
+        } catch (recalcError) {
+          app.log.warn({ error: recalcError, userId }, 'Failed to recalculate performance profile after deletion');
+          // Don't fail the deletion if profile recalculation fails
+        }
       }
 
       logSuccess(app, 'Activity deleted', { activityId: id });
@@ -1257,6 +1281,8 @@ function parseTerrainSegments(gpxContent: string, activityId: string): TerrainSe
   const MAX_SEGMENT_LENGTH_KM = 5.0; // Split flat/descent into 5km blocks
   const MIN_SEGMENT_LENGTH_KM = 0.3; // Minimum segment to avoid fragments
   const WINDOW_SIZE_M = 200; // Window for detecting terrain type
+  const MIN_CLIMB_ELEVATION_M = 50; // Minimum elevation gain for a "significant" climb
+  const MIN_DESCENT_ELEVATION_M = 100; // Minimum elevation loss for a "significant" descent
 
   // Calculate cumulative distance and smoothed elevation
   let cumulativeDistance = 0;
@@ -1305,16 +1331,6 @@ function parseTerrainSegments(gpxContent: string, activityId: string): TerrainSe
     if (gradePercent >= CLIMB_THRESHOLD) return 'climb';
     if (gradePercent <= DESCENT_THRESHOLD) return 'descent';
     return 'flat';
-  }
-
-  function getGradeCategory(gradePercent: number): string {
-    if (gradePercent > 8) return 'steep_climb';
-    if (gradePercent > 5) return 'moderate_climb';
-    if (gradePercent >= 3) return 'gentle_climb';
-    if (gradePercent > -3) return 'flat';
-    if (gradePercent > -5) return 'gentle_descent';
-    if (gradePercent > -8) return 'moderate_descent';
-    return 'steep_descent';
   }
 
   function findPointAtDistance(targetM: number): number {
@@ -1431,7 +1447,93 @@ function parseTerrainSegments(gpxContent: string, activityId: string): TerrainSe
     return 155.4 * Math.pow(i, 5) - 30.4 * Math.pow(i, 4) - 43.3 * Math.pow(i, 3) + 46.3 * Math.pow(i, 2) + 19.5 * i + 3.6;
   }
 
-  // Build final segment data
+  // Consolidate small climbs and descents into "rolling hills" sections
+  // Only show climbs with > MIN_CLIMB_ELEVATION_M total ascent
+  // Only show descents with > MIN_DESCENT_ELEVATION_M total descent
+  // Merge smaller segments into "rolling_hills" terrain type
+  interface ConsolidatedSegment {
+    startIdx: number;
+    endIdx: number;
+    terrainType: TerrainType | 'rolling_hills';
+    totalElevationGain: number;
+    totalElevationLoss: number;
+  }
+
+  function calculateSegmentElevation(seg: RawSegment): { gain: number; loss: number } {
+    const startPoint = processedPoints[seg.startIdx];
+    const endPoint = processedPoints[seg.endIdx];
+    const elevChange = endPoint.elevation - startPoint.elevation;
+    return {
+      gain: elevChange > 0 ? elevChange : 0,
+      loss: elevChange < 0 ? Math.abs(elevChange) : 0,
+    };
+  }
+
+  const consolidatedSegments: ConsolidatedSegment[] = [];
+  let i = 0;
+
+  while (i < finalSegments.length) {
+    const seg = finalSegments[i];
+    const { gain, loss } = calculateSegmentElevation(seg);
+
+    // Check if this segment meets the significance threshold
+    const isSignificantClimb = seg.terrainType === 'climb' && gain >= MIN_CLIMB_ELEVATION_M;
+    const isSignificantDescent = seg.terrainType === 'descent' && loss >= MIN_DESCENT_ELEVATION_M;
+    const isFlat = seg.terrainType === 'flat';
+
+    if (isSignificantClimb || isSignificantDescent || isFlat) {
+      // Keep as-is
+      consolidatedSegments.push({
+        startIdx: seg.startIdx,
+        endIdx: seg.endIdx,
+        terrainType: seg.terrainType,
+        totalElevationGain: gain,
+        totalElevationLoss: loss,
+      });
+      i++;
+    } else {
+      // This is a small climb or descent - try to consolidate with subsequent small segments
+      const rollingStartIdx = seg.startIdx;
+      let rollingEndIdx = seg.endIdx;
+      let rollingElevGain = gain;
+      let rollingElevLoss = loss;
+
+      // Look ahead to consolidate consecutive small segments
+      let j = i + 1;
+      while (j < finalSegments.length) {
+        const nextSeg = finalSegments[j];
+        const nextElev = calculateSegmentElevation(nextSeg);
+
+        const nextIsSignificantClimb = nextSeg.terrainType === 'climb' && nextElev.gain >= MIN_CLIMB_ELEVATION_M;
+        const nextIsSignificantDescent = nextSeg.terrainType === 'descent' && nextElev.loss >= MIN_DESCENT_ELEVATION_M;
+        const nextIsFlat = nextSeg.terrainType === 'flat';
+
+        if (nextIsSignificantClimb || nextIsSignificantDescent || nextIsFlat) {
+          // Next segment is significant or flat, stop consolidating
+          break;
+        }
+
+        // Consolidate this small segment
+        rollingEndIdx = nextSeg.endIdx;
+        rollingElevGain += nextElev.gain;
+        rollingElevLoss += nextElev.loss;
+        j++;
+      }
+
+      // Create a rolling hills segment
+      consolidatedSegments.push({
+        startIdx: rollingStartIdx,
+        endIdx: rollingEndIdx,
+        terrainType: 'rolling_hills',
+        totalElevationGain: rollingElevGain,
+        totalElevationLoss: rollingElevLoss,
+      });
+
+      i = j;
+    }
+  }
+
+  // Build final segment data from consolidated segments
   const segments: TerrainSegmentData['segments'] = [];
   let totalElevGain = 0;
   let totalElevLoss = 0;
@@ -1440,9 +1542,22 @@ function parseTerrainSegments(gpxContent: string, activityId: string): TerrainSe
   const climbStats = { distanceKm: 0, timeSeconds: 0, elevationM: 0 };
   const descentStats = { distanceKm: 0, timeSeconds: 0, elevationM: 0 };
   const flatStats = { distanceKm: 0, timeSeconds: 0 };
+  const rollingStats = { distanceKm: 0, timeSeconds: 0, elevationGainM: 0, elevationLossM: 0 };
 
-  for (let idx = 0; idx < finalSegments.length; idx++) {
-    const seg = finalSegments[idx];
+  // Function to categorize grade including rolling hills
+  function getGradeCategoryWithRolling(terrainType: string, gradePercent: number): string {
+    if (terrainType === 'rolling_hills') return 'rolling';
+    if (gradePercent > 8) return 'steep_climb';
+    if (gradePercent > 5) return 'moderate_climb';
+    if (gradePercent >= 3) return 'gentle_climb';
+    if (gradePercent > -3) return 'flat';
+    if (gradePercent > -5) return 'gentle_descent';
+    if (gradePercent > -8) return 'moderate_descent';
+    return 'steep_descent';
+  }
+
+  for (let idx = 0; idx < consolidatedSegments.length; idx++) {
+    const seg = consolidatedSegments[idx];
     const startPoint = processedPoints[seg.startIdx];
     const endPoint = processedPoints[seg.endIdx];
 
@@ -1485,6 +1600,11 @@ function parseTerrainSegments(gpxContent: string, activityId: string): TerrainSe
       descentStats.distanceKm += distanceKm;
       descentStats.timeSeconds += timeSeconds;
       descentStats.elevationM += Math.abs(elevChange);
+    } else if (seg.terrainType === 'rolling_hills') {
+      rollingStats.distanceKm += distanceKm;
+      rollingStats.timeSeconds += timeSeconds;
+      rollingStats.elevationGainM += seg.totalElevationGain;
+      rollingStats.elevationLossM += seg.totalElevationLoss;
     } else {
       flatStats.distanceKm += distanceKm;
       flatStats.timeSeconds += timeSeconds;
@@ -1493,7 +1613,7 @@ function parseTerrainSegments(gpxContent: string, activityId: string): TerrainSe
     segments.push({
       segmentIndex: idx,
       terrainType: seg.terrainType,
-      gradeCategory: getGradeCategory(gradePercent),
+      gradeCategory: getGradeCategoryWithRolling(seg.terrainType, gradePercent),
       startDistanceKm: Math.round((startPoint.distanceM / 1000) * 100) / 100,
       endDistanceKm: Math.round((endPoint.distanceM / 1000) * 100) / 100,
       distanceKm: Math.round(distanceKm * 100) / 100,

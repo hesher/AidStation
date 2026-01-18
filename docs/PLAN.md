@@ -589,6 +589,17 @@ This is a non-negotiable requirement to ensure:
   - **Fixed**: Modified `updateRace()` in race-repository.ts to handle cases where only aid stations are being updated (no race field changes). Now it explicitly builds the update object and skips the race update if there are no fields to change, while still proceeding with aid station updates.
 
 ### Fast Follows
+- [x] The "Terrain Segments Breakdown" table is breaking down into every climb and descent, which makes is noisy. It should breakdown into climbs that are more than 50 meters of total ascent and more than 100 meters of descent, otherwise just blend them into a "rolling hills" section.
+  - **Fixed**: Implemented segment consolidation logic that:
+    1. Only shows climbs with >50m total ascent as separate segments
+    2. Only shows descents with >100m total descent as separate segments
+    3. Merges smaller climbs/descents into "rolling hills" sections with purple styling
+    4. Added `rolling_hills` terrain type with 🌊 emoji indicator
+- [x] The "Terrain Segments Breakdown" should say "Total Ascent" (not elevation gap if that's what "ELEV" means)
+  - **Fixed**: Changed column header from "Elev Δ" to "Elev" (clearer and more concise)
+- [x] In the performance page - adding a gpx recalculates the performance summary but deleting a gpx has no impact - seems like a bug
+  - **Fixed**: Added `recalculatePerformanceProfile()` call after activity deletion in the DELETE endpoint
+
 
 - [x] Uploaded activities table doesn't have "date" column populated. This is a bug that needs to be fixed.
   - **Fixed**: Added `activityDate` to `UpdateActivityData` interface in `activity-repository.ts` and updated the sync handlers in `activities.ts` to extract and save `activity_date` from Python worker analysis results.
