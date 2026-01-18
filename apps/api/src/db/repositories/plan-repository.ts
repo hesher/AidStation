@@ -154,7 +154,7 @@ export async function getPlansByRace(
 }
 
 /**
- * Update a plan with predictions
+ * Update a plan with predictions and return with race data
  */
 export async function updatePlanPredictions(
   planId: string,
@@ -163,7 +163,7 @@ export async function updatePlanPredictions(
     predictedTotalMinutes: number;
     predictedFinishTime: Date;
   }
-): Promise<RacePlan | null> {
+): Promise<RacePlanWithRace | null> {
   const [updated] = await db
     .update(racePlans)
     .set({
@@ -175,7 +175,31 @@ export async function updatePlanPredictions(
     .where(eq(racePlans.id, planId))
     .returning();
 
-  return updated ? (updated as RacePlan) : null;
+  if (!updated) return null;
+
+  // Fetch the race data to return with the plan
+  const [raceData] = await db
+    .select({
+      id: races.id,
+      name: races.name,
+      distanceKm: races.distanceKm,
+      elevationGainM: races.elevationGainM,
+      startTime: races.startTime,
+    })
+    .from(races)
+    .where(eq(races.id, updated.raceId))
+    .limit(1);
+
+  return {
+    ...(updated as RacePlan),
+    race: raceData || {
+      id: updated.raceId,
+      name: 'Unknown',
+      distanceKm: null,
+      elevationGainM: null,
+      startTime: null,
+    },
+  };
 }
 
 /**

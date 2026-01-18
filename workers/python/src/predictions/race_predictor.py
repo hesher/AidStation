@@ -41,6 +41,9 @@ class PerformanceProfile:
     descending_pace_min_km: float
     fatigue_factor: float  # Riegel exponent, typically 1.02-1.15
     gradient_paces: Optional[Dict[str, float]] = None  # pace by gradient category
+    # NEW: Pace decay by race progress percentage (from activity analysis)
+    # Keys are "0-10", "10-20", ..., "90-100" -> multiplier values
+    pace_decay_by_progress_pct: Optional[Dict[str, float]] = None
 
 
 @dataclass
@@ -258,18 +261,53 @@ class RacePlanPredictor:
         self, distance_km: float, total_distance_km: float
     ) -> float:
         """
-        Calculate progressive fatigue factor.
+        Calculate progressive fatigue factor based on race progress.
 
-        Uses a modified Riegel formula where fatigue increases
-        non-linearly with distance covered.
+        If pace_decay_by_progress_pct is available from activity analysis,
+        uses actual pacing patterns from previous runs. Otherwise falls back
+        to linear Riegel-based estimate.
+
+        The pace_decay data shows how the runner typically slows down:
+        - At 0-20% of race: baseline (multiplier ~1.0)
+        - At 80-100% of race: peak fatigue (multiplier might be 1.15 = 15% slower)
         """
         if total_distance_km <= 0:
             return 1.0
 
-        # Progress through race (0 to 1)
-        progress = distance_km / total_distance_km
+        # Progress through race (0 to 100)
+        progress_pct = (distance_km / total_distance_km) * 100
 
-        # Progressive fatigue: starts at 1.0, reaches full fatigue factor at end
+        # NEW: Use segment-based pace decay if available
+        if self.performance.pace_decay_by_progress_pct:
+            pace_decay = self.performance.pace_decay_by_progress_pct
+
+            # Find the appropriate bucket for current progress
+            bucket_idx = min(int(progress_pct // 10), 9)  # 0-9 for 10 buckets
+            bucket_key = f"{bucket_idx * 10}-{(bucket_idx + 1) * 10}"
+
+            if bucket_key in pace_decay:
+                # The pace_decay value is already a multiplier (1.0 = baseline)
+                # It's based on GAP (terrain-adjusted) so it's pure fatigue
+                return pace_decay[bucket_key]
+
+            # Interpolation fallback: if exact bucket not found, interpolate
+            # between available buckets
+            available_buckets = sorted(
+                [(int(k.split("-")[0]), v) for k, v in pace_decay.items()]
+            )
+            if available_buckets:
+                # Find surrounding buckets
+                for i, (pct, mult) in enumerate(available_buckets):
+                    if pct > progress_pct and i > 0:
+                        prev_pct, prev_mult = available_buckets[i - 1]
+                        # Linear interpolation
+                        ratio = (progress_pct - prev_pct) / (pct - prev_pct)
+                        return prev_mult + ratio * (mult - prev_mult)
+                # If past all buckets, use last one
+                return available_buckets[-1][1]
+
+        # Fallback: linear Riegel-based fatigue estimate
+        progress = distance_km / total_distance_km
         base_fatigue = self.performance.fatigue_factor - 1.0
         return 1.0 + base_fatigue * progress
 
@@ -371,6 +409,7 @@ def create_predictor_from_profile(
         descending_pace_min_km=profile_data.get("descending_pace_min_km", 5.5),
         fatigue_factor=profile_data.get("fatigue_factor", 1.08),
         gradient_paces=profile_data.get("gradient_paces"),
+        pace_decay_by_progress_pct=profile_data.get("pace_decay_by_progress_pct"),
     )
 
     return RacePlanPredictor(

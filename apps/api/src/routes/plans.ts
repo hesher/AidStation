@@ -396,7 +396,7 @@ export async function planRoutes(app: FastifyInstance) {
 
       // Get user performance profile
       const performanceRaw = await getUserPerformanceForPrediction(userId);
-      
+
       // Extract pace profiles from profileData if available
       const performance = performanceRaw ? {
         ...performanceRaw,
@@ -408,7 +408,7 @@ export async function planRoutes(app: FastifyInstance) {
           sampleCount: number;
         }> | undefined) ?? null,
       } : null;
-      
+
       // Debug logging to trace the performance profile values
       app.log.info({
         userId,
@@ -564,7 +564,7 @@ function generatePredictions(
   const rawFatigueFactor = performance?.fatigueFactor ?? 0;
   // Convert: if raw is 2.0 (2% slowdown per 10km), we want ~1.08 for total race
   // If raw is negative (speed up), clamp to minimum positive value
-  const normalizedFatigueFactor = rawFatigueFactor < 0 
+  const normalizedFatigueFactor = rawFatigueFactor < 0
     ? DEFAULT_FATIGUE_FACTOR  // Use default if user appears to speed up (invalid)
     : 1.0 + Math.min(rawFatigueFactor / 100, 0.20);  // Cap at 20% slowdown
 
@@ -579,10 +579,10 @@ function generatePredictions(
 
   // Helper function to look up pace at a given distance from the distance-based pace table
   // This uses actual historical data: "At km X, you typically run Y pace"
-  // 
+  //
   // For extrapolation beyond known data, we use RIEGEL'S POWER LAW:
   //   P_target = P_known × (D_target / D_known)^(f-1)
-  // 
+  //
   // Where f is the fatigue factor:
   //   - 1.06: Elite marathon runners (standard Riegel)
   //   - 1.10-1.15: Good ultra runners
@@ -597,7 +597,7 @@ function generatePredictions(
     }
 
     const maxDataDistance = perf.paceByDistanceTable[perf.paceByDistanceTable.length - 1].distanceKm;
-    
+
     // If within known data range, find closest entry
     if (distanceKm <= maxDataDistance) {
       let closestEntry = perf.paceByDistanceTable[0];
@@ -610,7 +610,7 @@ function generatePredictions(
           closestEntry = entry;
         }
       }
-      
+
       return { pace: closestEntry.gapMinKm, isExtrapolated: false };
     }
 
@@ -619,18 +619,18 @@ function generatePredictions(
     const lastEntry = perf.paceByDistanceTable[perf.paceByDistanceTable.length - 1];
     const knownPace = lastEntry.gapMinKm;
     const knownDistance = lastEntry.distanceKm;
-    
+
     // Apply Riegel formula
     const distanceRatio = distanceKm / knownDistance;
     const riegelExponent = RIEGEL_FATIGUE_FACTOR - 1; // e.g., 1.15 - 1 = 0.15
     const degradationFactor = Math.pow(distanceRatio, riegelExponent);
-    
+
     const predictedPace = knownPace * degradationFactor;
-    
+
     console.log(`  → Riegel extrapolation: ${knownDistance}km @ ${knownPace.toFixed(2)}/km → ${distanceKm}km`);
     console.log(`    Formula: ${knownPace.toFixed(2)} × (${distanceKm}/${knownDistance})^${riegelExponent.toFixed(2)} = ${predictedPace.toFixed(2)}/km`);
     console.log(`    Degradation factor: ${degradationFactor.toFixed(3)}x (${((degradationFactor - 1) * 100).toFixed(1)}% slower)`);
-    
+
     return { pace: predictedPace, isExtrapolated: true };
   }
 
@@ -658,11 +658,11 @@ function generatePredictions(
     : perf.flatPaceMinKm;
 
   // Calculate total race distance: use race distance if set, otherwise derive from last aid station
-  const lastStationDistance = raceData.aidStations.length > 0 
+  const lastStationDistance = raceData.aidStations.length > 0
     ? (raceData.aidStations[raceData.aidStations.length - 1].distanceKm ?? 0)
     : 0;
   const totalRaceDistanceKm = raceData.race.distanceKm ?? lastStationDistance ?? 100;
-  
+
   console.log(`=== PREDICTION DEBUG ===`);
   console.log(`Race: ${raceData.race.name}`);
   console.log(`Total distance: ${totalRaceDistanceKm}km (race.distanceKm=${raceData.race.distanceKm}, lastStation=${lastStationDistance})`);
@@ -698,7 +698,7 @@ function generatePredictions(
   }
 
   const waypoints: Waypoint[] = [];
-  
+
   // Add Start waypoint if first station isn't at 0km
   const firstStationDistance = raceData.aidStations[0]?.distanceKm ?? 0;
   if (firstStationDistance > 0.1) {
@@ -794,11 +794,11 @@ function generatePredictions(
         // So we normalize: if profile shows fast start, we use 1.0 at start
         // and scale up the relative differences for later buckets
         const rawMultiplier = perf.paceDecayByProgressPct[bucketKey];
-        
+
         // Find the minimum multiplier in the profile (typically the "0-10" bucket)
         const allMultipliers = Object.values(perf.paceDecayByProgressPct);
         const minMultiplier = Math.min(...allMultipliers);
-        
+
         // Normalize so minimum becomes 1.0, preserving relative differences
         // This way, the slowest relative to their start becomes the fatigue factor
         if (minMultiplier > 0 && minMultiplier < 1.0) {
@@ -814,7 +814,7 @@ function generatePredictions(
       // Fallback: use linear Riegel-based fatigue estimate
       fatigueFactor = 1.0 + (perf.fatigueFactor - 1.0) * distanceRatio;
     }
-    
+
     // Ensure fatigue factor is always >= 1.0 (you can't get faster from fatigue)
     fatigueFactor = Math.max(1.0, fatigueFactor);
 
@@ -825,7 +825,7 @@ function generatePredictions(
     if (lookupResult !== null) {
       // Use the distance-based pace (either from data or Riegel extrapolation)
       effectiveBasePace = lookupResult.pace;
-      
+
       if (!lookupResult.isExtrapolated) {
         // For known data points, fatigue is already baked into the historical pace
         fatigueFactor = 1.0;
@@ -846,18 +846,18 @@ function generatePredictions(
     // If we have historical pace data, we only apply terrain and nighttime factors
     // If not, we apply terrain, fatigue, and nighttime factors
     let segmentPaceMinKm = effectiveBasePace * terrainFactor * fatigueFactor * nighttimeFactor;
-    
+
     // SANITY CHECK: Cap pace at realistic human movement limits
     // Even extremely fatigued ultra runners don't go slower than power hiking
     const MAX_FLAT_PACE = 15.0;  // 15 min/km = slow walk/shuffle (4 km/h)
     const MAX_CLIMB_PACE = 25.0; // 25 min/km = steep hiking (2.4 km/h)
     const MAX_PACE = terrainFactor > 1.5 ? MAX_CLIMB_PACE : MAX_FLAT_PACE;
-    
+
     if (segmentPaceMinKm > MAX_PACE) {
       console.log(`  ⚠️ Pace ${segmentPaceMinKm.toFixed(2)}/km exceeds max ${MAX_PACE}/km - capping`);
       segmentPaceMinKm = MAX_PACE;
     }
-      
+
     // Debug logging for prediction factors
     console.log(`Station ${station.name}: distance=${stationDistanceKm}km, basePace=${basePace}, terrain=${terrainFactor.toFixed(3)}, fatigue=${fatigueFactor.toFixed(3)}, night=${nighttimeFactor.toFixed(3)}, finalPace=${segmentPaceMinKm.toFixed(2)}`);
 

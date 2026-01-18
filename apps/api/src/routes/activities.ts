@@ -581,9 +581,9 @@ export async function activityRoutes(app: FastifyInstance) {
 
         if (submission.submitted) {
           await updateActivityStatus(activity.id, 'processing', { taskId: submission.taskId });
-          
+
           app.log.info({ activityId: activity.id, taskId: submission.taskId }, 'Activity queued for re-analysis');
-          
+
           return {
             success: true,
             data: {
@@ -1236,11 +1236,11 @@ async function recalculatePerformanceProfile(
         for (const segment of paceByDistance5k) {
           // Create bucket key like "0-5", "5-10", "10-15", etc.
           const bucketKey = `${segment.segment_start_km}-${segment.segment_end_km}`;
-          
+
           if (!paceByDistanceKm[bucketKey]) {
             paceByDistanceKm[bucketKey] = { sumPace: 0, sumGap: 0, count: 0 };
           }
-          
+
           paceByDistanceKm[bucketKey].sumPace += segment.actual_pace_min_km * weight;
           paceByDistanceKm[bucketKey].sumGap += segment.grade_adjusted_pace_min_km * weight;
           paceByDistanceKm[bucketKey].count += weight;
@@ -1282,7 +1282,7 @@ async function recalculatePerformanceProfile(
       gapMinKm: number;
       sampleCount: number;
     }> = [];
-    
+
     // Sort buckets by distance and calculate averages
     const sortedBuckets = Object.entries(paceByDistanceKm)
       .map(([key, data]) => {
@@ -1298,7 +1298,7 @@ async function recalculatePerformanceProfile(
       })
       .filter(b => b.sampleCount > 0)
       .sort((a, b) => a.startKm - b.startKm);
-    
+
     for (const bucket of sortedBuckets) {
       paceByDistanceTable.push({
         distanceKm: bucket.midpointKm,

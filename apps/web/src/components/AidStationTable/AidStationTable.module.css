@@ -90,6 +90,34 @@
   flex-shrink: 0;
 }
 
+/* Start marker - blue to match map legend */
+.startMarker {
+  background: #2196f3;
+}
+
+/* Finish marker - red to match map legend */
+.finishMarker {
+  background: #f44336;
+}
+
+/* Start row styling */
+.startRow {
+  background: rgba(33, 150, 243, 0.05);
+}
+
+.startRow:hover {
+  background: rgba(33, 150, 243, 0.1);
+}
+
+/* Finish row styling */
+.finishRow {
+  background: rgba(244, 67, 54, 0.05);
+}
+
+.finishRow:hover {
+  background: rgba(244, 67, 54, 0.1);
+}
+
 .stationName {
   color: #e0e0e0;
   font-weight: 500;

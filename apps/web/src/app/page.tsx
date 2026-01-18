@@ -221,9 +221,9 @@ export default function Home() {
         // Match by name OR by distance (for newly added stations)
         const analyzed = analyzedAidStations.find(
           a => a.name.toLowerCase() === station.name.toLowerCase() ||
-               (station.distanceKm && Math.abs((a.distance_km || 0) - station.distanceKm) < 0.5)
+            (station.distanceKm && Math.abs((a.distance_km || 0) - station.distanceKm) < 0.5)
         );
-        
+
         if (analyzed) {
           return {
             ...station,
@@ -280,10 +280,10 @@ export default function Home() {
 
     try {
       const gpxContent = await file.text();
-      
+
       // Store GPX content for future re-analysis
       gpxContentRef.current = gpxContent;
-      
+
       const parser = new DOMParser();
       const xmlDoc = parser.parseFromString(gpxContent, 'text/xml');
 

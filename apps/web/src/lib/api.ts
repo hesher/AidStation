@@ -820,6 +820,7 @@ export async function generatePredictions(id: string): Promise<PlanResponse> {
         'Content-Type': 'application/json',
       },
       credentials: 'include',
+      body: JSON.stringify({}),
     });
 
     const data = await response.json();
@@ -851,6 +852,7 @@ export async function activatePlan(id: string): Promise<{ success: boolean; erro
         'Content-Type': 'application/json',
       },
       credentials: 'include',
+      body: JSON.stringify({}),
     });
 
     const data = await response.json();

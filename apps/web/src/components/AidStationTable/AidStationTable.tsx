@@ -15,6 +15,20 @@ interface AidStationTableProps {
   editable?: boolean;
   /** When true, distance and elevation fields are calculated from GPX course data and cannot be manually edited */
   hasCourseData?: boolean;
+  /** Race total distance in km - used to show Finish row */
+  raceDistanceKm?: number | null;
+  /** Elevation at race start in meters */
+  startElevationM?: number | null;
+  /** Elevation at race finish in meters */
+  finishElevationM?: number | null;
+  /** Total race elevation gain */
+  totalElevationGainM?: number | null;
+  /** Total race elevation loss */
+  totalElevationLossM?: number | null;
+  /** Overall race cutoff time in hours */
+  overallCutoffHours?: number | null;
+  /** Callback when overall cutoff hours changes */
+  onOverallCutoffChange?: (hours: number | null) => void;
 }
 
 export function AidStationTable({
@@ -23,9 +37,18 @@ export function AidStationTable({
   onAidStationsChange,
   editable = false,
   hasCourseData = false,
+  raceDistanceKm,
+  startElevationM,
+  finishElevationM,
+  totalElevationGainM,
+  totalElevationLossM,
+  overallCutoffHours,
+  onOverallCutoffChange,
 }: AidStationTableProps) {
   const [editingRow, setEditingRow] = useState<number | null>(null);
   const [editingStation, setEditingStation] = useState<AidStation | null>(null);
+  const [editingFinish, setEditingFinish] = useState(false);
+  const [editingFinishCutoff, setEditingFinishCutoff] = useState<number | null>(null);
 
   const formatDistance = (km?: number | null) => {
     if (km === undefined || km === null) return '--';
@@ -388,6 +411,152 @@ export function AidStationTable({
     </tr>
   );
 
+  const renderStartRow = () => (
+    <tr
+      key="start"
+      className={`${styles.row} ${styles.startRow}`}
+      data-testid="aid-station-row-start"
+    >
+      <td className={styles.tdStation}>
+        <span className={`${styles.stationNumber} ${styles.startMarker}`}>S</span>
+        <span className={styles.stationName}>Start</span>
+      </td>
+      <td className={styles.tdNumber}>{formatDistance(0)}</td>
+      <td className={styles.tdNumber}>--</td>
+      <td className={styles.tdNumber}>{formatElevation(startElevationM)}</td>
+      <td className={`${styles.tdNumber} ${styles.gain}`}>--</td>
+      <td className={`${styles.tdNumber} ${styles.loss}`}>--</td>
+      <td className={styles.tdServices}>--</td>
+      <td className={styles.tdNumber}>--</td>
+      {editable && <td className={styles.tdActions}></td>}
+    </tr>
+  );
+
+  const handleFinishClick = useCallback(() => {
+    if (editable && onOverallCutoffChange && editingRow === null) {
+      setEditingFinish(true);
+      setEditingFinishCutoff(overallCutoffHours ?? null);
+    }
+  }, [editable, onOverallCutoffChange, editingRow, overallCutoffHours]);
+
+  const handleSaveFinishEdit = useCallback(() => {
+    if (onOverallCutoffChange) {
+      onOverallCutoffChange(editingFinishCutoff);
+    }
+    setEditingFinish(false);
+    setEditingFinishCutoff(null);
+  }, [editingFinishCutoff, onOverallCutoffChange]);
+
+  const handleCancelFinishEdit = useCallback(() => {
+    setEditingFinish(false);
+    setEditingFinishCutoff(null);
+  }, []);
+
+  const renderFinishRow = () => {
+    const lastStation = aidStations[aidStations.length - 1];
+    const distanceFromPrev = raceDistanceKm && lastStation?.distanceKm
+      ? raceDistanceKm - lastStation.distanceKm
+      : raceDistanceKm;
+
+    // Calculate gain/loss from last station to finish
+    // For total race: we have totalElevationGainM/LossM
+    // Sum of all aid station gains should equal roughly total race gain
+    // Finish gain = total - sum of all aid station gains (approximation)
+    const sumOfGains = aidStations.reduce((sum, s) => sum + (s.elevationGainFromPrevM ?? 0), 0);
+    const sumOfLosses = aidStations.reduce((sum, s) => sum + (s.elevationLossFromPrevM ?? 0), 0);
+    const finishGain = totalElevationGainM ? totalElevationGainM - sumOfGains : undefined;
+    const finishLoss = totalElevationLossM ? totalElevationLossM - sumOfLosses : undefined;
+
+    if (editingFinish) {
+      return (
+        <tr
+          key="finish-editing"
+          className={`${styles.row} ${styles.finishRow} ${styles.editingRow}`}
+          data-testid="aid-station-row-finish-editing"
+        >
+          <td className={styles.tdStation}>
+            <span className={`${styles.stationNumber} ${styles.finishMarker}`}>F</span>
+            <span className={styles.stationName}>Finish</span>
+          </td>
+          <td className={styles.tdNumber}>{formatDistance(raceDistanceKm)}</td>
+          <td className={styles.tdNumber}>{formatDistance(distanceFromPrev)}</td>
+          <td className={styles.tdNumber}>{formatElevation(finishElevationM)}</td>
+          <td className={`${styles.tdNumber} ${styles.gain}`}>
+            {finishGain !== undefined && finishGain > 0 ? `+${Math.round(finishGain)}` : '--'}
+          </td>
+          <td className={`${styles.tdNumber} ${styles.loss}`}>
+            {finishLoss !== undefined && finishLoss > 0 ? `-${Math.round(finishLoss)}` : '--'}
+          </td>
+          <td className={styles.tdServices}>--</td>
+          <td className={styles.tdNumber}>
+            <input
+              type="number"
+              value={editingFinishCutoff ?? ''}
+              onChange={(e) => {
+                const val = e.target.value;
+                setEditingFinishCutoff(val === '' ? null : parseFloat(val));
+              }}
+              className={styles.editInputNumber}
+              step="0.5"
+              onClick={(e) => e.stopPropagation()}
+              placeholder="hours"
+            />
+          </td>
+          <td className={styles.tdActions}>
+            <button
+              className={styles.saveButton}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleSaveFinishEdit();
+              }}
+              title="Save changes"
+            >
+              ✓
+            </button>
+            <button
+              className={styles.cancelButton}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleCancelFinishEdit();
+              }}
+              title="Cancel editing"
+            >
+              ✕
+            </button>
+          </td>
+        </tr>
+      );
+    }
+
+    return (
+      <tr
+        key="finish"
+        className={`${styles.row} ${styles.finishRow} ${editable && onOverallCutoffChange ? styles.editableRow : ''}`}
+        onClick={handleFinishClick}
+        data-testid="aid-station-row-finish"
+      >
+        <td className={styles.tdStation}>
+          <span className={`${styles.stationNumber} ${styles.finishMarker}`}>F</span>
+          <span className={styles.stationName}>Finish</span>
+        </td>
+        <td className={styles.tdNumber}>{formatDistance(raceDistanceKm)}</td>
+        <td className={styles.tdNumber}>{formatDistance(distanceFromPrev)}</td>
+        <td className={styles.tdNumber}>{formatElevation(finishElevationM)}</td>
+        <td className={`${styles.tdNumber} ${styles.gain}`}>
+          {finishGain !== undefined && finishGain > 0 ? `+${Math.round(finishGain)}` : '--'}
+        </td>
+        <td className={`${styles.tdNumber} ${styles.loss}`}>
+          {finishLoss !== undefined && finishLoss > 0 ? `-${Math.round(finishLoss)}` : '--'}
+        </td>
+        <td className={styles.tdServices}>--</td>
+        <td className={styles.tdNumber}>
+          {formatCutoff(null, overallCutoffHours)}
+        </td>
+        {editable && <td className={styles.tdActions}></td>}
+      </tr>
+    );
+  };
+
   return (
     <div className={styles.container} data-testid="aid-station-table">
       <div className={styles.titleRow}>
@@ -425,11 +594,13 @@ export function AidStationTable({
             </tr>
           </thead>
           <tbody>
+            {renderStartRow()}
             {aidStations.map((station, index) =>
               editingRow === index
                 ? renderEditRow(index)
                 : renderReadRow(station, index)
             )}
+            {raceDistanceKm && renderFinishRow()}
           </tbody>
         </table>
       </div>

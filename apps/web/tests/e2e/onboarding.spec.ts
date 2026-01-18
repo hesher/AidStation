@@ -130,8 +130,8 @@ test.describe('User Story 1: Onboarding Experience', () => {
     await expect(page.getByTestId('race-card')).toBeVisible();
     await expect(page.getByTestId('race-card').getByText('Western States Endurance Run')).toBeVisible();
 
-    // Verify race details are shown
-    await expect(page.getByText('161.0 km')).toBeVisible();
+    // Verify race details are shown (target RaceCard specifically to avoid Finish row match)
+    await expect(page.getByTestId('race-card').getByText('161.0 km', { exact: false })).toBeVisible();
     await expect(page.getByText('USA')).toBeVisible();
   });
 

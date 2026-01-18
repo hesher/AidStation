@@ -44,6 +44,40 @@ class SegmentMetrics:
 
 
 @dataclass
+class DistanceSegmentPace:
+    """Pace data for a distance segment (e.g., first 5km, second 5km)"""
+
+    segment_start_km: float
+    segment_end_km: float
+    actual_pace_min_km: float
+    grade_adjusted_pace_min_km: float
+    elevation_gain_m: float
+    elevation_loss_m: float
+
+
+@dataclass
+class NormalizedPaceProfile:
+    """
+    Pace profile normalized by percentage of total distance.
+    Allows comparison across activities of different lengths.
+    """
+
+    # Pace multipliers by race progress (1.0 = baseline pace)
+    # Keys are percentage ranges: "0-10", "10-20", ..., "90-100"
+    pace_by_progress_pct: Dict[str, float]
+
+    # GAP-based multipliers (terrain-adjusted)
+    gap_by_progress_pct: Dict[str, float]
+
+    # The baseline pace used for normalization (first 20% average)
+    baseline_pace_min_km: float
+    baseline_gap_min_km: float
+
+    # Activity distance for context
+    activity_distance_km: float
+
+
+@dataclass
 class ActivityAnalysisResult:
     """Complete analysis result for an activity"""
 
@@ -73,11 +107,17 @@ class ActivityAnalysisResult:
     fatigue_curve: List[Dict[str, float]]
     fatigue_factor: float  # Percentage increase in pace per km
 
+    # NEW: Distance-based pace segments (absolute 5km buckets)
+    pace_by_distance_5k: List[Dict[str, float]] = field(default_factory=list)
+
+    # NEW: Normalized pace profile (percentage of total distance)
+    normalized_pace_profile: Optional[Dict[str, Any]] = None
+
     # Segment analysis
-    segment_count: int
+    segment_count: int = 0
 
     # Metadata
-    analysis_version: str = "1.0"
+    analysis_version: str = "2.0"
 
 
 @dataclass
@@ -99,9 +139,13 @@ class PerformanceProfile:
     # Fatigue modeling
     fatigue_factor: float  # Pace increase per 10km
 
+    # NEW: Aggregated normalized pace profile across all activities
+    # Shows how pace degrades by percentage of race distance (terrain-adjusted)
+    pace_decay_by_progress_pct: Dict[str, float] = field(default_factory=dict)
+
     # Confidence metrics
-    activities_analyzed: int
-    total_distance_km: float
+    activities_analyzed: int = 0
+    total_distance_km: float = 0.0
 
     # Gradient-specific sample sizes
     gradient_sample_sizes: Dict[str, int] = field(default_factory=dict)
@@ -394,6 +438,157 @@ class ActivityPerformanceAnalyzer:
 
         return curve_data, fatigue_factor
 
+    def _calculate_pace_by_distance_5k(self) -> List[Dict[str, float]]:
+        """
+        Calculate pace for each 5km segment of the activity.
+
+        This provides absolute distance-based pacing analysis:
+        - First 5km, second 5km, third 5km, etc.
+
+        Returns:
+            List of dicts with segment data for each 5k block
+        """
+        if not self._segments:
+            self._analyze_segments()
+
+        if not self._segments:
+            return []
+
+        BUCKET_SIZE_KM = 5.0
+        total_distance_km = self._points[-1]["distance_m"] / 1000
+
+        buckets = []
+        current_bucket_start = 0.0
+
+        while current_bucket_start < total_distance_km:
+            bucket_end = min(current_bucket_start + BUCKET_SIZE_KM, total_distance_km)
+
+            # Find all segments that fall within this bucket
+            bucket_segments = [
+                seg
+                for seg in self._segments
+                if seg.start_distance_km >= current_bucket_start
+                and seg.start_distance_km < bucket_end
+            ]
+
+            if bucket_segments:
+                # Calculate weighted average pace (by distance) for this bucket
+                total_dist = sum(seg.distance_km for seg in bucket_segments)
+                if total_dist > 0:
+                    weighted_pace = sum(
+                        seg.actual_pace_min_km * seg.distance_km
+                        for seg in bucket_segments
+                    ) / total_dist
+                    weighted_gap = sum(
+                        seg.grade_adjusted_pace_min_km * seg.distance_km
+                        for seg in bucket_segments
+                    ) / total_dist
+
+                    # Calculate elevation for this bucket
+                    elev_gain = sum(
+                        max(0, seg.elevation_change_m) for seg in bucket_segments
+                    )
+                    elev_loss = sum(
+                        abs(min(0, seg.elevation_change_m)) for seg in bucket_segments
+                    )
+
+                    buckets.append(
+                        {
+                            "segment_start_km": round(current_bucket_start, 1),
+                            "segment_end_km": round(bucket_end, 1),
+                            "actual_pace_min_km": round(weighted_pace, 2),
+                            "grade_adjusted_pace_min_km": round(weighted_gap, 2),
+                            "elevation_gain_m": round(elev_gain, 0),
+                            "elevation_loss_m": round(elev_loss, 0),
+                            "distance_km": round(total_dist, 2),
+                        }
+                    )
+
+            current_bucket_start = bucket_end
+
+        return buckets
+
+    def _calculate_normalized_pace_profile(self) -> Optional[Dict[str, Any]]:
+        """
+        Calculate normalized pace profile by percentage of total distance.
+
+        This allows comparing pacing across activities of different lengths:
+        - How did you run at 10% of the race? 50%? 90%?
+        - Normalized as multipliers relative to your first 20% (baseline)
+
+        Returns:
+            Dict with normalized pace profile data, or None if not enough data
+        """
+        if not self._segments:
+            self._analyze_segments()
+
+        if len(self._segments) < 5:
+            return None
+
+        total_distance_km = self._points[-1]["distance_m"] / 1000
+        if total_distance_km < 5.0:  # Need at least 5km for meaningful analysis
+            return None
+
+        # Define 10% buckets
+        BUCKET_PCT = 10
+        pace_by_pct: Dict[str, List[float]] = {}
+        gap_by_pct: Dict[str, List[float]] = {}
+
+        for i in range(0, 100, BUCKET_PCT):
+            key = f"{i}-{i + BUCKET_PCT}"
+            pace_by_pct[key] = []
+            gap_by_pct[key] = []
+
+        # Assign each segment to its percentage bucket
+        for seg in self._segments:
+            seg_center_km = (seg.start_distance_km + seg.end_distance_km) / 2
+            pct_of_race = (seg_center_km / total_distance_km) * 100
+
+            # Find the right bucket
+            bucket_idx = min(int(pct_of_race // BUCKET_PCT), 9)  # Cap at 90-100 bucket
+            key = f"{bucket_idx * BUCKET_PCT}-{(bucket_idx + 1) * BUCKET_PCT}"
+
+            pace_by_pct[key].append(seg.actual_pace_min_km)
+            gap_by_pct[key].append(seg.grade_adjusted_pace_min_km)
+
+        # Calculate averages for each bucket
+        avg_pace_by_pct: Dict[str, float] = {}
+        avg_gap_by_pct: Dict[str, float] = {}
+
+        for key in pace_by_pct:
+            if pace_by_pct[key]:
+                avg_pace_by_pct[key] = sum(pace_by_pct[key]) / len(pace_by_pct[key])
+            if gap_by_pct[key]:
+                avg_gap_by_pct[key] = sum(gap_by_pct[key]) / len(gap_by_pct[key])
+
+        # Calculate baseline from first 20% (first two buckets)
+        baseline_paces = pace_by_pct.get("0-10", []) + pace_by_pct.get("10-20", [])
+        baseline_gaps = gap_by_pct.get("0-10", []) + gap_by_pct.get("10-20", [])
+
+        if not baseline_paces or not baseline_gaps:
+            return None
+
+        baseline_pace = sum(baseline_paces) / len(baseline_paces)
+        baseline_gap = sum(baseline_gaps) / len(baseline_gaps)
+
+        # Convert to multipliers (1.0 = baseline, 1.1 = 10% slower, etc.)
+        pace_multipliers: Dict[str, float] = {}
+        gap_multipliers: Dict[str, float] = {}
+
+        for key, avg_pace in avg_pace_by_pct.items():
+            pace_multipliers[key] = round(avg_pace / baseline_pace, 3)
+
+        for key, avg_gap in avg_gap_by_pct.items():
+            gap_multipliers[key] = round(avg_gap / baseline_gap, 3)
+
+        return {
+            "pace_by_progress_pct": pace_multipliers,
+            "gap_by_progress_pct": gap_multipliers,
+            "baseline_pace_min_km": round(baseline_pace, 2),
+            "baseline_gap_min_km": round(baseline_gap, 2),
+            "activity_distance_km": round(total_distance_km, 2),
+        }
+
     def analyze(self) -> ActivityAnalysisResult:
         """
         Perform complete analysis of the activity.
@@ -471,6 +666,12 @@ class ActivityPerformanceAnalyzer:
         if start_time:
             activity_date = start_time.isoformat()
 
+        # NEW: Calculate distance-based pace segments
+        pace_by_distance_5k = self._calculate_pace_by_distance_5k()
+
+        # NEW: Calculate normalized pace profile
+        normalized_pace_profile = self._calculate_normalized_pace_profile()
+
         return ActivityAnalysisResult(
             activity_id=self.activity_id,
             name=name,
@@ -486,6 +687,8 @@ class ActivityPerformanceAnalyzer:
             pace_by_gradient=pace_by_gradient,
             fatigue_curve=fatigue_curve,
             fatigue_factor=fatigue_factor,
+            pace_by_distance_5k=pace_by_distance_5k,
+            normalized_pace_profile=normalized_pace_profile,
             segment_count=len(self._segments),
         )
 
@@ -528,6 +731,11 @@ def aggregate_performance_profiles(
     all_fatigues = []
     total_distance = 0.0
 
+    # NEW: Accumulator for normalized pace profiles (GAP-based multipliers)
+    pace_decay_by_pct: Dict[str, List[Tuple[float, float]]] = {
+        f"{i}-{i + 10}": [] for i in range(0, 100, 10)
+    }
+
     for analysis, weight in zip(analyses, weights):
         # Accumulate pace by gradient
         for gradient, pace in analysis.pace_by_gradient.items():
@@ -538,6 +746,17 @@ def aggregate_performance_profiles(
         all_gaps.append((analysis.grade_adjusted_pace_min_km, weight))
         all_fatigues.append((analysis.fatigue_factor, weight))
         total_distance += analysis.total_distance_km
+
+        # NEW: Accumulate normalized pace profiles
+        # Weight longer activities more (they provide more reliable pacing data)
+        if analysis.normalized_pace_profile:
+            profile = analysis.normalized_pace_profile
+            gap_multipliers = profile.get("gap_by_progress_pct", {})
+            distance_weight = weight * analysis.total_distance_km
+
+            for pct_key, multiplier in gap_multipliers.items():
+                if pct_key in pace_decay_by_pct:
+                    pace_decay_by_pct[pct_key].append((multiplier, distance_weight))
 
     # Calculate weighted averages
     def weighted_average(values_weights: List[Tuple[float, float]]) -> Optional[float]:
@@ -567,6 +786,13 @@ def aggregate_performance_profiles(
         gradient_paces.get(GradientCategory.STEEP_DOWNHILL.value, [])
     )
 
+    # NEW: Calculate aggregated pace decay profile
+    aggregated_pace_decay: Dict[str, float] = {}
+    for pct_key, values_weights in pace_decay_by_pct.items():
+        avg = weighted_average(values_weights)
+        if avg is not None:
+            aggregated_pace_decay[pct_key] = round(avg, 3)
+
     return PerformanceProfile(
         flat_pace_min_km=round(flat_pace, 2) if flat_pace else 0.0,
         gentle_uphill_pace_min_km=round(gentle_up, 2) if gentle_up else 0.0,
@@ -577,6 +803,7 @@ def aggregate_performance_profiles(
         steep_downhill_pace_min_km=round(steep_down, 2) if steep_down else 0.0,
         overall_gap_min_km=round(weighted_average(all_gaps) or 0.0, 2),
         fatigue_factor=round(weighted_average(all_fatigues) or 0.0, 2),
+        pace_decay_by_progress_pct=aggregated_pace_decay,
         activities_analyzed=len(analyses),
         total_distance_km=round(total_distance, 2),
         gradient_sample_sizes=gradient_sample_sizes,

@@ -123,7 +123,7 @@ export const RaceCard = memo(RaceCardComponent, (prevProps, nextProps) => {
   // Return true if props are equal (should NOT re-render)
   const prevRace = prevProps.race;
   const nextRace = nextProps.race;
-  
+
   // Compare key race properties
   return (
     prevRace.id === nextRace.id &&
@@ -132,6 +132,7 @@ export const RaceCard = memo(RaceCardComponent, (prevProps, nextProps) => {
     prevRace.distanceKm === nextRace.distanceKm &&
     prevRace.elevationGainM === nextRace.elevationGainM &&
     prevRace.elevationLossM === nextRace.elevationLossM &&
+    prevRace.overallCutoffHours === nextRace.overallCutoffHours &&
     prevRace.aidStations?.length === nextRace.aidStations?.length
   );
 });
