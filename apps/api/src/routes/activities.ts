@@ -1591,7 +1591,7 @@ function parseTerrainSegments(gpxContent: string, activityId: string): TerrainSe
     finalConsolidatedSegments.push({ ...seg });
   }
   
-  // One more pass to merge any remaining consecutive flat/rolling that ended up next to each other
+  // One more pass to merge any remaining consecutive segments of the same type
   const mergedSegments: ConsolidatedSegment[] = [];
   for (const seg of finalConsolidatedSegments) {
     if (mergedSegments.length > 0) {
@@ -1609,6 +1609,22 @@ function parseTerrainSegments(gpxContent: string, activityId: string): TerrainSe
         if (seg.terrainType === 'rolling_hills') {
           prevSeg.terrainType = 'rolling_hills';
         }
+        continue;
+      }
+      
+      // Merge consecutive climbs
+      if (prevSeg.terrainType === 'climb' && seg.terrainType === 'climb') {
+        prevSeg.endIdx = seg.endIdx;
+        prevSeg.totalElevationGain += seg.totalElevationGain;
+        prevSeg.totalElevationLoss += seg.totalElevationLoss;
+        continue;
+      }
+      
+      // Merge consecutive descents
+      if (prevSeg.terrainType === 'descent' && seg.terrainType === 'descent') {
+        prevSeg.endIdx = seg.endIdx;
+        prevSeg.totalElevationGain += seg.totalElevationGain;
+        prevSeg.totalElevationLoss += seg.totalElevationLoss;
         continue;
       }
     }
