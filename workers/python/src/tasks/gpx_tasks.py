@@ -263,7 +263,9 @@ def analyze_user_activity(
         if file_type.lower() == "fit":
             import base64
 
-            logger.info(f"[Task {self.request.id}] Converting FIT file to GPX format...")
+            logger.info(
+                f"[Task {self.request.id}] Converting FIT file to GPX format..."
+            )
             fit_bytes = base64.b64decode(file_content)
             gpx_content = parse_fit_to_gpx(fit_bytes)
             logger.info(
@@ -398,3 +400,225 @@ def calculate_performance_profile(
             "success": False,
             "error": str(e),
         }
+
+
+@app.task(name="extract_time_series_data")
+def extract_time_series_data(
+    activity_id: str, user_id: str, file_content: str, file_type: str = "gpx"
+) -> Dict[str, Any]:
+    """
+    Extract time-series data points from a GPX/FIT file for TimescaleDB storage.
+
+    This task parses the activity file and extracts individual GPS points with
+    calculated metrics that can be inserted into the activity_metrics hypertable.
+
+    Args:
+        activity_id: Unique ID for the activity
+        user_id: User ID who owns this activity
+        file_content: Raw file content (GPX as string, FIT as base64-encoded string)
+        file_type: Type of file - "gpx" or "fit" (default: "gpx")
+
+    Returns:
+        Dict containing:
+            - success: Boolean indicating if extraction succeeded
+            - metrics: List of time-series data points ready for DB insertion
+            - point_count: Number of data points extracted
+    """
+    from datetime import datetime
+
+    from ..analysis import parse_fit_to_gpx
+
+    logger.info(
+        f"[Task] Starting time-series extraction for activity_id={activity_id}, user_id={user_id}"
+    )
+
+    try:
+        # Convert FIT to GPX if needed
+        if file_type.lower() == "fit":
+            import base64
+
+            fit_bytes = base64.b64decode(file_content)
+            gpx_content = parse_fit_to_gpx(fit_bytes)
+        else:
+            gpx_content = file_content
+
+        # Parse GPX
+        gpx = gpxpy.parse(gpx_content)
+
+        # Extract all points with metrics
+        metrics = []
+        cumulative_distance = 0.0
+        cumulative_gain = 0.0
+        cumulative_loss = 0.0
+        prev_point = None
+        start_time = None
+        segment_index = 0
+
+        for track in gpx.tracks:
+            for segment in track.segments:
+                for i, point in enumerate(segment.points):
+                    if point.time is None:
+                        continue
+
+                    if start_time is None:
+                        start_time = point.time
+
+                    # Calculate elapsed time
+                    elapsed_seconds = int((point.time - start_time).total_seconds())
+
+                    # Calculate distance and metrics from previous point
+                    if prev_point is not None:
+                        # Distance calculation (Haversine)
+                        dist = _haversine_distance(
+                            prev_point.latitude,
+                            prev_point.longitude,
+                            point.latitude,
+                            point.longitude,
+                        )
+                        cumulative_distance += dist / 1000.0  # Convert to km
+
+                        # Time difference
+                        time_diff = (point.time - prev_point.time).total_seconds()
+
+                        # Elevation change
+                        elev_diff = 0.0
+                        if (
+                            point.elevation is not None
+                            and prev_point.elevation is not None
+                        ):
+                            elev_diff = point.elevation - prev_point.elevation
+                            if elev_diff > 0:
+                                cumulative_gain += elev_diff
+                            else:
+                                cumulative_loss += abs(elev_diff)
+
+                        # Calculate pace (min/km)
+                        if dist > 0 and time_diff > 0:
+                            pace_min_km = (time_diff / 60) / (dist / 1000)
+                        else:
+                            pace_min_km = None
+
+                        # Calculate gradient
+                        gradient = (elev_diff / dist * 100) if dist > 0 else 0
+
+                        # Calculate GAP using Minetti equation
+                        gap = None
+                        if pace_min_km is not None and pace_min_km > 0:
+                            i_grad = elev_diff / dist if dist > 0 else 0
+                            cost = (
+                                155.4 * i_grad**5
+                                - 30.4 * i_grad**4
+                                - 43.3 * i_grad**3
+                                + 46.3 * i_grad**2
+                                + 19.5 * i_grad
+                                + 3.6
+                            )
+                            flat_cost = 3.6
+                            cost_ratio = cost / flat_cost if flat_cost > 0 else 1
+                            gap = (
+                                pace_min_km / cost_ratio
+                                if cost_ratio > 0
+                                else pace_min_km
+                            )
+
+                        # Determine if moving (pace < 30 min/km is moving)
+                        is_moving = pace_min_km is not None and pace_min_km < 30
+                    else:
+                        pace_min_km = None
+                        gradient = 0
+                        gap = None
+                        is_moving = True
+
+                    # Update segment index (1km segments)
+                    segment_index = int(cumulative_distance)
+
+                    # Create metric point
+                    metric = {
+                        "recorded_at": point.time.isoformat(),
+                        "activity_id": activity_id,
+                        "user_id": user_id,
+                        "latitude": point.latitude,
+                        "longitude": point.longitude,
+                        "elevation_m": point.elevation,
+                        "distance_km": round(cumulative_distance, 4),
+                        "elapsed_seconds": elapsed_seconds,
+                        "moving_time_seconds": elapsed_seconds if is_moving else None,
+                        "instant_pace_min_km": (
+                            round(pace_min_km, 2) if pace_min_km else None
+                        ),
+                        "smoothed_pace_min_km": None,  # Will be calculated in post-processing
+                        "grade_adjusted_pace_min_km": round(gap, 2) if gap else None,
+                        "gradient_percent": round(gradient, 2),
+                        "cumulative_elevation_gain_m": round(cumulative_gain, 1),
+                        "cumulative_elevation_loss_m": round(cumulative_loss, 1),
+                        "heart_rate_bpm": None,  # Would be extracted from extensions
+                        "cadence_spm": None,
+                        "power_watts": None,
+                        "segment_index": segment_index,
+                        "is_moving": is_moving,
+                        "is_paused": False,
+                    }
+
+                    metrics.append(metric)
+                    prev_point = point
+
+        # Apply Savitzky-Golay smoothing to pace data
+        if len(metrics) > 7:
+            paces = [m["instant_pace_min_km"] for m in metrics]
+            valid_paces = [p if p is not None else 0 for p in paces]
+
+            try:
+                smoothed = signal.savgol_filter(
+                    valid_paces, window_length=7, polyorder=2
+                )
+                for i, m in enumerate(metrics):
+                    if m["instant_pace_min_km"] is not None:
+                        m["smoothed_pace_min_km"] = round(
+                            max(0.5, min(30, smoothed[i])), 2
+                        )
+            except Exception as e:
+                logger.warning(f"Failed to smooth pace data: {e}")
+
+        logger.info(
+            f"[Task] Extracted {len(metrics)} time-series data points for activity {activity_id}"
+        )
+
+        return {
+            "success": True,
+            "metrics": metrics,
+            "point_count": len(metrics),
+            "total_distance_km": round(cumulative_distance, 2),
+            "elevation_gain_m": round(cumulative_gain, 1),
+            "elevation_loss_m": round(cumulative_loss, 1),
+        }
+
+    except Exception as e:
+        logger.error(f"[Task] Error extracting time-series data: {e}", exc_info=True)
+        return {
+            "success": False,
+            "error": str(e),
+            "activity_id": activity_id,
+        }
+
+
+def _haversine_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    """
+    Calculate the great circle distance in meters between two points
+    on the earth (specified in decimal degrees).
+    """
+    # Convert decimal degrees to radians
+    lat1, lon1, lat2, lon2 = map(math.radians, [lat1, lon1, lat2, lon2])
+
+    # Haversine formula
+    dlat = lat2 - lat1
+    dlon = lon2 - lon1
+    a = (
+        math.sin(dlat / 2) ** 2
+        + math.cos(lat1) * math.cos(lat2) * math.sin(dlon / 2) ** 2
+    )
+    c = 2 * math.asin(math.sqrt(a))
+
+    # Earth radius in meters
+    r = 6371000
+
+    return c * r

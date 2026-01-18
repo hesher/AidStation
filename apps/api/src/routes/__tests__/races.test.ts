@@ -170,4 +170,111 @@ describe('Race Routes', () => {
       expect([404, 503]).toContain(response.statusCode);
     });
   });
+
+  describe('Race Versioning API', () => {
+    describe('GET /api/races/:id/versions', () => {
+      it('should return 400 for invalid UUID format', async () => {
+        const response = await app.inject({
+          method: 'GET',
+          url: '/api/races/invalid-uuid/versions',
+        });
+
+        expect(response.statusCode).toBe(400);
+        const body = JSON.parse(response.body);
+        expect(body.success).toBe(false);
+        expect(body.error).toBe('Invalid race ID format');
+      });
+
+      it('should accept pagination parameters', async () => {
+        const validUuid = '12345678-1234-1234-1234-123456789012';
+        const response = await app.inject({
+          method: 'GET',
+          url: `/api/races/${validUuid}/versions?limit=5&offset=10`,
+        });
+
+        // Should not fail due to query params (may return 404/503 due to no DB)
+        expect([404, 503]).toContain(response.statusCode);
+      });
+    });
+
+    describe('GET /api/races/:id/versions/:version', () => {
+      it('should return 400 for invalid UUID format', async () => {
+        const response = await app.inject({
+          method: 'GET',
+          url: '/api/races/invalid-uuid/versions/1',
+        });
+
+        expect(response.statusCode).toBe(400);
+        const body = JSON.parse(response.body);
+        expect(body.success).toBe(false);
+        expect(body.error).toBe('Invalid race ID format');
+      });
+
+      it('should return 400 for invalid version number', async () => {
+        const validUuid = '12345678-1234-1234-1234-123456789012';
+        const response = await app.inject({
+          method: 'GET',
+          url: `/api/races/${validUuid}/versions/invalid`,
+        });
+
+        expect(response.statusCode).toBe(400);
+        const body = JSON.parse(response.body);
+        expect(body.success).toBe(false);
+        expect(body.error).toBe('Invalid version number');
+      });
+
+      it('should return 400 for negative version number', async () => {
+        const validUuid = '12345678-1234-1234-1234-123456789012';
+        const response = await app.inject({
+          method: 'GET',
+          url: `/api/races/${validUuid}/versions/-1`,
+        });
+
+        expect(response.statusCode).toBe(400);
+        const body = JSON.parse(response.body);
+        expect(body.success).toBe(false);
+        expect(body.error).toBe('Invalid version number');
+      });
+
+      it('should return 400 for version 0', async () => {
+        const validUuid = '12345678-1234-1234-1234-123456789012';
+        const response = await app.inject({
+          method: 'GET',
+          url: `/api/races/${validUuid}/versions/0`,
+        });
+
+        expect(response.statusCode).toBe(400);
+        const body = JSON.parse(response.body);
+        expect(body.success).toBe(false);
+        expect(body.error).toBe('Invalid version number');
+      });
+    });
+
+    describe('POST /api/races/:id/versions/:version/restore', () => {
+      it('should return 400 for invalid UUID format', async () => {
+        const response = await app.inject({
+          method: 'POST',
+          url: '/api/races/invalid-uuid/versions/1/restore',
+        });
+
+        expect(response.statusCode).toBe(400);
+        const body = JSON.parse(response.body);
+        expect(body.success).toBe(false);
+        expect(body.error).toBe('Invalid race ID format');
+      });
+
+      it('should return 400 for invalid version number', async () => {
+        const validUuid = '12345678-1234-1234-1234-123456789012';
+        const response = await app.inject({
+          method: 'POST',
+          url: `/api/races/${validUuid}/versions/invalid/restore`,
+        });
+
+        expect(response.statusCode).toBe(400);
+        const body = JSON.parse(response.body);
+        expect(body.success).toBe(false);
+        expect(body.error).toBe('Invalid version number');
+      });
+    });
+  });
 });

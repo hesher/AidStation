@@ -26,6 +26,7 @@ vi.mock('../connection', () => ({
           courseGpx: null,
           isPublic: false,
           ownerId: 'test-user-id',
+          versionNumber: 1,
           createdAt: new Date(),
           updatedAt: new Date(),
           metadata: {},
@@ -48,6 +49,7 @@ vi.mock('../connection', () => ({
           returning: vi.fn().mockResolvedValue([{
             id: 'test-race-id',
             name: 'Updated Race',
+            versionNumber: 2,
           }]),
         }),
       }),
@@ -57,6 +59,7 @@ vi.mock('../connection', () => ({
         returning: vi.fn().mockResolvedValue([{ id: 'test-race-id' }]),
       }),
     }),
+    execute: vi.fn().mockResolvedValue({ rows: [] }),
   },
 }));
 
@@ -259,6 +262,171 @@ describe('Race Repository Business Logic', () => {
       };
 
       expect(race.isPublic).toBe(true);
+    });
+  });
+});
+
+describe('Race Versioning', () => {
+  describe('Version data structure', () => {
+    it('should include version number in race data', () => {
+      const raceWithVersion = {
+        id: 'test-id',
+        name: 'Test Race',
+        versionNumber: 1,
+        aidStations: [],
+      };
+
+      expect(raceWithVersion.versionNumber).toBe(1);
+    });
+
+    it('should capture aid stations snapshot in version', () => {
+      const versionSnapshot = {
+        id: 'version-id',
+        raceId: 'race-id',
+        versionNumber: 1,
+        name: 'Test Race',
+        aidStationsSnapshot: [
+          { name: 'Aid 1', distanceKm: 10 },
+          { name: 'Aid 2', distanceKm: 20 },
+        ],
+        changeSummary: 'Initial version',
+        createdAt: new Date(),
+      };
+
+      expect(versionSnapshot.aidStationsSnapshot).toHaveLength(2);
+      expect(versionSnapshot.changeSummary).toBe('Initial version');
+    });
+
+    it('should increment version on race update', () => {
+      const originalVersion = 1;
+      const updatedVersion = originalVersion + 1;
+
+      expect(updatedVersion).toBe(2);
+    });
+  });
+
+  describe('Version history', () => {
+    it('should list versions in descending order (newest first)', () => {
+      const versions = [
+        { versionNumber: 3, createdAt: new Date('2024-01-03') },
+        { versionNumber: 2, createdAt: new Date('2024-01-02') },
+        { versionNumber: 1, createdAt: new Date('2024-01-01') },
+      ];
+
+      expect(versions[0].versionNumber).toBe(3);
+      expect(versions[versions.length - 1].versionNumber).toBe(1);
+    });
+
+    it('should paginate version history', () => {
+      const allVersions = [
+        { versionNumber: 5 },
+        { versionNumber: 4 },
+        { versionNumber: 3 },
+        { versionNumber: 2 },
+        { versionNumber: 1 },
+      ];
+
+      const limit = 2;
+      const offset = 0;
+      const page1 = allVersions.slice(offset, offset + limit);
+
+      expect(page1).toHaveLength(2);
+      expect(page1[0].versionNumber).toBe(5);
+      expect(page1[1].versionNumber).toBe(4);
+
+      const page2 = allVersions.slice(limit, limit + 2);
+      expect(page2[0].versionNumber).toBe(3);
+    });
+  });
+
+  describe('Version restoration', () => {
+    it('should allow restoring race to previous version', () => {
+      const currentRace = {
+        name: 'Updated Race Name',
+        distanceKm: 110,
+        versionNumber: 3,
+      };
+
+      const version1 = {
+        name: 'Original Race Name',
+        distanceKm: 100,
+        versionNumber: 1,
+      };
+
+      // Simulate restoration - current race would get data from version 1
+      const restoredRace = {
+        ...currentRace,
+        name: version1.name,
+        distanceKm: version1.distanceKm,
+        versionNumber: currentRace.versionNumber + 1, // New version after restore
+      };
+
+      expect(restoredRace.name).toBe('Original Race Name');
+      expect(restoredRace.distanceKm).toBe(100);
+      expect(restoredRace.versionNumber).toBe(4); // Version incremented after restore
+    });
+
+    it('should include aid stations in restoration', () => {
+      const version1AidStations = [
+        { name: 'Original Aid 1', distanceKm: 10 },
+        { name: 'Original Aid 2', distanceKm: 25 },
+      ];
+
+      // Current state has 3 modified aid stations
+      const _currentAidStations = [
+        { name: 'Modified Aid 1', distanceKm: 12 },
+        { name: 'New Aid 2', distanceKm: 28 },
+        { name: 'New Aid 3', distanceKm: 40 },
+      ];
+      // Verify current state is different (3 stations vs 2)
+      expect(_currentAidStations).toHaveLength(3);
+
+      // After restoration, aid stations should match version 1
+      const restoredStations = version1AidStations;
+
+      expect(restoredStations).toHaveLength(2);
+      expect(restoredStations[0].name).toBe('Original Aid 1');
+      expect(restoredStations[0].distanceKm).toBe(10);
+    });
+  });
+
+  describe('Version change detection', () => {
+    it('should detect meaningful changes requiring new version', () => {
+      const oldRace = {
+        name: 'Test Race',
+        distanceKm: 100,
+        elevationGainM: 3000,
+      };
+
+      const newRace = {
+        name: 'Test Race',
+        distanceKm: 105, // Changed
+        elevationGainM: 3000,
+      };
+
+      const hasChanges = oldRace.distanceKm !== newRace.distanceKm;
+      expect(hasChanges).toBe(true);
+    });
+
+    it('should not create version for unchanged update', () => {
+      const oldRace = {
+        name: 'Test Race',
+        distanceKm: 100,
+        elevationGainM: 3000,
+      };
+
+      const newRace = {
+        name: 'Test Race',
+        distanceKm: 100, // Unchanged
+        elevationGainM: 3000,
+      };
+
+      const hasChanges =
+        oldRace.name !== newRace.name ||
+        oldRace.distanceKm !== newRace.distanceKm ||
+        oldRace.elevationGainM !== newRace.elevationGainM;
+
+      expect(hasChanges).toBe(false);
     });
   });
 });

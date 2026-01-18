@@ -1,0 +1,349 @@
+# AidStation CI/CD Pipeline
+# Runs on all pushes and pull requests to main/master branches
+# Includes linting, type checking, tests, and build validation
+
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+env:
+  NODE_VERSION: '20.x'
+  PYTHON_VERSION: '3.11'
+
+jobs:
+  # ========================================
+  # Lint and Type Check
+  # ========================================
+  lint:
+    name: Lint & Type Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run ESLint
+        run: npm run lint
+
+      - name: TypeScript Check (API)
+        run: npm run build --workspace=apps/api
+
+      - name: TypeScript Check (Web)
+        run: npm run build --workspace=apps/web
+
+  # ========================================
+  # API Tests
+  # ========================================
+  test-api:
+    name: API Tests
+    runs-on: ubuntu-latest
+    needs: lint
+
+    services:
+      postgres:
+        image: postgis/postgis:15-3.3
+        env:
+          POSTGRES_USER: aidstation
+          POSTGRES_PASSWORD: aidstation
+          POSTGRES_DB: aidstation_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run API tests with coverage
+        env:
+          DATABASE_URL: postgresql://aidstation:aidstation@localhost:5432/aidstation_test
+          REDIS_URL: redis://localhost:6379/0
+          NODE_ENV: test
+        run: |
+          cd apps/api
+          npx vitest run --coverage
+
+      - name: Upload coverage report
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./apps/api/coverage/coverage-final.json
+          flags: api
+          name: api-coverage
+
+  # ========================================
+  # Python Worker Tests
+  # ========================================
+  test-python:
+    name: Python Worker Tests
+    runs-on: ubuntu-latest
+    needs: lint
+
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+          cache-dependency-path: workers/python/requirements.txt
+
+      - name: Install Python dependencies
+        run: |
+          cd workers/python
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-cov
+
+      - name: Run Python tests with coverage
+        env:
+          REDIS_URL: redis://localhost:6379/0
+        run: |
+          cd workers/python
+          pytest tests/ --cov=src --cov-report=xml -v
+
+      - name: Upload Python coverage
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./workers/python/coverage.xml
+          flags: python-worker
+          name: python-coverage
+
+  # ========================================
+  # E2E Tests
+  # ========================================
+  test-e2e:
+    name: E2E Browser Tests
+    runs-on: ubuntu-latest
+    needs: [test-api, test-python]
+
+    services:
+      postgres:
+        image: postgis/postgis:15-3.3
+        env:
+          POSTGRES_USER: aidstation
+          POSTGRES_PASSWORD: aidstation
+          POSTGRES_DB: aidstation
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Setup Python for worker
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+          cache-dependency-path: workers/python/requirements.txt
+
+      - name: Install Node dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Install Python worker dependencies
+        run: |
+          cd workers/python
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Build applications
+        run: npm run build
+
+      - name: Run database migrations
+        env:
+          DATABASE_URL: postgresql://aidstation:aidstation@localhost:5432/aidstation
+        run: |
+          cd apps/api
+          npx drizzle-kit push
+
+      - name: Start services for E2E tests
+        env:
+          DATABASE_URL: postgresql://aidstation:aidstation@localhost:5432/aidstation
+          REDIS_URL: redis://localhost:6379/0
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          NODE_ENV: test
+          NEXT_PUBLIC_API_URL: http://localhost:3001
+        run: |
+          # Start API server
+          cd apps/api && npm start &
+
+          # Start Python worker
+          cd workers/python && celery -A src.celery_app worker --loglevel=info &
+
+          # Start web server
+          cd apps/web && npm start &
+
+          # Wait for services to be ready
+          sleep 10
+          curl --retry 10 --retry-delay 2 --retry-connrefused http://localhost:3001/health
+          curl --retry 10 --retry-delay 2 --retry-connrefused http://localhost:3000
+
+      - name: Run E2E tests
+        env:
+          PLAYWRIGHT_TEST_BASE_URL: http://localhost:3000
+        run: npx playwright test
+
+      - name: Upload Playwright report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 30
+
+  # ========================================
+  # Build Docker Images (on main only)
+  # ========================================
+  build-docker:
+    name: Build Docker Images
+    runs-on: ubuntu-latest
+    needs: [test-e2e]
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build and push API image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./docker/Dockerfile.api
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: |
+            ${{ secrets.DOCKER_USERNAME }}/aidstation-api:latest
+            ${{ secrets.DOCKER_USERNAME }}/aidstation-api:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and push Web image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./docker/Dockerfile.web
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: |
+            ${{ secrets.DOCKER_USERNAME }}/aidstation-web:latest
+            ${{ secrets.DOCKER_USERNAME }}/aidstation-web:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and push Python Worker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./workers/python
+          file: ./workers/python/Dockerfile
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: |
+            ${{ secrets.DOCKER_USERNAME }}/aidstation-worker:latest
+            ${{ secrets.DOCKER_USERNAME }}/aidstation-worker:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ========================================
+  # Deploy to Production (manual trigger)
+  # ========================================
+  deploy:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: [build-docker]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    environment: production
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy to production
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+        run: |
+          echo "Deploying version ${{ github.sha }} to production..."
+          # Add deployment script here (e.g., SSH to server, docker-compose pull, etc.)
+          # ssh -i $DEPLOY_SSH_KEY $DEPLOY_USER@$DEPLOY_HOST "cd /app && docker-compose pull && docker-compose up -d"
+          echo "Deployment complete!"

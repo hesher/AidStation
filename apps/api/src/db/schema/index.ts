@@ -34,9 +34,33 @@ export const races = pgTable('races', {
   // courseGeometry will be added via raw SQL migration for PostGIS
   isPublic: boolean('is_public').default(false).notNull(),
   ownerId: uuid('owner_id').references(() => users.id),
+  versionNumber: integer('version_number').default(1).notNull(), // Current version number
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
   metadata: jsonb('metadata'), // Additional race info from AI
+});
+
+// Race versions table for version history
+export const raceVersions = pgTable('race_versions', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  raceId: uuid('race_id').references(() => races.id).notNull(),
+  versionNumber: integer('version_number').notNull(),
+  name: text('name').notNull(),
+  date: timestamp('date'),
+  location: text('location'),
+  country: text('country'),
+  distanceKm: real('distance_km'),
+  elevationGainM: real('elevation_gain_m'),
+  elevationLossM: real('elevation_loss_m'),
+  startTime: text('start_time'),
+  overallCutoffHours: real('overall_cutoff_hours'),
+  courseGpx: text('course_gpx'),
+  isPublic: boolean('is_public'),
+  metadata: jsonb('metadata'),
+  aidStationsSnapshot: jsonb('aid_stations_snapshot'), // JSON array of aid stations
+  changeSummary: text('change_summary'),
+  changedBy: uuid('changed_by').references(() => users.id),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
 // Aid stations table
@@ -57,7 +81,16 @@ export const aidStations = pgTable('aid_stations', {
   sortOrder: integer('sort_order').notNull(),
   latitude: real('latitude'),
   longitude: real('longitude'),
+  terrainType: text('terrain_type').default('trail'), // road, gravel, single_track, technical, alpine, etc.
   createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
+// Terrain factors lookup table
+export const terrainFactors = pgTable('terrain_factors', {
+  terrainType: text('terrain_type').primaryKey(),
+  paceFactor: real('pace_factor').notNull(),
+  description: text('description'),
+  icon: text('icon'),
 });
 
 // User activities (GPX uploads for performance analysis)
@@ -120,13 +153,40 @@ export const userSessions = pgTable('user_sessions', {
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
 
+// Activity metrics table (TimescaleDB hypertable for time-series GPS data)
+export const activityMetrics = pgTable('activity_metrics', {
+  recordedAt: timestamp('recorded_at', { withTimezone: true }).notNull(),
+  activityId: uuid('activity_id').references(() => userActivities.id).notNull(),
+  userId: uuid('user_id').references(() => users.id).notNull(),
+  latitude: real('latitude').notNull(),
+  longitude: real('longitude').notNull(),
+  elevationM: real('elevation_m'),
+  distanceKm: real('distance_km').notNull(),
+  elapsedSeconds: integer('elapsed_seconds').notNull(),
+  movingTimeSeconds: integer('moving_time_seconds'),
+  instantPaceMinKm: real('instant_pace_min_km'),
+  smoothedPaceMinKm: real('smoothed_pace_min_km'),
+  gradeAdjustedPaceMinKm: real('grade_adjusted_pace_min_km'),
+  gradientPercent: real('gradient_percent'),
+  cumulativeElevationGainM: real('cumulative_elevation_gain_m'),
+  cumulativeElevationLossM: real('cumulative_elevation_loss_m'),
+  heartRateBpm: integer('heart_rate_bpm'),
+  cadenceSpm: integer('cadence_spm'),
+  powerWatts: integer('power_watts'),
+  segmentIndex: integer('segment_index').default(0),
+  isMoving: boolean('is_moving').default(true),
+  isPaused: boolean('is_paused').default(false),
+});
+
 // Export all tables
 export const schema = {
   users,
   races,
+  raceVersions,
   aidStations,
   userActivities,
   userPerformanceProfiles,
   racePlans,
   userSessions,
+  activityMetrics,
 };

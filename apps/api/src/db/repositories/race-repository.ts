@@ -124,6 +124,7 @@ export async function createRace(
           sortOrder: index,
           latitude: station.latitude,
           longitude: station.longitude,
+          terrainType: station.terrainType ?? 'trail',
         }))
       )
       .returning();
@@ -225,6 +226,7 @@ export async function updateRace(
             sortOrder: index,
             latitude: station.latitude,
             longitude: station.longitude,
+            terrainType: station.terrainType ?? 'trail',
           }))
         )
         .returning();
@@ -419,7 +421,7 @@ export async function getRaceVersionHistory(
 
     // Query versions
     const result = await db.execute(sql`
-      SELECT 
+      SELECT
         id,
         race_id,
         version_number,
@@ -504,7 +506,7 @@ export async function getRaceVersion(
 ): Promise<RaceVersion | null> {
   try {
     const result = await db.execute(sql`
-      SELECT 
+      SELECT
         id,
         race_id,
         version_number,

@@ -49,6 +49,7 @@ export interface AidStationData {
   cutoffHoursFromStart?: number | null;
   latitude?: number | null;
   longitude?: number | null;
+  terrainType?: string | null; // road, gravel, single_track, technical, alpine, trail, etc.
 }
 
 /**

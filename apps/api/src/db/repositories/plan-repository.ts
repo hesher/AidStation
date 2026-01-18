@@ -265,6 +265,7 @@ export async function getRaceForPrediction(raceId: string): Promise<{
     cutoffHoursFromStart: number | null;
     cutoffTime: string | null;
     sortOrder: number;
+    terrainType: string | null;
   }>;
 } | null> {
   const [race] = await db
@@ -302,6 +303,7 @@ export async function getRaceForPrediction(raceId: string): Promise<{
       cutoffHoursFromStart: s.cutoffHoursFromStart,
       cutoffTime: s.cutoffTime,
       sortOrder: s.sortOrder,
+      terrainType: s.terrainType,
     })),
   };
 }

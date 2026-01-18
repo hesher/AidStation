@@ -745,6 +745,8 @@ export async function activityRoutes(app: FastifyInstance) {
         // Update activity with analysis results
         await updateActivity(activity.id, {
           name: activity.name || analysis.name,
+          // Update activityDate from analysis if not already set
+          activityDate: analysis.activity_date || activity.activityDate?.toISOString(),
           distanceKm: analysis.total_distance_km,
           elevationGainM: analysis.elevation_gain_m,
           elevationLossM: analysis.elevation_loss_m,
@@ -929,6 +931,8 @@ export async function activityRoutes(app: FastifyInstance) {
           // Update activity with analysis results
           await updateActivity(activity.id, {
             name: activity.name || analysis.name,
+            // Update activityDate from analysis if not already set
+            activityDate: analysis.activity_date || activity.activityDate?.toISOString(),
             distanceKm: analysis.total_distance_km,
             elevationGainM: analysis.elevation_gain_m,
             elevationLossM: analysis.elevation_loss_m,

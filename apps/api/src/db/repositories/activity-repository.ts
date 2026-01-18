@@ -7,6 +7,7 @@
 import { db } from '../connection';
 import { userActivities, userPerformanceProfiles } from '../schema';
 import { eq, desc, sql } from 'drizzle-orm';
+import { storage, generateGpxStorageKey } from '../../services/storage';
 
 type Activity = typeof userActivities.$inferSelect;
 type PerformanceProfile = typeof userPerformanceProfiles.$inferSelect;
@@ -24,10 +25,12 @@ export interface CreateActivityData {
   gradeAdjustedPaceMinKm?: number;
   status?: string;
   analysisResults?: Record<string, unknown>;
+  filename?: string;
 }
 
 export interface UpdateActivityData {
   name?: string;
+  activityDate?: string;
   distanceKm?: number;
   elevationGainM?: number;
   elevationLossM?: number;
@@ -45,17 +48,19 @@ export interface GetActivitiesOptions {
 
 /**
  * Create a new activity record
+ * Stores the GPX content in file storage and keeps a reference in the database
  */
 export async function createActivity(data: CreateActivityData): Promise<Activity> {
   const activityDate = data.activityDate ? new Date(data.activityDate) : undefined;
 
+  // First insert to get the activity ID
   const [activity] = await db
     .insert(userActivities)
     .values({
       userId: data.userId,
       name: data.name,
       activityDate,
-      gpxContent: data.gpxContent,
+      gpxContent: data.gpxContent, // Keep in DB for backwards compatibility
       distanceKm: data.distanceKm,
       elevationGainM: data.elevationGainM,
       elevationLossM: data.elevationLossM,
@@ -65,6 +70,36 @@ export async function createActivity(data: CreateActivityData): Promise<Activity
       analysisResults: data.analysisResults,
     })
     .returning();
+
+  // Store GPX content in file storage asynchronously (don't block on it)
+  // Store the key in analysis results for future retrieval
+  if (data.gpxContent) {
+    try {
+      const storageKey = generateGpxStorageKey(data.userId, activity.id, data.filename);
+      await storage.store(storageKey, data.gpxContent);
+
+      // Update activity with storage key
+      const currentResults = (activity.analysisResults as Record<string, unknown>) || {};
+      await db
+        .update(userActivities)
+        .set({
+          analysisResults: {
+            ...currentResults,
+            gpxStorageKey: storageKey,
+          },
+        })
+        .where(eq(userActivities.id, activity.id));
+
+      // Update local reference
+      activity.analysisResults = {
+        ...currentResults,
+        gpxStorageKey: storageKey,
+      };
+    } catch (storageError) {
+      // Log but don't fail - GPX is also stored in DB as fallback
+      console.warn('Failed to store GPX in file storage:', storageError);
+    }
+  }
 
   return activity;
 }
@@ -107,15 +142,50 @@ export async function getActivityById(id: string): Promise<Activity | null> {
 }
 
 /**
+ * Get GPX content for an activity
+ * Tries file storage first, falls back to database
+ */
+export async function getActivityGpxContent(id: string): Promise<string | null> {
+  const activity = await getActivityById(id);
+  if (!activity) {
+    return null;
+  }
+
+  // Try to get from file storage first
+  const analysisResults = activity.analysisResults as Record<string, unknown> | null;
+  const storageKey = analysisResults?.gpxStorageKey as string | undefined;
+
+  if (storageKey) {
+    try {
+      const content = await storage.retrieve(storageKey);
+      if (content) {
+        return content;
+      }
+    } catch (error) {
+      console.warn('Failed to retrieve GPX from file storage:', error);
+    }
+  }
+
+  // Fallback to database content
+  return activity.gpxContent;
+}
+
+/**
  * Update an activity
  */
 export async function updateActivity(
   id: string,
   data: UpdateActivityData
 ): Promise<Activity | null> {
+  // Convert activityDate string to Date if provided
+  const updateData: Record<string, unknown> = { ...data };
+  if (data.activityDate) {
+    updateData.activityDate = new Date(data.activityDate);
+  }
+
   const [activity] = await db
     .update(userActivities)
-    .set(data)
+    .set(updateData)
     .where(eq(userActivities.id, id))
     .returning();
 

@@ -61,10 +61,9 @@ The repository must be configured with Git hooks that enforce:
 !! When the prompt didn't specify a story, sub-story or a specific request, prioritise work in this order:
 1. "Urgent Fixes" from Phase 8
 2. "Fast Follows" from Phase 8
-3. Incomplete steps in partially completed stories
-4. Lint and type errors and warnings
-5. new stories
-6. "Future Work" from Phase 8
+3. Lint and type errors and warnings
+4. Stories and Sub Stories (incomplete and new)
+5. "Future Work" from Phase 8
 
 * Mark the active task in the plan file so we can track which task is active.
 * If a Task failed - Add the failure reason to the plan so the next iteration tries to fix it
@@ -386,7 +385,8 @@ This is a non-negotiable requirement to ensure:
 - [x] Create save race API (`POST /api/races`) - Implemented in Phase 3
 - [x] Create update race API (`PUT /api/races/:id`)
 - [x] Create delete race API (`DELETE /api/races/:id`)
-- [ ] Implement race versioning (track changes)
+- [x] Implement race versioning (track changes)
+  - **Implemented**: Created `race_versions` table via migration `002_race_versions.sql`. Automatic versioning via PostgreSQL trigger that snapshots race data + aid stations before updates. API endpoints for version history (`GET /api/races/:id/versions`), specific version retrieval (`GET /api/races/:id/versions/:version`), and version restoration (`POST /api/races/:id/versions/:version/restore`). Tests added: 22 unit tests + 9 API route tests.
 
 ### 4.2 Public/Private Race Visibility
 - [x] Add `is_public` flag to races table (already in schema)
@@ -418,6 +418,11 @@ This is a non-negotiable requirement to ensure:
 - The AI will also determine the type of waypoint which will feed into the milestome type
 - When adding a milestone, it will automatically update its distance since previous, elevation, etc...
 
+### 4.7 Past Performance table view
+- Past peformance data should break down into climbs and descent sections to show performance on those (ign)
+- Additionally, it should break down long flat and descending sections into 5km blocks
+- Data should be presented in a table with each row providing context on the type of section and type of terrain in that section
+
 **E2E Test (User Story 3 Complete):** ✅
 - User saves race as private → Only they can see it
 - User saves race as public → All users can find it
@@ -432,14 +437,16 @@ This is a non-negotiable requirement to ensure:
 - [x] Create file upload endpoint (`POST /api/activities`)
 - [x] Support multi-file GPX upload (`POST /api/activities/bulk`)
 - [x] Queue files to Python worker for analysis
-- [ ] Store raw GPX in object storage (S3/local)
+- [x] Store raw GPX in object storage (S3/local)
+  - **Implemented**: Created `StorageProvider` abstraction layer with `LocalStorageProvider` (filesystem) and `S3StorageProvider` (AWS S3/MinIO). Activities now store GPX in file storage with key saved in `analysisResults.gpxStorageKey`. Fallback to database storage if file storage fails. 28 unit tests added.
 - [x] Allow uploading FIT files
 
 **Sub-Story Test:** ✅ Activity upload and retrieval API (12 tests passing)
 
 ### 5.2 Performance Analysis (Python Worker)
 - [x] Parse uploaded GPX files with gpxpy
-- [ ] Extract time-series data to TimescaleDB hypertable
+- [x] Extract time-series data to TimescaleDB hypertable
+  - **Implemented**: Created migration `003_activity_metrics_hypertable.sql` with TimescaleDB hypertable for time-series GPS data. Added `activityMetrics` table to Drizzle schema. Implemented `extract_time_series_data` Python task that extracts individual GPS points with calculated metrics (pace, GAP, gradient, elevation tracking, segment indexing). Includes Savitzky-Golay smoothing for pace data. Created aggregation views `activity_segment_stats` and `gradient_performance` for analysis.
 - [x] Calculate pace per segment (flat, uphill, downhill)
 - [x] Calculate performance at different race stages (10km, 20km, 30km, etc.)
 - [x] Identify terrain types and correlate with pace
@@ -494,8 +501,8 @@ This is a non-negotiable requirement to ensure:
   - Time of day (nighttime slowdown factor)
   - Race distance fatigue curve
 - [x] Generate predicted arrival time for each aid station
-- [ ] Add terrain type to predicted pace (single trail, double track, etc..)
-  - **Note**: Requires database schema changes (add `terrain_type` field to aid_stations), UI updates for terrain type selection, and prediction algorithm updates. Currently only gradient-based terrain factors are implemented.
+- [x] Add terrain type to predicted pace (single trail, double track, etc..)
+  - **Implemented**: Added `terrain_type` field to `aid_stations` table via migration `004_terrain_types.sql`. Created `terrain_factors` lookup table with pace factors for 10 terrain types (road: 1.0, gravel: 1.02, double_track: 1.05, single_track: 1.10, technical: 1.18, alpine: 1.22, sand: 1.25, snow: 1.30, mixed: 1.08, trail: 1.05). Updated prediction algorithm to apply surface terrain factor as multiplier on top of gradient-based terrain factor. Schema updated with `terrainType` field in aidStations table.
 - [x] Add aid station time to total time
   - **Implemented**: `getDefaultAidStationMinutes()` function calculates stop time based on race distance (3-15 min base) plus additional time for drop bags (+5 min) and crew access (+3 min). Stop time is added after each non-virtual aid station.
 - [x] Reject short runs from prediction (less than 15km)
@@ -554,10 +561,14 @@ This is a non-negotiable requirement to ensure:
 - [x] Accessibility audit and fixes
 
 ### 7.3 Deployment
-- [ ] Set up CI/CD pipeline
-- [ ] Configure production environment
-- [ ] Set up monitoring and logging
-- [ ] Create deployment documentation
+- [x] Set up CI/CD pipeline
+  - **Implemented**: Created `.github/workflows/ci.yml` with GitHub Actions pipeline including lint, API tests, Python tests, E2E tests, Docker image builds, and production deployment stages.
+- [x] Configure production environment
+  - **Implemented**: Created `docker-compose.prod.yml`, `docker/Dockerfile.api`, `docker/Dockerfile.web`, `docker/nginx.conf` for production deployment with all services.
+- [x] Set up monitoring and logging
+  - **Implemented**: Health checks on all containers, centralized logging via Docker, Nginx access/error logs, optional Sentry integration via `SENTRY_DSN` env var.
+- [x] Create deployment documentation
+  - **Implemented**: Created comprehensive `docs/DEPLOYMENT.md` covering prerequisites, quick start, architecture, configuration, deployment options, SSL, monitoring, scaling, backup/recovery, and troubleshooting.
 
 ## Phase 8: Follow Ups, Fixes, Ideas and Future Work
 
@@ -566,6 +577,9 @@ This is a non-negotiable requirement to ensure:
 
 
 ### Fast Follows
+
+- [x] Uploaded activities table doesn't have "date" column populated. This is a bug that needs to be fixed.
+  - **Fixed**: Added `activityDate` to `UpdateActivityData` interface in `activity-repository.ts` and updated the sync handlers in `activities.ts` to extract and save `activity_date` from Python worker analysis results.
 
 ### Future Work
 

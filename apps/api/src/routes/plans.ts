@@ -742,6 +742,7 @@ function generatePredictions(
     cutoffHoursFromStart: number | null;
     cutoffTime: string | null;
     isVirtual: boolean;
+    terrainType?: string | null;
   }
 
   const waypoints: Waypoint[] = [];
@@ -789,6 +790,26 @@ function generatePredictions(
 
   console.log(`Waypoints: ${waypoints.length} (${waypoints.filter(w => w.isVirtual).length} virtual)`);
 
+  // Terrain surface factors lookup
+  // These factors multiply the base pace based on terrain type
+  const TERRAIN_SURFACE_FACTORS: Record<string, number> = {
+    'road': 1.00,
+    'gravel': 1.02,
+    'double_track': 1.05,
+    'single_track': 1.10,
+    'technical': 1.18,
+    'alpine': 1.22,
+    'sand': 1.25,
+    'snow': 1.30,
+    'mixed': 1.08,
+    'trail': 1.05, // Default
+  };
+
+  const getTerrainSurfaceFactor = (terrainType: string | null): number => {
+    if (!terrainType) return TERRAIN_SURFACE_FACTORS['trail'];
+    return TERRAIN_SURFACE_FACTORS[terrainType.toLowerCase()] ?? TERRAIN_SURFACE_FACTORS['trail'];
+  };
+
   const predictions: AidStationPrediction[] = [];
   let cumulativeMinutes = 0;
   let prevDistanceKm = 0;
@@ -822,6 +843,11 @@ function generatePredictions(
         terrainFactor = 0.9 + (Math.abs(gradientPercent) - 2) * 0.02;
       }
     }
+
+    // Apply surface terrain factor (road, gravel, single track, technical, etc.)
+    // This multiplies with the gradient-based terrain factor
+    const surfaceFactor = getTerrainSurfaceFactor(station.terrainType ?? null);
+    terrainFactor *= surfaceFactor;
 
     // Calculate fatigue factor based on distance covered
     // NEW: Use segment-based pace decay profile if available
