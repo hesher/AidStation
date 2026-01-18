@@ -580,6 +580,7 @@ This is a non-negotiable requirement to ensure:
 
 - [x] Uploaded activities table doesn't have "date" column populated. This is a bug that needs to be fixed.
   - **Fixed**: Added `activityDate` to `UpdateActivityData` interface in `activity-repository.ts` and updated the sync handlers in `activities.ts` to extract and save `activity_date` from Python worker analysis results.
+- The race search AI is not populating any meaningful data. The prompt should clearly ask to retrieve aid station data with cut offs and distances
 
 ### Future Work
 

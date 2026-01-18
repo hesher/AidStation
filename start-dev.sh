@@ -100,8 +100,11 @@ wait_for_service localhost 6379 "Redis"
 echo -e "  ${YELLOW}Running database migrations...${NC}"
 for migration in "$PROJECT_ROOT/apps/api/src/db/migrations"/*.sql; do
     migration_name=$(basename "$migration")
-    docker exec -i aidstation-postgres psql -U aidstation -d aidstation < "$migration" >/dev/null 2>&1
-    echo -e "    ${GREEN}✓${NC} $migration_name"
+    if docker exec -i aidstation-postgres psql -U aidstation -d aidstation < "$migration" >/dev/null 2>&1; then
+        echo -e "    ${GREEN}✓${NC} $migration_name"
+    else
+        echo -e "    ${YELLOW}⚠${NC} $migration_name (already applied or error)"
+    fi
 done
 echo -e "  ${GREEN}✓ Database migrations complete${NC}"
 
