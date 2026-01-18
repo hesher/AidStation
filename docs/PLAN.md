@@ -595,8 +595,13 @@ This is a non-negotiable requirement to ensure:
     2. Only shows descents with >100m total descent as separate segments
     3. Merges smaller climbs/descents into "rolling hills" sections with purple styling
     4. Added `rolling_hills` terrain type with 🌊 emoji indicator
-- [x] The "Terrain Segments Breakdown" should say "Total Ascent" (not elevation gap if that's what "ELEV" means)
-  - **Fixed**: Changed column header from "Elev Δ" to "Elev" (clearer and more concise)
+    5. **Additional fix**: Added second-pass consolidation to merge consecutive flat and rolling sections < 1km
+- [x] The "Terrain Segments Breakdown" should show Total Ascent and Total Descent (not just net elevation change)
+  - **Fixed**: 
+    1. Replaced single "Elev Δ" column with separate "Ascent" and "Descent" columns
+    2. Calculate actual ascent/descent by iterating through all points in each segment (not just net change)
+    3. Display as "+X m" (red) for ascent and "-X m" (blue) for descent
+    4. Removed "Gradient" column to reduce clutter
 - [x] In the performance page - adding a gpx recalculates the performance summary but deleting a gpx has no impact - seems like a bug
   - **Fixed**: Added `recalculatePerformanceProfile()` call after activity deletion in the DELETE endpoint
 
