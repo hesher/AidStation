@@ -70,7 +70,7 @@ The repository must be configured with Git hooks that enforce:
 * If a Task failed - Add the failure reason to the plan so the next iteration tries to fix it
 * If there are follow ups or interesting insights, add them to the plan for future reference
 
-
+!! Run each story as a sub agent to allow parallelization and to avoid bloated context.
 
 For each Sub-Story:
   1. Implement the feature/fix
@@ -332,7 +332,7 @@ This is a non-negotiable requirement to ensure:
 - [x] Implement loading state during AI search
 - [x] Integrate Mapbox GL JS for course visualization
 - [x] Draw course on map with aid station markers
-- [x] Implement 3D terrain visualization for elevation context
+- [ ] Implement 3D terrain visualization for elevation context
 - [x] Create aid station data table component with columns:
   - Station Name
   - Distance from Start
@@ -385,7 +385,7 @@ This is a non-negotiable requirement to ensure:
 - [x] Create save race API (`POST /api/races`) - Implemented in Phase 3
 - [x] Create update race API (`PUT /api/races/:id`)
 - [x] Create delete race API (`DELETE /api/races/:id`)
-- [x] Implement race versioning (track changes)
+- [ ] Implement race versioning (track changes)
 
 ### 4.2 Public/Private Race Visibility
 - [x] Add `is_public` flag to races table (already in schema)
@@ -548,26 +548,17 @@ This is a non-negotiable requirement to ensure:
 ## Phase 8: Follow Ups, Fixes, Ideas and Future Work
 
 ### Urgent Fixes
-  - QA Reported Bugs: https://docs.google.com/document/d/1k-fngp9HjCNqbjLxypC7IZSjw_oaHwo_kKXzasRxww4/edit?usp=sharing
+  - ~~Error: TypeScript property name mismatch in page.tsx~~ ✅ Fixed - Changed `courseStats.elevation_gain_m` to `courseStats.total_elevation_gain_m`
+
+
 
 
 ### Fast Follows
-- [x] Allow changing aid station distance from start (and make it apply to the map and distance from pre)
-  - **Completed**: Users can now edit the "Distance from Start" field for aid stations even when GPX course data is loaded
-  - The "Distance from Previous" column automatically recalculates for all stations when any distance is changed
-  - The map markers update to reflect the new positions
+- ~~When the user uploads a GPX file in Race Search - It should update the Elevation Gain, loss~~ ✅ Already implemented - Fixed TypeScript property name mismatch
+- ~~The aid station edits should calculate distance from previous and total distance from start based on the GPX course uploaded and not let manual adjustments when there's course data~~ ✅ Implemented in P8: Fast Follow commits
 
 
 ### Future Work
-
-**Deferred Infrastructure Items (Phase 5 & 7):**
-- Store raw GPX in object storage (S3/local) - Currently storing in PostgreSQL, S3 for production scale
-- Extract time-series data to TimescaleDB hypertable - Currently using standard PostgreSQL, TimescaleDB for advanced time-series analytics
-- Achieve >80% code coverage - Current: 67 tests passing, focus on E2E coverage
-- Set up CI/CD pipeline
-- Configure production environment
-- Set up monitoring and logging
-- Create deployment documentation
 
 ---
 

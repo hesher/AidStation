@@ -174,13 +174,104 @@ export default function Home() {
     }
   }, [raceData]);
 
-  // Handle aid stations change (from editing)
-  const handleAidStationsChange = useCallback((aidStations: AidStation[]) => {
-    if (raceData) {
-      setRaceData({ ...raceData, aidStations });
-      setHasUnsavedChanges(true);
+  // Store the GPX content for re-analysis when aid stations change
+  const gpxContentRef = useRef<string | null>(null);
+
+  // Helper function to analyze GPX and update race data with elevation metrics
+  const analyzeAndUpdateElevation = useCallback(async (
+    gpxContent: string,
+    currentRaceData: RaceData,
+    aidStations: AidStation[]
+  ): Promise<RaceData> => {
+    const analysisResult = await analyzeGpx(
+      gpxContent,
+      aidStations.map(s => ({
+        name: s.name,
+        distanceKm: s.distanceKm ?? undefined,
+      }))
+    );
+
+    if (!analysisResult.success || !analysisResult.data) {
+      if (analysisResult.error) {
+        console.warn('GPX analysis warning:', analysisResult.error);
+      }
+      return currentRaceData;
     }
+
+    const { courseStats, aidStations: analyzedAidStations, coordinates: processedCoords } = analysisResult.data;
+
+    // Start with current race data
+    const updatedRaceData = { ...currentRaceData };
+
+    // Use processed coordinates if available
+    if (processedCoords && processedCoords.length > 0) {
+      updatedRaceData.courseCoordinates = processedCoords;
+    }
+
+    // Update race metrics from course stats
+    if (courseStats) {
+      updatedRaceData.distanceKm = courseStats.total_distance_km;
+      updatedRaceData.elevationGainM = courseStats.total_elevation_gain_m;
+      updatedRaceData.elevationLossM = courseStats.total_elevation_loss_m;
+    }
+
+    // Update aid station data with calculated elevation metrics
+    if (analyzedAidStations && analyzedAidStations.length > 0 && updatedRaceData.aidStations) {
+      const updatedAidStations = updatedRaceData.aidStations.map(station => {
+        // Match by name OR by distance (for newly added stations)
+        const analyzed = analyzedAidStations.find(
+          a => a.name.toLowerCase() === station.name.toLowerCase() ||
+               (station.distanceKm && Math.abs((a.distance_km || 0) - station.distanceKm) < 0.5)
+        );
+        
+        if (analyzed) {
+          return {
+            ...station,
+            distanceKm: analyzed.distance_km ?? station.distanceKm,
+            elevationM: analyzed.elevation_m ?? station.elevationM,
+            distanceFromPrevKm: analyzed.distance_from_prev_km ?? station.distanceFromPrevKm,
+            elevationGainFromPrevM: analyzed.elevation_gain_from_prev_m ?? station.elevationGainFromPrevM,
+            elevationLossFromPrevM: analyzed.elevation_loss_from_prev_m ?? station.elevationLossFromPrevM,
+          };
+        }
+        return station;
+      });
+      updatedRaceData.aidStations = updatedAidStations;
+    }
+
+    return updatedRaceData;
+  }, []);
+
+  // Handle overall cutoff change from finish row
+  const handleOverallCutoffChange = useCallback((hours: number | null) => {
+    if (!raceData) return;
+    setRaceData({ ...raceData, overallCutoffHours: hours ?? undefined });
+    setHasUnsavedChanges(true);
   }, [raceData]);
+
+  // Handle aid stations change (from editing) - re-analyze GPX if available
+  const handleAidStationsChange = useCallback(async (aidStations: AidStation[]) => {
+    if (!raceData) return;
+
+    // Update aid stations immediately for responsive UI
+    const updatedRaceData = { ...raceData, aidStations };
+    setRaceData(updatedRaceData);
+    setHasUnsavedChanges(true);
+
+    // Re-analyze GPX to recalculate elevation data for updated aid stations
+    if (gpxContentRef.current && raceData.courseCoordinates && raceData.courseCoordinates.length > 0) {
+      try {
+        const finalRaceData = await analyzeAndUpdateElevation(
+          gpxContentRef.current,
+          updatedRaceData,
+          aidStations
+        );
+        setRaceData(finalRaceData);
+      } catch (err) {
+        console.warn('Failed to re-analyze GPX for aid station changes:', err);
+      }
+    }
+  }, [raceData, analyzeAndUpdateElevation]);
 
   // Handle GPX file upload for race course
   const handleCourseGpxUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -189,6 +280,10 @@ export default function Home() {
 
     try {
       const gpxContent = await file.text();
+      
+      // Store GPX content for future re-analysis
+      gpxContentRef.current = gpxContent;
+      
       const parser = new DOMParser();
       const xmlDoc = parser.parseFromString(gpxContent, 'text/xml');
 
@@ -261,61 +356,14 @@ export default function Home() {
       setRaceData(updatedRaceData);
       setHasUnsavedChanges(true);
 
-      // Now analyze the GPX using the Python worker for advanced metrics
-      const analysisResult = await analyzeGpx(
+      // Analyze GPX and update elevation metrics
+      const finalRaceData = await analyzeAndUpdateElevation(
         gpxContent,
-        raceData.aidStations?.map(s => ({
-          name: s.name,
-          distanceKm: s.distanceKm ?? undefined,
-        }))
+        updatedRaceData,
+        raceData.aidStations || []
       );
 
-      if (analysisResult.success && analysisResult.data) {
-        const { courseStats, aidStations: analyzedAidStations, coordinates: processedCoords } = analysisResult.data;
-
-        // Update race data with calculated metrics
-        const finalRaceData = {
-          ...updatedRaceData,
-          // Use processed coordinates if available (smoother), otherwise keep the original
-          courseCoordinates: processedCoords && processedCoords.length > 0 
-            ? processedCoords 
-            : coordinates,
-        };
-
-        // Update race metrics from course stats
-        if (courseStats) {
-          finalRaceData.distanceKm = courseStats.total_distance_km;
-          finalRaceData.elevationGainM = courseStats.total_elevation_gain_m;
-          finalRaceData.elevationLossM = courseStats.total_elevation_loss_m;
-        }
-
-        // Update aid station data with calculated distances if available
-        if (analyzedAidStations && analyzedAidStations.length > 0 && finalRaceData.aidStations) {
-          // Match analyzed aid stations with existing ones by name
-          const updatedAidStations = finalRaceData.aidStations.map(station => {
-            const analyzed = analyzedAidStations.find(
-              a => a.name.toLowerCase() === station.name.toLowerCase()
-            );
-            if (analyzed) {
-              return {
-                ...station,
-                distanceKm: analyzed.distance_km,
-                distanceFromPrevKm: analyzed.distance_from_prev_km,
-                elevationM: analyzed.elevation_m,
-                elevationGainFromPrevM: analyzed.elevation_gain_from_prev_m,
-                elevationLossFromPrevM: analyzed.elevation_loss_from_prev_m,
-              };
-            }
-            return station;
-          });
-          finalRaceData.aidStations = updatedAidStations;
-        }
-
-        setRaceData(finalRaceData);
-      } else if (analysisResult.error) {
-        // Log the error but don't fail - we still have the basic coordinates
-        console.warn('GPX analysis warning:', analysisResult.error);
-      }
+      setRaceData(finalRaceData);
 
       // Clear the input so the same file can be re-uploaded
       e.target.value = '';
@@ -323,7 +371,7 @@ export default function Home() {
       console.error('Error parsing GPX file:', err);
       setError('Failed to parse GPX file');
     }
-  }, [raceData]);
+  }, [raceData, analyzeAndUpdateElevation]);
 
   // Handle save race
   const handleSaveRace = useCallback(async () => {
@@ -523,6 +571,13 @@ export default function Home() {
                 onAidStationsChange={handleAidStationsChange}
                 editable
                 hasCourseData={!!(raceData.courseCoordinates && raceData.courseCoordinates.length > 0)}
+                raceDistanceKm={raceData.distanceKm}
+                startElevationM={raceData.courseCoordinates?.[0]?.elevation}
+                finishElevationM={raceData.courseCoordinates?.[raceData.courseCoordinates.length - 1]?.elevation}
+                totalElevationGainM={raceData.elevationGainM}
+                totalElevationLossM={raceData.elevationLossM}
+                overallCutoffHours={raceData.overallCutoffHours}
+                onOverallCutoffChange={handleOverallCutoffChange}
               />
             </section>
           )}
@@ -535,6 +590,13 @@ export default function Home() {
                 onAidStationsChange={handleAidStationsChange}
                 editable
                 hasCourseData={!!(raceData.courseCoordinates && raceData.courseCoordinates.length > 0)}
+                raceDistanceKm={raceData.distanceKm}
+                startElevationM={raceData.courseCoordinates?.[0]?.elevation}
+                finishElevationM={raceData.courseCoordinates?.[raceData.courseCoordinates.length - 1]?.elevation}
+                totalElevationGainM={raceData.elevationGainM}
+                totalElevationLossM={raceData.elevationLossM}
+                overallCutoffHours={raceData.overallCutoffHours}
+                onOverallCutoffChange={handleOverallCutoffChange}
               />
             </section>
           )}
