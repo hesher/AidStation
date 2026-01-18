@@ -96,6 +96,15 @@ echo -e "  ${GREEN}✓ PostgreSQL and Redis containers started${NC}"
 wait_for_service localhost 5432 "PostgreSQL"
 wait_for_service localhost 6379 "Redis"
 
+# Run database migrations
+echo -e "  ${YELLOW}Running database migrations...${NC}"
+for migration in "$PROJECT_ROOT/apps/api/src/db/migrations"/*.sql; do
+    migration_name=$(basename "$migration")
+    docker exec -i aidstation-postgres psql -U aidstation -d aidstation < "$migration" >/dev/null 2>&1
+    echo -e "    ${GREEN}✓${NC} $migration_name"
+done
+echo -e "  ${GREEN}✓ Database migrations complete${NC}"
+
 echo ""
 
 # Check if npm dependencies are installed
