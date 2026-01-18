@@ -197,7 +197,7 @@ export default function PerformancesPage() {
   const [uploadProgress, setUploadProgress] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
   const [selectedActivityView, setSelectedActivityView] = useState<SelectedActivityView | null>(null);
-    const [selectedSegmentsView, setSelectedSegmentsView] = useState<SelectedSegmentsView | null>(null);
+  const [selectedSegmentsView, setSelectedSegmentsView] = useState<SelectedSegmentsView | null>(null);
 
   const loadData = useCallback(async () => {
     try {
@@ -361,7 +361,7 @@ export default function PerformancesPage() {
     }
   };
 
-const handleCloseMap = () => {
+  const handleCloseMap = () => {
     setSelectedActivityView(null);
   };
 
@@ -589,7 +589,7 @@ const handleCloseMap = () => {
                 </span>
                 <span>{formatDuration(activity.movingTimeSeconds)}</span>
                 <span>{formatPace(activity.averagePaceMinKm)}</span>
-<span className={styles.actions}>
+                <span className={styles.actions}>
                   <button
                     onClick={() => handleViewMap(activity)}
                     className={styles.viewMapButton}
@@ -676,7 +676,7 @@ const handleCloseMap = () => {
         </div>
       )}
 
-{/* Help section explaining key concepts */}
+      {/* Help section explaining key concepts */}
       <HelpCard topics={PERFORMANCES_HELP_TOPICS} title="Understanding Your Performance Data" />
 
       {/* Terrain Segments Modal */}

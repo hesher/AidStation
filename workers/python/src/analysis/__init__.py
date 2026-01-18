@@ -20,12 +20,12 @@ from .performance_analyzer import (
     SegmentMetrics,
 )
 from .terrain_segment_analyzer import (
+    analyze_activity_terrain_segments,
     GradeCategory,
     TerrainSegment,
     TerrainSegmentAnalysisResult,
     TerrainSegmentAnalyzer,
     TerrainType,
-    analyze_activity_terrain_segments,
 )
 
 __all__ = [

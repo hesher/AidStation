@@ -9,7 +9,7 @@ import Fastify, { FastifyInstance } from 'fastify';
 import cookie from '@fastify/cookie';
 import { raceRoutes } from '../races';
 import * as aiService from '../../services/ai';
-import type { RaceSearchResult, AIProvider, RaceUpdateResult } from '../../services/ai';
+import type { RaceSearchResult, AIProvider } from '../../services/ai';
 
 // Mock database repositories
 vi.mock('../../db/repositories', () => ({

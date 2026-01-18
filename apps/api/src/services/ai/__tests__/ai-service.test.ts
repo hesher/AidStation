@@ -4,7 +4,7 @@
  * Unit tests for the AI abstraction layer and providers.
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { OpenAIProvider } from '../openai-provider';
 import { getAIProvider, createAIProvider, setDefaultAIProvider, searchRace, updateRaceWithAI } from '../index';
 import type { AIProvider, RaceSearchResult, RaceUpdateResult } from '../types';
@@ -220,7 +220,7 @@ describe('AI Service', () => {
 
         setDefaultAIProvider(mockProvider);
         const result = await searchRace('Unknown Race');
-        
+
         // Should not throw, provider should handle missing name
         expect(result.distanceKm).toBe(50);
       });
@@ -242,7 +242,7 @@ describe('AI Service', () => {
 
         setDefaultAIProvider(mockProvider);
         const result = await searchRace('Test Race');
-        
+
         expect(result.aidStations).toBeDefined();
         expect(result.aidStations!.length).toBe(3);
       });
@@ -260,7 +260,7 @@ describe('AI Service', () => {
 
         setDefaultAIProvider(mockProvider);
         const result = await searchRace('Test Race');
-        
+
         expect(result.courseCoordinates).toEqual([]);
       });
     });
@@ -284,7 +284,7 @@ describe('AI Service', () => {
 
         setDefaultAIProvider(mockProvider);
         const result = await updateRaceWithAI('Add markers', { raceDistanceKm: 50 });
-        
+
         expect(result.success).toBe(true);
         expect(result.waypointUpdates).toHaveLength(1);
       });
@@ -305,7 +305,7 @@ describe('AI Service', () => {
 
         setDefaultAIProvider(mockProvider);
         const result = await updateRaceWithAI('Invalid instruction', { raceDistanceKm: 50 });
-        
+
         expect(result.success).toBe(false);
         expect(result.message).toBe('Could not interpret instruction');
       });

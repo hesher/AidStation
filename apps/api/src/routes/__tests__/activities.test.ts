@@ -485,7 +485,7 @@ describe('Activity Routes', () => {
       expect(body.data.coordinates).toBeDefined();
       expect(Array.isArray(body.data.coordinates)).toBe(true);
       expect(body.data.count).toBe(body.data.coordinates.length);
-      
+
       // Check that coordinates have expected structure
       if (body.data.coordinates.length > 0) {
         const coord = body.data.coordinates[0];

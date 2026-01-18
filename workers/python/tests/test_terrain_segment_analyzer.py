@@ -6,12 +6,12 @@ Tests for breaking activities into climb/descent/flat segments with 5km blocks.
 
 import pytest
 from src.analysis.terrain_segment_analyzer import (
+    analyze_activity_terrain_segments,
     GradeCategory,
     TerrainSegment,
     TerrainSegmentAnalysisResult,
     TerrainSegmentAnalyzer,
     TerrainType,
-    analyze_activity_terrain_segments,
 )
 
 
@@ -27,21 +27,21 @@ SAMPLE_VARIED_TERRAIN_GPX = """<?xml version="1.0" encoding="UTF-8"?>
       <trkpt lat="51.5020" lon="-0.1000"><ele>102</ele><time>2026-01-15T08:06:00Z</time></trkpt>
       <trkpt lat="51.5030" lon="-0.1000"><ele>101</ele><time>2026-01-15T08:09:00Z</time></trkpt>
       <trkpt lat="51.5040" lon="-0.1000"><ele>100</ele><time>2026-01-15T08:12:00Z</time></trkpt>
-      
+
       <!-- Climb section (1km-2km, ~5% grade) -->
       <trkpt lat="51.5050" lon="-0.1000"><ele>120</ele><time>2026-01-15T08:17:00Z</time></trkpt>
       <trkpt lat="51.5060" lon="-0.1000"><ele>140</ele><time>2026-01-15T08:22:00Z</time></trkpt>
       <trkpt lat="51.5070" lon="-0.1000"><ele>160</ele><time>2026-01-15T08:27:00Z</time></trkpt>
       <trkpt lat="51.5080" lon="-0.1000"><ele>180</ele><time>2026-01-15T08:32:00Z</time></trkpt>
       <trkpt lat="51.5090" lon="-0.1000"><ele>200</ele><time>2026-01-15T08:37:00Z</time></trkpt>
-      
+
       <!-- Flat/rolling section (2km-3km) -->
       <trkpt lat="51.5100" lon="-0.1000"><ele>202</ele><time>2026-01-15T08:42:00Z</time></trkpt>
       <trkpt lat="51.5110" lon="-0.1000"><ele>198</ele><time>2026-01-15T08:45:00Z</time></trkpt>
       <trkpt lat="51.5120" lon="-0.1000"><ele>201</ele><time>2026-01-15T08:48:00Z</time></trkpt>
       <trkpt lat="51.5130" lon="-0.1000"><ele>199</ele><time>2026-01-15T08:51:00Z</time></trkpt>
       <trkpt lat="51.5140" lon="-0.1000"><ele>200</ele><time>2026-01-15T08:54:00Z</time></trkpt>
-      
+
       <!-- Descent section (3km-4km, ~-5% grade) -->
       <trkpt lat="51.5150" lon="-0.1000"><ele>180</ele><time>2026-01-15T08:57:00Z</time></trkpt>
       <trkpt lat="51.5160" lon="-0.1000"><ele>160</ele><time>2026-01-15T09:00:00Z</time></trkpt>
@@ -269,7 +269,7 @@ class TestLongFlatSegmentSplitting:
         result = analyzer.analyze()
 
         total_segment_distance = sum(s.distance_km for s in result.segments)
-        
+
         # Total segment distance should be close to total distance
         assert abs(total_segment_distance - result.total_distance_km) < 0.5
 
@@ -293,7 +293,7 @@ class TestClimbSegments:
 
         # A continuous climb should be kept as one segment
         climb_segments = [s for s in result.segments if s.terrain_type == "climb"]
-        
+
         # The total distance of all climb segments should be covered
         # but climbs are kept continuous (not split into 5km blocks)
         for climb in climb_segments:
@@ -306,7 +306,9 @@ class TestConvenienceFunction:
 
     def test_analyze_activity_terrain_segments(self):
         """Convenience function should work correctly"""
-        result = analyze_activity_terrain_segments(SAMPLE_VARIED_TERRAIN_GPX, "test-conv")
+        result = analyze_activity_terrain_segments(
+            SAMPLE_VARIED_TERRAIN_GPX, "test-conv"
+        )
 
         assert isinstance(result, dict)
         assert result["activity_id"] == "test-conv"
