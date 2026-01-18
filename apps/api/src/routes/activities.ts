@@ -1148,6 +1148,12 @@ function parseGpxCoordinates(gpxContent: string): Array<{ lat: number; lon: numb
 }
 
 /**
+ * Minimum distance in km for an activity to be included in performance profile calculations.
+ * Short runs don't provide meaningful data for race predictions.
+ */
+const MIN_ACTIVITY_DISTANCE_KM = 15;
+
+/**
  * Recalculate a user's performance profile from their analyzed activities
  */
 async function recalculatePerformanceProfile(
@@ -1160,11 +1166,30 @@ async function recalculatePerformanceProfile(
 
     const analyzedActivities = result.activities.filter((a) => {
       const analysisResults = a.analysisResults as Record<string, unknown> | null;
-      return analysisResults?.processingStatus === 'completed' && analysisResults?.paceByGradient;
+      if (analysisResults?.processingStatus !== 'completed' || !analysisResults?.paceByGradient) {
+        return false;
+      }
+
+      // Check minimum distance requirement (15km)
+      // First try to get distance from analysis results, then fall back to activity's distanceKm
+      const totalDistanceKm =
+        (analysisResults.totalDistanceKm as number | undefined) ??
+        (analysisResults.total_distance_km as number | undefined) ??
+        a.distanceKm ??
+        0;
+
+      if (totalDistanceKm < MIN_ACTIVITY_DISTANCE_KM) {
+        return false;
+      }
+
+      return true;
     });
 
     if (analyzedActivities.length === 0) {
-      app.log.info({ userId }, 'No analyzed activities for performance profile calculation');
+      app.log.info(
+        { userId, minDistanceKm: MIN_ACTIVITY_DISTANCE_KM },
+        'No analyzed activities meeting minimum distance requirement for performance profile calculation'
+      );
       return;
     }
 

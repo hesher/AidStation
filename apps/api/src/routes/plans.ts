@@ -507,6 +507,50 @@ export async function planRoutes(app: FastifyInstance) {
 }
 
 /**
+ * Calculate default aid station stop time based on race distance and station type.
+ *
+ * Ultra-race research suggests:
+ * - Short races (<50km): 2-5 min per station (quick refuel)
+ * - Medium races (50-100km): 5-10 min per station (refuel + minor care)
+ * - Long races (100-160km): 8-15 min per station (full service)
+ * - Very long races (>160km): 10-20 min per station (extended care, potential sleep)
+ *
+ * @param totalDistanceKm Total race distance
+ * @param hasDropBag Whether the station has a drop bag (adds time)
+ * @param hasCrew Whether the station has crew access (adds time)
+ * @returns Recommended stop time in minutes
+ */
+function getDefaultAidStationMinutes(
+  totalDistanceKm: number,
+  hasDropBag = false,
+  hasCrew = false
+): number {
+  let baseMinutes: number;
+
+  if (totalDistanceKm <= 50) {
+    baseMinutes = 3;
+  } else if (totalDistanceKm <= 100) {
+    baseMinutes = 6;
+  } else if (totalDistanceKm <= 160) {
+    baseMinutes = 10;
+  } else {
+    baseMinutes = 15;
+  }
+
+  // Add time for drop bags (gathering gear, changing clothes)
+  if (hasDropBag) {
+    baseMinutes += 5;
+  }
+
+  // Add time for crew (more efficient but also more socializing)
+  if (hasCrew) {
+    baseMinutes += 3;
+  }
+
+  return baseMinutes;
+}
+
+/**
  * Generate predictions for aid station arrival times
  */
 function generatePredictions(
@@ -527,6 +571,8 @@ function generatePredictions(
       elevationLossFromPrevM: number | null;
       cutoffHoursFromStart: number | null;
       cutoffTime: string | null;
+      hasDropBag?: boolean;
+      hasCrew?: boolean;
     }>;
   },
   performance: {
@@ -546,6 +592,7 @@ function generatePredictions(
     basePaceMinKm?: number | null;
     nighttimeSlowdown: number;
     startTime?: Date | null;
+    defaultAidStationMinutes?: number | null; // Override auto-calculated stop time
   }
 ): {
   aidStationPredictions: AidStationPrediction[];
@@ -904,6 +951,20 @@ function generatePredictions(
         nighttimeFactor: Math.round(nighttimeFactor * 100) / 100,
       },
     });
+
+    // Add aid station stop time after each real (non-virtual) station
+    // This accounts for refueling, gear changes, bathroom breaks, etc.
+    if (!station.isVirtual && station.name !== 'Finish') {
+      const stopMinutes = options.defaultAidStationMinutes ??
+        getDefaultAidStationMinutes(
+          totalRaceDistanceKm,
+          (station as { hasDropBag?: boolean }).hasDropBag ?? false,
+          (station as { hasCrew?: boolean }).hasCrew ?? false
+        );
+
+      cumulativeMinutes += stopMinutes;
+      console.log(`  → Adding ${stopMinutes} min stop time at ${station.name}`);
+    }
 
     prevDistanceKm = stationDistanceKm;
   }

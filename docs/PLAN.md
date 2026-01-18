@@ -332,7 +332,8 @@ This is a non-negotiable requirement to ensure:
 - [x] Implement loading state during AI search
 - [x] Integrate Mapbox GL JS for course visualization
 - [x] Draw course on map with aid station markers
-- [ ] Implement 3D terrain visualization for elevation context
+- [x] Implement 3D terrain visualization for elevation context
+  - **Implemented**: CourseMap component includes full 3D terrain support with `enable3D` prop (default: true), `terrainExaggeration` prop (default: 1.5), and a toggle button. Uses Mapbox terrain DEM, sky atmosphere layer, and 45° pitch for 3D view.
 - [x] Create aid station data table component with columns:
   - Station Name
   - Distance from Start
@@ -410,6 +411,13 @@ This is a non-negotiable requirement to ensure:
 - [x] Display currently loaded race name in header/navbar
 - [x] Show saved/unsaved status indicator
 
+### 4.6 Race Details Update with AI
+- Instead of using strictly aid stations in the Aid Stations section, there should be a way to flag waypoints as "aid stations", or other types of waypoints (like water stop, view point, toilet, or custom)
+- There will be an option to update the race details with AI. This will be a button that will call the AI to update the race details.
+- When updating the race details, it can be by typing the specific change ("add a milestone every 5 km", "add a milestone on every mountain peak", etc...)
+- The AI will also determine the type of waypoint which will feed into the milestome type
+- When adding a milestone, it will automatically update its distance since previous, elevation, etc...
+
 **E2E Test (User Story 3 Complete):** ✅
 - User saves race as private → Only they can see it
 - User saves race as public → All users can find it
@@ -486,6 +494,12 @@ This is a non-negotiable requirement to ensure:
   - Time of day (nighttime slowdown factor)
   - Race distance fatigue curve
 - [x] Generate predicted arrival time for each aid station
+- [ ] Add terrain type to predicted pace (single trail, double track, etc..)
+  - **Note**: Requires database schema changes (add `terrain_type` field to aid_stations), UI updates for terrain type selection, and prediction algorithm updates. Currently only gradient-based terrain factors are implemented.
+- [x] Add aid station time to total time
+  - **Implemented**: `getDefaultAidStationMinutes()` function calculates stop time based on race distance (3-15 min base) plus additional time for drop bags (+5 min) and crew access (+3 min). Stop time is added after each non-virtual aid station.
+- [x] Reject short runs from prediction (less than 15km)
+  - **Implemented**: `MIN_ACTIVITY_DISTANCE_KM = 15` constant filters out activities shorter than 15km when calculating performance profiles.
 
 ### 6.3 Cutoff Time Analysis
 - [x] Compare predicted times to aid station cutoffs
@@ -548,15 +562,10 @@ This is a non-negotiable requirement to ensure:
 ## Phase 8: Follow Ups, Fixes, Ideas and Future Work
 
 ### Urgent Fixes
-  - ~~Error: TypeScript property name mismatch in page.tsx~~ ✅ Fixed - Changed `courseStats.elevation_gain_m` to `courseStats.total_elevation_gain_m`
-
 
 
 
 ### Fast Follows
-- ~~When the user uploads a GPX file in Race Search - It should update the Elevation Gain, loss~~ ✅ Already implemented - Fixed TypeScript property name mismatch
-- ~~The aid station edits should calculate distance from previous and total distance from start based on the GPX course uploaded and not let manual adjustments when there's course data~~ ✅ Implemented in P8: Fast Follow commits
-
 
 ### Future Work
 
