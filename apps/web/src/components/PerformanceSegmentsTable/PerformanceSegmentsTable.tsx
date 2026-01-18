@@ -26,16 +26,16 @@ function formatDistance(km: number | undefined | null): string {
   return km.toFixed(2);
 }
 
-function formatElevation(m: number | undefined | null): string {
+function formatElevationPositive(m: number | undefined | null): string {
   if (m === undefined || m === null) return '--';
   const rounded = Math.round(m);
-  return rounded >= 0 ? `+${rounded}` : `${rounded}`;
+  return `+${rounded}`;
 }
 
-function formatGradient(percent: number | undefined | null): string {
-  if (percent === undefined || percent === null) return '--';
-  const sign = percent >= 0 ? '+' : '';
-  return `${sign}${percent.toFixed(1)}%`;
+function formatElevationNegative(m: number | undefined | null): string {
+  if (m === undefined || m === null) return '--';
+  const rounded = Math.round(m);
+  return `-${rounded}`;
 }
 
 function formatDuration(seconds: number | undefined | null): string {
@@ -127,8 +127,8 @@ export function PerformanceSegmentsTable({
               <th className={styles.thType}>Type</th>
               <th className={styles.thGrade}>Grade</th>
               <th className={styles.thNumber}>Distance</th>
-              <th className={styles.thNumber}>Elev</th>
-              <th className={styles.thNumber}>Gradient</th>
+              <th className={styles.thNumber}>Ascent</th>
+              <th className={styles.thNumber}>Descent</th>
               <th className={styles.thNumber}>Pace</th>
               <th className={styles.thNumber}>GAP</th>
             </tr>
@@ -151,10 +151,12 @@ export function PerformanceSegmentsTable({
                   </span>
                 </td>
                 <td className={styles.tdNumber}>{formatDistance(segment.distanceKm)} km</td>
-                <td className={`${styles.tdNumber} ${segment.elevationChangeM >= 0 ? styles.gain : styles.loss}`}>
-                  {formatElevation(segment.elevationChangeM)} m
+                <td className={`${styles.tdNumber} ${styles.gain}`}>
+                  {formatElevationPositive(segment.totalAscentM)} m
                 </td>
-                <td className={styles.tdNumber}>{formatGradient(segment.averageGradePercent)}</td>
+                <td className={`${styles.tdNumber} ${styles.loss}`}>
+                  {formatElevationNegative(segment.totalDescentM)} m
+                </td>
                 <td className={styles.tdNumber}>{formatPace(segment.paceMinKm)} /km</td>
                 <td className={styles.tdNumber}>{formatPace(segment.gradeAdjustedPaceMinKm)} /km</td>
               </tr>

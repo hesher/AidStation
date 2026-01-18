@@ -60,7 +60,8 @@ export interface TerrainSegment {
   distanceKm: number;
   elevationStartM: number;
   elevationEndM: number;
-  elevationChangeM: number;
+  totalAscentM: number;
+  totalDescentM: number;
   averageGradePercent: number;
   timeSeconds: number;
   paceMinKm: number;

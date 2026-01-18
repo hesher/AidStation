@@ -453,7 +453,8 @@ export async function activityRoutes(app: FastifyInstance) {
         distanceKm: number;
         elevationStartM: number;
         elevationEndM: number;
-        elevationChangeM: number;
+        totalAscentM: number;
+        totalDescentM: number;
         averageGradePercent: number;
         timeSeconds: number;
         paceMinKm: number;
@@ -1232,7 +1233,8 @@ interface TerrainSegmentData {
     distanceKm: number;
     elevationStartM: number;
     elevationEndM: number;
-    elevationChangeM: number;
+    totalAscentM: number;
+    totalDescentM: number;
     averageGradePercent: number;
     timeSeconds: number;
     paceMinKm: number;
@@ -1395,7 +1397,7 @@ function parseTerrainSegments(gpxContent: string, activityId: string): TerrainSe
   }
 
   // Merge short segments
-  const mergedSegments: RawSegment[] = [];
+  const shortMergedSegments: RawSegment[] = [];
   for (let i = 0; i < rawSegments.length; i++) {
     const seg = rawSegments[i];
     const startDist = processedPoints[seg.startIdx].distanceM;
@@ -1404,16 +1406,16 @@ function parseTerrainSegments(gpxContent: string, activityId: string): TerrainSe
 
     if (lengthKm < MIN_SEGMENT_LENGTH_KM && i + 1 < rawSegments.length) {
       rawSegments[i + 1].startIdx = seg.startIdx;
-    } else if (lengthKm < MIN_SEGMENT_LENGTH_KM && mergedSegments.length > 0) {
-      mergedSegments[mergedSegments.length - 1].endIdx = seg.endIdx;
+    } else if (lengthKm < MIN_SEGMENT_LENGTH_KM && shortMergedSegments.length > 0) {
+      shortMergedSegments[shortMergedSegments.length - 1].endIdx = seg.endIdx;
     } else {
-      mergedSegments.push(seg);
+      shortMergedSegments.push(seg);
     }
   }
 
   // Split long flat/descent segments into 5km blocks
   const finalSegments: RawSegment[] = [];
-  for (const seg of mergedSegments) {
+  for (const seg of shortMergedSegments) {
     const startDistM = processedPoints[seg.startIdx].distanceM;
     const endDistM = processedPoints[seg.endIdx].distanceM;
     const lengthKm = (endDistM - startDistM) / 1000;
@@ -1459,14 +1461,20 @@ function parseTerrainSegments(gpxContent: string, activityId: string): TerrainSe
     totalElevationLoss: number;
   }
 
+  // Calculate actual ascent and descent within a segment (by iterating through points)
+  function calculateSegmentElevationDetails(startIdx: number, endIdx: number): { gain: number; loss: number } {
+    let gain = 0;
+    let loss = 0;
+    for (let k = startIdx; k < endIdx; k++) {
+      const diff = processedPoints[k + 1].elevation - processedPoints[k].elevation;
+      if (diff > 0) gain += diff;
+      else loss += Math.abs(diff);
+    }
+    return { gain, loss };
+  }
+
   function calculateSegmentElevation(seg: RawSegment): { gain: number; loss: number } {
-    const startPoint = processedPoints[seg.startIdx];
-    const endPoint = processedPoints[seg.endIdx];
-    const elevChange = endPoint.elevation - startPoint.elevation;
-    return {
-      gain: elevChange > 0 ? elevChange : 0,
-      loss: elevChange < 0 ? Math.abs(elevChange) : 0,
-    };
+    return calculateSegmentElevationDetails(seg.startIdx, seg.endIdx);
   }
 
   const consolidatedSegments: ConsolidatedSegment[] = [];
@@ -1533,6 +1541,80 @@ function parseTerrainSegments(gpxContent: string, activityId: string): TerrainSe
     }
   }
 
+  // SECOND PASS: Merge consecutive flat and rolling_hills segments < 1km
+  const MIN_FLAT_ROLLING_LENGTH_KM = 1.0;
+  const finalConsolidatedSegments: ConsolidatedSegment[] = [];
+  
+  for (let idx = 0; idx < consolidatedSegments.length; idx++) {
+    const seg = consolidatedSegments[idx];
+    const startDistM = processedPoints[seg.startIdx].distanceM;
+    const endDistM = processedPoints[seg.endIdx].distanceM;
+    const lengthKm = (endDistM - startDistM) / 1000;
+    
+    // Check if this is a short flat or rolling segment that should be merged
+    const isShortFlatOrRolling = (seg.terrainType === 'flat' || seg.terrainType === 'rolling_hills') && lengthKm < MIN_FLAT_ROLLING_LENGTH_KM;
+    
+    if (isShortFlatOrRolling && finalConsolidatedSegments.length > 0) {
+      const prevSeg = finalConsolidatedSegments[finalConsolidatedSegments.length - 1];
+      
+      // Merge with previous if it's also flat or rolling
+      if (prevSeg.terrainType === 'flat' || prevSeg.terrainType === 'rolling_hills') {
+        prevSeg.endIdx = seg.endIdx;
+        prevSeg.totalElevationGain += seg.totalElevationGain;
+        prevSeg.totalElevationLoss += seg.totalElevationLoss;
+        // If either is rolling, the merged result should be rolling
+        if (seg.terrainType === 'rolling_hills') {
+          prevSeg.terrainType = 'rolling_hills';
+        }
+        continue;
+      }
+    }
+    
+    // Check if we should merge with next segment
+    if (isShortFlatOrRolling && idx + 1 < consolidatedSegments.length) {
+      const nextSeg = consolidatedSegments[idx + 1];
+      
+      // If next is also flat or rolling, let the next iteration handle merging
+      if (nextSeg.terrainType === 'flat' || nextSeg.terrainType === 'rolling_hills') {
+        // Merge this into the next segment
+        consolidatedSegments[idx + 1] = {
+          startIdx: seg.startIdx,
+          endIdx: nextSeg.endIdx,
+          terrainType: nextSeg.terrainType === 'rolling_hills' || seg.terrainType === 'rolling_hills' ? 'rolling_hills' : 'flat',
+          totalElevationGain: seg.totalElevationGain + nextSeg.totalElevationGain,
+          totalElevationLoss: seg.totalElevationLoss + nextSeg.totalElevationLoss,
+        };
+        continue;
+      }
+    }
+    
+    finalConsolidatedSegments.push({ ...seg });
+  }
+  
+  // One more pass to merge any remaining consecutive flat/rolling that ended up next to each other
+  const mergedSegments: ConsolidatedSegment[] = [];
+  for (const seg of finalConsolidatedSegments) {
+    if (mergedSegments.length > 0) {
+      const prevSeg = mergedSegments[mergedSegments.length - 1];
+      const prevDistKm = (processedPoints[prevSeg.endIdx].distanceM - processedPoints[prevSeg.startIdx].distanceM) / 1000;
+      const currDistKm = (processedPoints[seg.endIdx].distanceM - processedPoints[seg.startIdx].distanceM) / 1000;
+      
+      // Merge consecutive flat/rolling sections if either is < 1km
+      if ((prevSeg.terrainType === 'flat' || prevSeg.terrainType === 'rolling_hills') &&
+          (seg.terrainType === 'flat' || seg.terrainType === 'rolling_hills') &&
+          (prevDistKm < MIN_FLAT_ROLLING_LENGTH_KM || currDistKm < MIN_FLAT_ROLLING_LENGTH_KM)) {
+        prevSeg.endIdx = seg.endIdx;
+        prevSeg.totalElevationGain += seg.totalElevationGain;
+        prevSeg.totalElevationLoss += seg.totalElevationLoss;
+        if (seg.terrainType === 'rolling_hills') {
+          prevSeg.terrainType = 'rolling_hills';
+        }
+        continue;
+      }
+    }
+    mergedSegments.push({ ...seg });
+  }
+
   // Build final segment data from consolidated segments
   const segments: TerrainSegmentData['segments'] = [];
   let totalElevGain = 0;
@@ -1556,8 +1638,8 @@ function parseTerrainSegments(gpxContent: string, activityId: string): TerrainSe
     return 'steep_descent';
   }
 
-  for (let idx = 0; idx < consolidatedSegments.length; idx++) {
-    const seg = consolidatedSegments[idx];
+  for (let idx = 0; idx < mergedSegments.length; idx++) {
+    const seg = mergedSegments[idx];
     const startPoint = processedPoints[seg.startIdx];
     const endPoint = processedPoints[seg.endIdx];
 
@@ -1567,6 +1649,9 @@ function parseTerrainSegments(gpxContent: string, activityId: string): TerrainSe
     const distanceKm = distanceM / 1000;
     const elevChange = endPoint.elevation - startPoint.elevation;
     const gradePercent = (elevChange / distanceM) * 100;
+
+    // Recalculate actual ascent/descent for this segment
+    const { gain: segAscent, loss: segDescent } = calculateSegmentElevationDetails(seg.startIdx, seg.endIdx);
 
     // Time calculation
     let timeSeconds = 0;
@@ -1587,24 +1672,24 @@ function parseTerrainSegments(gpxContent: string, activityId: string): TerrainSe
     const costRatio = actualCost / flatCost;
     const gap = costRatio > 0 ? paceMinKm / costRatio : paceMinKm;
 
-    // Track stats
-    if (elevChange > 0) totalElevGain += elevChange;
-    else totalElevLoss += Math.abs(elevChange);
+    // Track stats using actual ascent/descent
+    totalElevGain += segAscent;
+    totalElevLoss += segDescent;
     totalTime += timeSeconds;
 
     if (seg.terrainType === 'climb') {
       climbStats.distanceKm += distanceKm;
       climbStats.timeSeconds += timeSeconds;
-      climbStats.elevationM += elevChange;
+      climbStats.elevationM += segAscent;
     } else if (seg.terrainType === 'descent') {
       descentStats.distanceKm += distanceKm;
       descentStats.timeSeconds += timeSeconds;
-      descentStats.elevationM += Math.abs(elevChange);
+      descentStats.elevationM += segDescent;
     } else if (seg.terrainType === 'rolling_hills') {
       rollingStats.distanceKm += distanceKm;
       rollingStats.timeSeconds += timeSeconds;
-      rollingStats.elevationGainM += seg.totalElevationGain;
-      rollingStats.elevationLossM += seg.totalElevationLoss;
+      rollingStats.elevationGainM += segAscent;
+      rollingStats.elevationLossM += segDescent;
     } else {
       flatStats.distanceKm += distanceKm;
       flatStats.timeSeconds += timeSeconds;
@@ -1619,7 +1704,8 @@ function parseTerrainSegments(gpxContent: string, activityId: string): TerrainSe
       distanceKm: Math.round(distanceKm * 100) / 100,
       elevationStartM: Math.round(startPoint.elevation),
       elevationEndM: Math.round(endPoint.elevation),
-      elevationChangeM: Math.round(elevChange),
+      totalAscentM: Math.round(segAscent),
+      totalDescentM: Math.round(segDescent),
       averageGradePercent: Math.round(gradePercent * 10) / 10,
       timeSeconds: Math.round(timeSeconds),
       paceMinKm: Math.round(paceMinKm * 100) / 100,
