@@ -602,6 +602,19 @@ This is a non-negotiable requirement to ensure:
 
 ### Future Work
 
+- [ ] **Multi-language support**: Add internationalization (i18n) support for multiple languages, starting with common endurance sports markets (German, French, Spanish, Japanese)
+- [ ] **Strava integration**: Allow users to import activities directly from Strava using OAuth, instead of manually uploading GPX files
+- [ ] **Weather integration**: Pull historical weather data for the race date/location and factor temperature, humidity, and conditions into pace predictions
+- [ ] **Nutrition planning**: Add nutrition and hydration planning based on predicted effort levels and time at each segment
+- [ ] **Crew/pacer instructions**: Generate downloadable PDF with instructions for crew members and pacers, including arrival times and locations
+- [ ] **Real-time race tracking**: During a race, allow users to input actual arrival times and recalculate predictions for remaining segments
+- [ ] **Social features**: Allow users to share race plans and compare predictions with other runners who've done the same race
+- [ ] **Gear checklist**: Generate a customized gear checklist based on race conditions, mandatory gear requirements, and predicted weather
+- [ ] **Training plan integration**: Connect with training platforms to suggest race-specific workouts based on course profile
+- [ ] **Heart rate zone predictions**: If heart rate data is available from past activities, predict HR zones for each race segment
+- [ ] **Altitude acclimatization**: For high-altitude races, factor in altitude effects and provide acclimatization recommendations
+- [ ] **Mobile app**: Create a React Native mobile app for viewing race plans offline during the race
+
 ---
 
 ## Project Structure
