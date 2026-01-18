@@ -1,0 +1,356 @@
+.container {
+  background: white;
+  border-radius: 12px;
+  padding: 1.5rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.titleRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.5rem;
+}
+
+.title {
+  margin: 0;
+  font-size: 1.25rem;
+  color: #1a1a2e;
+}
+
+.closeButton {
+  background: none;
+  border: none;
+  font-size: 1.75rem;
+  cursor: pointer;
+  color: #64748b;
+  padding: 0;
+  line-height: 1;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: background 0.2s ease;
+}
+
+.closeButton:hover {
+  background: #f1f5f9;
+  color: #1a1a2e;
+}
+
+/* Overall Stats */
+.overallStats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  padding: 1rem;
+  background: #f8fafc;
+  border-radius: 8px;
+}
+
+.statItem {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.statLabel {
+  font-size: 0.75rem;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.statValue {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #1a1a2e;
+}
+
+/* Table */
+.tableWrapper {
+  overflow-x: auto;
+  margin-bottom: 1.5rem;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.table thead {
+  background: #f1f5f9;
+}
+
+.table th {
+  padding: 0.75rem 0.5rem;
+  text-align: left;
+  font-weight: 600;
+  color: #475569;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+.thNumber {
+  text-align: right;
+}
+
+.thType {
+  text-align: left;
+}
+
+.thGrade {
+  text-align: center;
+}
+
+/* Rows */
+.row {
+  border-bottom: 1px solid #e2e8f0;
+  transition: background 0.15s ease;
+}
+
+.row:last-child {
+  border-bottom: none;
+}
+
+.row:hover {
+  background: #f8fafc;
+}
+
+/* Terrain type row colors */
+.rowClimb {
+  background: rgba(239, 68, 68, 0.05);
+}
+
+.rowClimb:hover {
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.rowDescent {
+  background: rgba(59, 130, 246, 0.05);
+}
+
+.rowDescent:hover {
+  background: rgba(59, 130, 246, 0.1);
+}
+
+.rowFlat {
+  background: rgba(34, 197, 94, 0.05);
+}
+
+.rowFlat:hover {
+  background: rgba(34, 197, 94, 0.1);
+}
+
+/* Table cells */
+.row td {
+  padding: 0.75rem 0.5rem;
+}
+
+.tdNumber {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.tdType {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.terrainEmoji {
+  font-size: 1rem;
+}
+
+.terrainLabel {
+  font-weight: 500;
+  color: #1a1a2e;
+}
+
+.tdGrade {
+  text-align: center;
+}
+
+/* Grade badges */
+.gradeBadge {
+  display: inline-block;
+  padding: 0.25rem 0.5rem;
+  border-radius: 12px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.gradeEasy {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.gradeModerate {
+  background: #fef9c3;
+  color: #854d0e;
+}
+
+.gradeSteep {
+  background: #fed7aa;
+  color: #9a3412;
+}
+
+.gradeExtreme {
+  background: #fecaca;
+  color: #991b1b;
+}
+
+/* Elevation gain/loss colors */
+.gain {
+  color: #dc2626;
+}
+
+.loss {
+  color: #2563eb;
+}
+
+/* Summary Section */
+.summarySection {
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid #e2e8f0;
+}
+
+.summaryTitle {
+  margin: 0 0 1rem 0;
+  font-size: 1rem;
+  color: #1a1a2e;
+}
+
+.summaryGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+}
+
+.summaryCard {
+  border-radius: 8px;
+  padding: 1rem;
+  border: 1px solid transparent;
+}
+
+.summaryClimb {
+  background: rgba(239, 68, 68, 0.08);
+  border-color: rgba(239, 68, 68, 0.2);
+}
+
+.summaryDescent {
+  background: rgba(59, 130, 246, 0.08);
+  border-color: rgba(59, 130, 246, 0.2);
+}
+
+.summaryFlat {
+  background: rgba(34, 197, 94, 0.08);
+  border-color: rgba(34, 197, 94, 0.2);
+}
+
+.summaryHeader {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.summaryEmoji {
+  font-size: 1.25rem;
+}
+
+.summaryType {
+  font-weight: 600;
+  font-size: 1rem;
+  color: #1a1a2e;
+}
+
+.summaryStats {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.5rem;
+}
+
+.summaryStat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.summaryStatLabel {
+  font-size: 0.7rem;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.summaryStatValue {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #1a1a2e;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Legend */
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid #e2e8f0;
+  font-size: 0.8rem;
+  color: #64748b;
+}
+
+.legendTitle {
+  font-weight: 600;
+  color: #475569;
+}
+
+.legendItem {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .container {
+    padding: 1rem;
+  }
+
+  .overallStats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .summaryGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .table {
+    font-size: 0.8rem;
+  }
+
+  .table th,
+  .row td {
+    padding: 0.5rem 0.25rem;
+  }
+
+  .legend {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+}

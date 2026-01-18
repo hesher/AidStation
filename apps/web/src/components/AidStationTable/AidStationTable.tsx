@@ -5,8 +5,27 @@
  */
 
 import React, { useState, useCallback } from 'react';
-import { AidStation } from '@/lib/types';
+import { AidStation, WaypointType } from '@/lib/types';
 import styles from './AidStationTable.module.css';
+
+// Waypoint type configuration for icons and labels
+const WAYPOINT_CONFIG: Record<WaypointType, { icon: string; label: string; color: string }> = {
+  aid_station: { icon: '🏕️', label: 'Aid Station', color: '#22c55e' },
+  water_stop: { icon: '💧', label: 'Water Stop', color: '#3b82f6' },
+  viewpoint: { icon: '👀', label: 'Viewpoint', color: '#a855f7' },
+  toilet: { icon: '🚻', label: 'Toilet', color: '#64748b' },
+  milestone: { icon: '📍', label: 'Milestone', color: '#f59e0b' },
+  custom: { icon: '⭐', label: 'Custom', color: '#ec4899' },
+};
+
+const WAYPOINT_OPTIONS: WaypointType[] = [
+  'aid_station',
+  'water_stop',
+  'viewpoint',
+  'toilet',
+  'milestone',
+  'custom',
+];
 
 interface AidStationTableProps {
   aidStations: AidStation[];
@@ -69,6 +88,20 @@ export function AidStationTable({
       return `${h}:${m.toString().padStart(2, '0')}`;
     }
     return '--';
+  };
+
+  const WaypointTypeBadge = ({ type }: { type?: WaypointType }) => {
+    const waypointType = type || 'aid_station';
+    const config = WAYPOINT_CONFIG[waypointType];
+    return (
+      <span
+        className={styles.waypointBadge}
+        style={{ backgroundColor: `${config.color}22`, borderColor: config.color }}
+        title={config.label}
+      >
+        <span className={styles.waypointIcon}>{config.icon}</span>
+      </span>
+    );
   };
 
   const ServiceBadge = ({
@@ -369,6 +402,7 @@ export function AidStationTable({
     >
       <td className={styles.tdStation}>
         <span className={styles.stationNumber}>{index + 1}</span>
+        <WaypointTypeBadge type={station.waypointType} />
         <span className={styles.stationName}>{station.name}</span>
       </td>
       <td className={styles.tdNumber}>{formatDistance(station.distanceKm)}</td>

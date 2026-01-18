@@ -7,7 +7,7 @@
 
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { z } from 'zod';
-import { searchRace, RaceSearchResult, AidStationInfo } from '../services/ai';
+import { searchRace, RaceSearchResult, AidStationInfo, updateRaceWithAI, WaypointUpdate } from '../services/ai';
 import {
   createRace,
   getRaceById,
@@ -1191,6 +1191,271 @@ export async function raceRoutes(app: FastifyInstance) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
 
       logFailure(app, 'Restore race version', errorMessage, { id: (request.params as { id: string }).id });
+
+      reply.status(500);
+
+      return {
+        success: false,
+        error: errorMessage,
+      };
+    }
+  });
+
+  /**
+   * POST /api/races/:id/update-with-ai
+   *
+   * Update race details using AI interpretation of natural language instructions
+   * Examples:
+   * - "Add a milestone every 5 km"
+   * - "Add a milestone on every mountain peak"
+   * - "Add a water stop at 15 km"
+   */
+  app.post('/races/:id/update-with-ai', async (
+    request: FastifyRequest<{
+      Params: { id: string };
+      Body: { instruction: string };
+    }>,
+    reply: FastifyReply
+  ): Promise<{
+    success: boolean;
+    data?: {
+      message: string;
+      waypointUpdates: WaypointUpdate[];
+      updatedAidStations?: AidStationData[];
+    };
+    error?: string;
+  }> => {
+    try {
+      const { id } = request.params;
+      const { instruction } = request.body;
+
+      // Validate input
+      if (!instruction || typeof instruction !== 'string' || instruction.trim().length === 0) {
+        reply.status(400);
+        return {
+          success: false,
+          error: 'Instruction is required',
+        };
+      }
+
+      // Validate UUID format
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (!uuidRegex.test(id)) {
+        reply.status(400);
+        return {
+          success: false,
+          error: 'Invalid race ID format',
+        };
+      }
+
+      // Get existing race
+      let race;
+      try {
+        race = await getRaceById(id);
+      } catch (dbError) {
+        app.log.warn({ error: dbError }, 'Database not available');
+        reply.status(503);
+        return {
+          success: false,
+          error: 'Database not available',
+        };
+      }
+
+      if (!race) {
+        reply.status(404);
+        return {
+          success: false,
+          error: 'Race not found',
+        };
+      }
+
+      // Get course coordinates from metadata
+      const metadata = race.metadata as Record<string, unknown> | null;
+      const courseCoordinates = metadata?.courseCoordinates as Array<{ lat: number; lon: number; elevation?: number }> | undefined;
+
+      // Prepare existing waypoints for AI context
+      const existingWaypoints = race.aidStations.map((as) => ({
+        name: as.name,
+        distanceKm: as.distanceKm,
+        elevationM: as.elevationM ?? undefined,
+        waypointType: (as as { waypointType?: string }).waypointType ?? 'aid_station',
+        hasDropBag: as.hasDropBag ?? undefined,
+        hasCrew: as.hasCrew ?? undefined,
+        hasPacer: as.hasPacer ?? undefined,
+        cutoffTime: as.cutoffTime ?? undefined,
+        cutoffHoursFromStart: as.cutoffHoursFromStart ?? undefined,
+        latitude: as.latitude ?? undefined,
+        longitude: as.longitude ?? undefined,
+      }));
+
+      app.log.info({ raceId: id, instruction, existingWaypointCount: existingWaypoints.length }, 'Processing AI race update');
+
+      // Call AI to interpret the instruction
+      let aiResult;
+      try {
+        aiResult = await updateRaceWithAI(instruction, {
+          raceDistanceKm: race.distanceKm,
+          existingWaypoints,
+          courseCoordinates,
+        });
+      } catch (aiError) {
+        const aiErrorMessage = aiError instanceof Error ? aiError.message : 'AI service error';
+        app.log.error({ error: aiError }, 'AI race update failed');
+        reply.status(500);
+        return {
+          success: false,
+          error: `AI service error: ${aiErrorMessage}`,
+        };
+      }
+
+      if (!aiResult.success) {
+        return {
+          success: false,
+          error: aiResult.message || 'Failed to process instruction',
+        };
+      }
+
+      // Process the waypoint updates
+      const updatedAidStations: AidStationData[] = [...race.aidStations.map((as) => ({
+        name: as.name,
+        distanceKm: as.distanceKm,
+        distanceFromPrevKm: as.distanceFromPrevKm,
+        elevationM: as.elevationM,
+        elevationGainFromPrevM: as.elevationGainFromPrevM,
+        elevationLossFromPrevM: as.elevationLossFromPrevM,
+        hasDropBag: as.hasDropBag,
+        hasCrew: as.hasCrew,
+        hasPacer: as.hasPacer,
+        cutoffTime: as.cutoffTime,
+        cutoffHoursFromStart: as.cutoffHoursFromStart,
+        latitude: as.latitude,
+        longitude: as.longitude,
+        terrainType: (as as { terrainType?: string }).terrainType,
+        waypointType: (as as { waypointType?: string }).waypointType ?? 'aid_station',
+      }))];
+
+      for (const update of aiResult.waypointUpdates) {
+        if (update.action === 'add') {
+          // Find elevation from course coordinates if available
+          let elevationM = update.elevationM;
+          const updateDistanceKm = update.distanceKm ?? 0;
+          if (elevationM === null && courseCoordinates && courseCoordinates.length > 0 && update.distanceKm !== null && update.distanceKm !== undefined && race.distanceKm) {
+            // Estimate elevation from course coordinates based on distance
+            const fractionOfCourse = updateDistanceKm / race.distanceKm;
+            const coordIndex = Math.min(
+              Math.floor(fractionOfCourse * courseCoordinates.length),
+              courseCoordinates.length - 1
+            );
+            const coord = courseCoordinates[coordIndex];
+            if (coord?.elevation !== undefined) {
+              elevationM = coord.elevation;
+            }
+          }
+
+          updatedAidStations.push({
+            name: update.name,
+            distanceKm: update.distanceKm,
+            elevationM: elevationM,
+            waypointType: update.waypointType ?? 'milestone',
+            latitude: update.latitude,
+            longitude: update.longitude,
+            hasDropBag: false,
+            hasCrew: false,
+            hasPacer: false,
+          });
+        } else if (update.action === 'update') {
+          // Find and update existing waypoint
+          const existingIndex = updatedAidStations.findIndex(
+            (as) => as.name === update.name || (as.distanceKm && as.distanceKm === update.distanceKm)
+          );
+          if (existingIndex >= 0) {
+            updatedAidStations[existingIndex] = {
+              ...updatedAidStations[existingIndex],
+              waypointType: update.waypointType ?? updatedAidStations[existingIndex].waypointType,
+              elevationM: update.elevationM ?? updatedAidStations[existingIndex].elevationM,
+            };
+          }
+        } else if (update.action === 'remove') {
+          // Remove waypoint
+          const removeIndex = updatedAidStations.findIndex(
+            (as) => as.name === update.name || (as.distanceKm && as.distanceKm === update.distanceKm)
+          );
+          if (removeIndex >= 0) {
+            updatedAidStations.splice(removeIndex, 1);
+          }
+        }
+      }
+
+      // Sort by distance
+      updatedAidStations.sort((a, b) => {
+        const aDist = a.distanceKm ?? -1;
+        const bDist = b.distanceKm ?? -1;
+        if (aDist === -1 && bDist === -1) return 0;
+        if (aDist === -1) return 1;
+        if (bDist === -1) return -1;
+        return aDist - bDist;
+      });
+
+      // Recalculate distanceFromPrev and elevation changes
+      for (let i = 0; i < updatedAidStations.length; i++) {
+        const station = updatedAidStations[i];
+        if (i === 0) {
+          station.distanceFromPrevKm = station.distanceKm;
+          station.elevationGainFromPrevM = station.elevationM != null ? station.elevationM : undefined;
+          station.elevationLossFromPrevM = undefined;
+        } else {
+          const prevStation = updatedAidStations[i - 1];
+          if (station.distanceKm != null && prevStation.distanceKm != null) {
+            station.distanceFromPrevKm = Math.round((station.distanceKm - prevStation.distanceKm) * 100) / 100;
+          } else {
+            station.distanceFromPrevKm = null;
+          }
+
+          if (station.elevationM != null && prevStation.elevationM != null) {
+            const elevDiff = station.elevationM - prevStation.elevationM;
+            if (elevDiff > 0) {
+              station.elevationGainFromPrevM = elevDiff;
+              station.elevationLossFromPrevM = 0;
+            } else {
+              station.elevationGainFromPrevM = 0;
+              station.elevationLossFromPrevM = Math.abs(elevDiff);
+            }
+          } else {
+            station.elevationGainFromPrevM = undefined;
+            station.elevationLossFromPrevM = undefined;
+          }
+        }
+      }
+
+      // Update the race in the database
+      const updatedRace = await updateRace(id, {}, updatedAidStations);
+
+      if (!updatedRace) {
+        reply.status(500);
+        return {
+          success: false,
+          error: 'Failed to update race',
+        };
+      }
+
+      logSuccess(app, 'AI race update', {
+        raceId: id,
+        instruction,
+        updatesApplied: aiResult.waypointUpdates.length,
+      });
+
+      return {
+        success: true,
+        data: {
+          message: aiResult.message,
+          waypointUpdates: aiResult.waypointUpdates,
+          updatedAidStations,
+        },
+      };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+
+      logFailure(app, 'AI race update', errorMessage, { id: (request.params as { id: string }).id });
 
       reply.status(500);
 

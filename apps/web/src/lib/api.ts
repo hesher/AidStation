@@ -1,12 +1,143 @@
-/**
- * API Client
- *
- * Client for interacting with the AidStation API.
- */
+import { RaceData, AidStation, WaypointType } from './types';
 
-import { RaceData, RaceSearchResponse, RaceResponse } from './types';
+// Re-export types for convenience
+export type { RaceData, AidStation, WaypointType };
+
+// Types for race responses
+interface RaceSearchResponse {
+  success: boolean;
+  data?: RaceData;
+  error?: string;
+}
+
+interface RaceResponse {
+  success: boolean;
+  data?: RaceData;
+  error?: string;
+}
+
+// Waypoint update from AI service
+export interface WaypointUpdate {
+  action: 'add' | 'update' | 'remove';
+  name: string;
+  distanceKm: number | null;
+  waypointType?: WaypointType;
+  elevationM?: number | null;
+  latitude?: number;
+  longitude?: number;
+}
+
+// Response for AI-powered race update
+export interface UpdateRaceWithAIResponse {
+  success: boolean;
+  data?: {
+    message: string;
+    waypointUpdates: WaypointUpdate[];
+    updatedAidStations?: AidStation[];
+  };
+  error?: string;
+}
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
+
+/**
+ * Export plan as PDF/printable format
+ */
+export async function exportPlanAsPdf(id: string): Promise<{ success: boolean; error?: string }> {
+  // For now, we'll just open the plan in a new window for printing
+  // A more sophisticated implementation would generate an actual PDF
+  window.open(`/planning?planId=${id}&print=true`, '_blank');
+  return { success: true };
+}
+
+// Terrain Segments types for performance breakdown
+export interface TerrainSegment {
+  segmentIndex: number;
+  terrainType: 'climb' | 'descent' | 'flat';
+  gradeCategory: string;
+  startDistanceKm: number;
+  endDistanceKm: number;
+  distanceKm: number;
+  elevationStartM: number;
+  elevationEndM: number;
+  elevationChangeM: number;
+  averageGradePercent: number;
+  timeSeconds: number;
+  paceMinKm: number;
+  gradeAdjustedPaceMinKm: number;
+}
+
+export interface TerrainSegmentsSummary {
+  climb: {
+    totalDistanceKm: number;
+    totalTimeSeconds: number;
+    totalElevationM: number;
+    averagePaceMinKm: number;
+    segmentCount: number;
+  };
+  descent: {
+    totalDistanceKm: number;
+    totalTimeSeconds: number;
+    totalElevationM: number;
+    averagePaceMinKm: number;
+    segmentCount: number;
+  };
+  flat: {
+    totalDistanceKm: number;
+    totalTimeSeconds: number;
+    averagePaceMinKm: number;
+    segmentCount: number;
+  };
+  totalSegments: number;
+}
+
+export interface TerrainSegmentsData {
+  activityId: string;
+  totalDistanceKm: number;
+  totalElevationGainM: number;
+  totalElevationLossM: number;
+  totalTimeSeconds: number;
+  segments: TerrainSegment[];
+  summary: TerrainSegmentsSummary;
+}
+
+interface TerrainSegmentsResponse {
+  success: boolean;
+  data?: TerrainSegmentsData;
+  error?: string;
+}
+
+/**
+ * Get terrain segments breakdown for an activity
+ * Breaks down the activity into climb/descent/flat sections with 5km blocks for flat/descent
+ */
+export async function getActivityTerrainSegments(id: string): Promise<TerrainSegmentsResponse> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/activities/${id}/terrain-segments`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include',
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      return {
+        success: false,
+        error: data.error || 'Failed to get terrain segments',
+      };
+    }
+
+    return data;
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Network error occurred',
+    };
+  }
+}
 
 /**
  * Search for a race using AI
@@ -937,6 +1068,45 @@ export async function analyzeGpx(
       return {
         success: false,
         error: data.error || 'Failed to analyze GPX',
+      };
+    }
+
+    return data;
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Network error occurred',
+    };
+  }
+}
+
+/**
+ * Update a race using AI interpretation of natural language instructions
+ * Examples:
+ * - "Add a milestone every 5 km"
+ * - "Add a milestone on every mountain peak"
+ * - "Add a water stop at 15 km"
+ */
+export async function updateRaceWithAI(
+  raceId: string,
+  instruction: string
+): Promise<UpdateRaceWithAIResponse> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/races/${raceId}/update-with-ai`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include',
+      body: JSON.stringify({ instruction }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      return {
+        success: false,
+        error: data.error || 'Failed to update race with AI',
       };
     }
 

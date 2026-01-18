@@ -4,6 +4,14 @@
  * Shared types for race data used across the frontend.
  */
 
+export type WaypointType =
+  | 'aid_station'
+  | 'water_stop'
+  | 'viewpoint'
+  | 'toilet'
+  | 'milestone'
+  | 'custom';
+
 export interface AidStation {
   name: string;
   distanceKm: number | null;
@@ -16,6 +24,7 @@ export interface AidStation {
   hasPacer?: boolean | null;
   cutoffTime?: string | null;
   cutoffHoursFromStart?: number | null;
+  waypointType?: WaypointType;
 }
 
 export interface CourseCoordinate {

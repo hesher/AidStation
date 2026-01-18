@@ -125,6 +125,7 @@ export async function createRace(
           latitude: station.latitude,
           longitude: station.longitude,
           terrainType: station.terrainType ?? 'trail',
+          waypointType: station.waypointType ?? 'aid_station',
         }))
       )
       .returning();
@@ -227,6 +228,7 @@ export async function updateRace(
             latitude: station.latitude,
             longitude: station.longitude,
             terrainType: station.terrainType ?? 'trail',
+            waypointType: station.waypointType ?? 'aid_station',
           }))
         )
         .returning();

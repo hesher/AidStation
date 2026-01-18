@@ -5,7 +5,7 @@
  * Currently supports OpenAI, with the ability to add more providers.
  */
 
-import { AIProvider, AISearchOptions, RaceSearchResult, AIServiceConfig } from './types';
+import { AIProvider, AISearchOptions, RaceSearchResult, AIServiceConfig, AIRaceUpdateOptions, RaceUpdateResult } from './types';
 import { OpenAIProvider } from './openai-provider';
 
 export * from './types';
@@ -65,4 +65,29 @@ export async function searchRace(
   }
 
   return provider.searchRace(query, options);
+}
+
+/**
+ * Update race details using AI interpretation of natural language instruction
+ */
+export async function updateRaceWithAI(
+  instruction: string,
+  options: AIRaceUpdateOptions
+): Promise<RaceUpdateResult> {
+  const provider = getAIProvider();
+
+  if (!provider.isConfigured()) {
+    throw new Error(
+      `AI provider "${provider.name}" is not configured. ` +
+      'Please ensure the required API key is set.'
+    );
+  }
+
+  if (!provider.updateRace) {
+    throw new Error(
+      `AI provider "${provider.name}" does not support race updates.`
+    );
+  }
+
+  return provider.updateRace(instruction, options);
 }

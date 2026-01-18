@@ -412,16 +412,16 @@ This is a non-negotiable requirement to ensure:
 - [x] Show saved/unsaved status indicator
 
 ### 4.6 Race Details Update with AI
-- Instead of using strictly aid stations in the Aid Stations section, there should be a way to flag waypoints as "aid stations", or other types of waypoints (like water stop, view point, toilet, or custom)
-- There will be an option to update the race details with AI. This will be a button that will call the AI to update the race details.
-- When updating the race details, it can be by typing the specific change ("add a milestone every 5 km", "add a milestone on every mountain peak", etc...)
-- The AI will also determine the type of waypoint which will feed into the milestome type
-- When adding a milestone, it will automatically update its distance since previous, elevation, etc...
+- [x] Instead of using strictly aid stations in the Aid Stations section, there should be a way to flag waypoints as "aid stations", or other types of waypoints (like water stop, view point, toilet, or custom)
+- [x] There will be an option to update the race details with AI. This will be a button that will call the AI to update the race details.
+- [x] When updating the race details, it can be by typing the specific change ("add a milestone every 5 km", "add a milestone on every mountain peak", etc...)
+- [x] The AI will also determine the type of waypoint which will feed into the milestone type
+- [x] When adding a milestone, it will automatically update its distance since previous, elevation, etc...
 
 ### 4.7 Past Performance table view
-- Past peformance data should break down into climbs and descent sections to show performance on those (ign)
-- Additionally, it should break down long flat and descending sections into 5km blocks
-- Data should be presented in a table with each row providing context on the type of section and type of terrain in that section
+- [x] Past peformance data should break down into climbs and descent sections to show performance on those (ign)
+- [x] Additionally, it should break down long flat and descending sections into 5km blocks
+- [x] Data should be presented in a table with each row providing context on the type of section and type of terrain in that section
 
 **E2E Test (User Story 3 Complete):** ✅
 - User saves race as private → Only they can see it

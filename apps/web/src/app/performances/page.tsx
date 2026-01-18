@@ -13,7 +13,9 @@ import {
   deleteActivity,
   syncActivities,
   getActivityCoordinates,
+  getActivityTerrainSegments,
   ActivityCoordinates,
+  TerrainSegmentsData,
 } from '../../lib/api';
 
 // Lazy load heavy components to improve initial page load
@@ -29,6 +31,14 @@ const ElevationProfile = dynamic(
   () => import('@/components/ElevationProfile').then((mod) => mod.ElevationProfile),
   {
     loading: () => <Skeleton width="100%" height={150} />,
+    ssr: false,
+  }
+);
+
+const PerformanceSegmentsTable = dynamic(
+  () => import('@/components/PerformanceSegmentsTable').then((mod) => mod.PerformanceSegmentsTable),
+  {
+    loading: () => <Skeleton width="100%" height={300} />,
     ssr: false,
   }
 );
@@ -72,6 +82,13 @@ interface PerformanceProfile {
 interface SelectedActivityView {
   activity: Activity;
   coordinates: ActivityCoordinates[];
+  isLoading: boolean;
+}
+
+// Selected activity segments view
+interface SelectedSegmentsView {
+  activity: Activity;
+  segments: TerrainSegmentsData | null;
   isLoading: boolean;
 }
 
@@ -180,6 +197,7 @@ export default function PerformancesPage() {
   const [uploadProgress, setUploadProgress] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
   const [selectedActivityView, setSelectedActivityView] = useState<SelectedActivityView | null>(null);
+    const [selectedSegmentsView, setSelectedSegmentsView] = useState<SelectedSegmentsView | null>(null);
 
   const loadData = useCallback(async () => {
     try {
@@ -343,8 +361,38 @@ export default function PerformancesPage() {
     }
   };
 
-  const handleCloseMap = () => {
+const handleCloseMap = () => {
     setSelectedActivityView(null);
+  };
+
+  const handleViewSegments = async (activity: Activity) => {
+    setSelectedSegmentsView({
+      activity,
+      segments: null,
+      isLoading: true,
+    });
+
+    try {
+      const result = await getActivityTerrainSegments(activity.id);
+      if (result.success && result.data) {
+        setSelectedSegmentsView({
+          activity,
+          segments: result.data,
+          isLoading: false,
+        });
+      } else {
+        setError('Failed to load terrain segments');
+        setSelectedSegmentsView(null);
+      }
+    } catch (err) {
+      console.error('Load segments error:', err);
+      setError('Failed to load terrain segments');
+      setSelectedSegmentsView(null);
+    }
+  };
+
+  const handleCloseSegments = () => {
+    setSelectedSegmentsView(null);
   };
 
   if (isLoading) {
@@ -541,13 +589,20 @@ export default function PerformancesPage() {
                 </span>
                 <span>{formatDuration(activity.movingTimeSeconds)}</span>
                 <span>{formatPace(activity.averagePaceMinKm)}</span>
-                <span className={styles.actions}>
+<span className={styles.actions}>
                   <button
                     onClick={() => handleViewMap(activity)}
                     className={styles.viewMapButton}
                     title="View on map"
                   >
                     🗺️
+                  </button>
+                  <button
+                    onClick={() => handleViewSegments(activity)}
+                    className={styles.viewMapButton}
+                    title="View terrain segments"
+                  >
+                    📊
                   </button>
                   <button
                     onClick={() => handleDeleteActivity(activity.id)}
@@ -621,8 +676,46 @@ export default function PerformancesPage() {
         </div>
       )}
 
-      {/* Help section explaining key concepts */}
+{/* Help section explaining key concepts */}
       <HelpCard topics={PERFORMANCES_HELP_TOPICS} title="Understanding Your Performance Data" />
+
+      {/* Terrain Segments Modal */}
+      {selectedSegmentsView && (
+        <div className={styles.mapModal} onClick={handleCloseSegments}>
+          <div className={styles.mapModalContent} onClick={(e) => e.stopPropagation()}>
+            <div className={styles.mapModalHeader}>
+              <h3>{selectedSegmentsView.activity.name || 'Activity'} - Terrain Analysis</h3>
+              <div className={styles.mapModalMeta}>
+                {selectedSegmentsView.activity.distanceKm && (
+                  <span>{selectedSegmentsView.activity.distanceKm.toFixed(1)} km</span>
+                )}
+                {selectedSegmentsView.activity.elevationGainM && (
+                  <span>{Math.round(selectedSegmentsView.activity.elevationGainM)} m ↗</span>
+                )}
+              </div>
+              <button onClick={handleCloseSegments} className={styles.mapModalClose} aria-label="Close">
+                ×
+              </button>
+            </div>
+            <div className={styles.mapModalBody} style={{ overflow: 'auto', padding: '0' }}>
+              {selectedSegmentsView.isLoading ? (
+                <div className={styles.mapLoading}>
+                  <div className={styles.spinner}></div>
+                  <p>Analyzing terrain segments...</p>
+                </div>
+              ) : selectedSegmentsView.segments ? (
+                <PerformanceSegmentsTable
+                  data={selectedSegmentsView.segments}
+                />
+              ) : (
+                <div className={styles.mapEmpty}>
+                  <p>No terrain segment data available for this activity</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
     </main>
   );

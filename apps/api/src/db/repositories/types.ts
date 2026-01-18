@@ -33,7 +33,25 @@ export interface RaceData {
 }
 
 /**
- * Aid station data for creating/updating aid stations
+ * Valid waypoint types
+ */
+export const WAYPOINT_TYPES = [
+  'aid_station',
+  'water_stop',
+  'view_point',
+  'toilet',
+  'milestone',
+  'peak',
+  'start',
+  'finish',
+  'checkpoint',
+  'custom',
+] as const;
+
+export type WaypointType = (typeof WAYPOINT_TYPES)[number];
+
+/**
+ * Aid station / waypoint data for creating/updating waypoints
  */
 export interface AidStationData {
   name: string;
@@ -50,6 +68,7 @@ export interface AidStationData {
   latitude?: number | null;
   longitude?: number | null;
   terrainType?: string | null; // road, gravel, single_track, technical, alpine, trail, etc.
+  waypointType?: WaypointType | string | null; // aid_station, water_stop, view_point, toilet, milestone, peak, checkpoint, custom
 }
 
 /**

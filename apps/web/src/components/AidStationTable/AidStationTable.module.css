@@ -322,6 +322,23 @@
   box-shadow: 0 0 8px rgba(76, 175, 80, 0.3);
 }
 
+/* Waypoint type badge */
+.waypointBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  border: 1px solid;
+  flex-shrink: 0;
+}
+
+.waypointIcon {
+  font-size: 0.875rem;
+  line-height: 1;
+}
+
 /* Calculated value display (when GPX course data is available) */
 .calculatedValue {
   display: inline-flex;

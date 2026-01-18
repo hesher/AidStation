@@ -63,7 +63,7 @@ export const raceVersions = pgTable('race_versions', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
-// Aid stations table
+// Aid stations / waypoints table
 export const aidStations = pgTable('aid_stations', {
   id: uuid('id').primaryKey().defaultRandom(),
   raceId: uuid('race_id').references(() => races.id).notNull(),
@@ -82,7 +82,17 @@ export const aidStations = pgTable('aid_stations', {
   latitude: real('latitude'),
   longitude: real('longitude'),
   terrainType: text('terrain_type').default('trail'), // road, gravel, single_track, technical, alpine, etc.
+  waypointType: text('waypoint_type').default('aid_station'), // aid_station, water_stop, view_point, toilet, milestone, peak, checkpoint, custom
   createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
+// Waypoint types lookup table
+export const waypointTypes = pgTable('waypoint_types', {
+  typeId: text('type_id').primaryKey(),
+  displayName: text('display_name').notNull(),
+  description: text('description'),
+  icon: text('icon'),
+  color: text('color'),
 });
 
 // Terrain factors lookup table

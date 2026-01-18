@@ -5,7 +5,7 @@
  */
 
 import OpenAI from 'openai';
-import { AIProvider, AISearchOptions, RaceSearchResult, AidStationInfo } from './types';
+import { AIProvider, AISearchOptions, RaceSearchResult, AidStationInfo, AIRaceUpdateOptions, RaceUpdateResult, WaypointUpdate } from './types';
 
 const RACE_SEARCH_SYSTEM_PROMPT = `You are an expert on ultra-marathon and endurance running races worldwide.
 When given a race name, you must provide detailed, accurate information about that race.
@@ -62,6 +62,63 @@ For elevation data:
 - Do NOT estimate based on location or race type
 
 The user will use this data for race planning - inaccurate data could be dangerous. When in doubt, use null.
+`;
+
+const RACE_UPDATE_SYSTEM_PROMPT = `You are an AI assistant that helps endurance athletes update and modify their race details.
+Your job is to interpret natural language instructions and generate structured updates to a race's waypoints and details.
+
+You must respond with valid JSON only, no other text. Use this exact structure:
+{
+  "success": true,
+  "message": "Brief description of what was done",
+  "waypointUpdates": [
+    {
+      "action": "add" | "update" | "remove",
+      "name": "Waypoint name",
+      "distanceKm": number or null,
+      "elevationM": number or null,
+      "waypointType": "aid_station" | "water_stop" | "view_point" | "toilet" | "milestone" | "peak" | "checkpoint" | "custom",
+      "latitude": number or null,
+      "longitude": number or null
+    }
+  ],
+  "raceFieldUpdates": {
+    "name": "string or omit if not changing",
+    "date": "YYYY-MM-DD or omit if not changing",
+    "distanceKm": number or omit if not changing,
+    ...etc
+  }
+}
+
+WAYPOINT TYPES:
+- "aid_station": Full aid station with supplies and support
+- "water_stop": Water-only station
+- "view_point": Scenic viewpoint or landmark
+- "toilet": Restroom or portable toilet
+- "milestone": Distance or progress marker (e.g., "5km", "10km")
+- "peak": Mountain peak or summit
+- "checkpoint": Timing checkpoint or control point
+- "custom": User-defined waypoint
+
+COMMON INSTRUCTIONS AND HOW TO HANDLE THEM:
+1. "Add a milestone every X km" - Create milestone waypoints at regular intervals (e.g., 5km, 10km, 15km...)
+2. "Add milestones at mountain peaks" - If course coordinates with elevation are provided, identify peaks (local maxima in elevation) and add peak waypoints
+3. "Add a water stop at X km" - Add a water_stop waypoint at the specified distance
+4. "Convert X to a view point" - Update the waypointType of an existing waypoint
+5. "Remove the checkpoint at X km" - Set action to "remove" for that waypoint
+
+IMPORTANT:
+- When adding milestones at intervals, use the race distance to determine how many to add
+- When adding milestones for peaks, look at the elevation data from course coordinates
+- Always provide meaningful names (e.g., "5km Marker", "Summit 1", "Ridge View")
+- If you can't fulfill the request (missing data, unclear instruction), set success to false and explain in the message
+- For elevation-based waypoints, try to find the elevation from the course coordinates if provided
+
+COURSE DATA:
+- If course coordinates are provided, use them to:
+  1. Calculate elevations at specific distances
+  2. Identify peaks (local maxima in elevation data)
+  3. Identify view points (points with significant elevation or landmarks)
 `;
 
 export class OpenAIProvider implements AIProvider {
@@ -169,6 +226,134 @@ ${options?.includeCourseData !== false ? 'Include approximate course coordinates
       result.overallCutoffHours = Number(result.overallCutoffHours);
       if (isNaN(result.overallCutoffHours)) result.overallCutoffHours = null;
     }
+
+    return result;
+  }
+
+  /**
+   * Interpret and process a natural language race update request
+   */
+  async updateRace(
+    instruction: string,
+    options: AIRaceUpdateOptions
+  ): Promise<RaceUpdateResult> {
+    if (!this.client) {
+      throw new Error('OpenAI client not configured. Please set OPENAI_API_KEY environment variable.');
+    }
+
+    // Build context for the AI
+    const contextParts: string[] = [];
+
+    if (options.raceDistanceKm) {
+      contextParts.push(`Race distance: ${options.raceDistanceKm} km`);
+    }
+
+    if (options.existingWaypoints && options.existingWaypoints.length > 0) {
+      contextParts.push('Existing waypoints:');
+      options.existingWaypoints.forEach((wp, i) => {
+        const parts = [
+          `  ${i + 1}. "${wp.name}"`,
+          wp.distanceKm !== null ? `at ${wp.distanceKm}km` : '',
+          wp.waypointType ? `(${wp.waypointType})` : '',
+          wp.elevationM !== null ? `elevation: ${wp.elevationM}m` : '',
+        ].filter(Boolean);
+        contextParts.push(parts.join(' '));
+      });
+    }
+
+    if (options.courseCoordinates && options.courseCoordinates.length > 0) {
+      contextParts.push(`Course has ${options.courseCoordinates.length} coordinate points with elevation data.`);
+
+      // Sample some elevation points to help identify peaks
+      const elevationSamples: string[] = [];
+      const step = Math.max(1, Math.floor(options.courseCoordinates.length / 20));
+      for (let i = 0; i < options.courseCoordinates.length; i += step) {
+        const coord = options.courseCoordinates[i];
+        if (coord.elevation !== undefined && coord.elevation !== null) {
+          const distanceEstimate = options.raceDistanceKm
+            ? ((i / options.courseCoordinates.length) * options.raceDistanceKm).toFixed(1)
+            : 'unknown';
+          elevationSamples.push(`  ~${distanceEstimate}km: ${coord.elevation}m`);
+        }
+      }
+      if (elevationSamples.length > 0) {
+        contextParts.push('Elevation profile samples:');
+        contextParts.push(...elevationSamples);
+      }
+    }
+
+    const userPrompt = `${contextParts.length > 0 ? contextParts.join('\n') + '\n\n' : ''}User instruction: "${instruction}"
+
+Please interpret this instruction and generate the appropriate waypoint updates.`;
+
+    try {
+      const response = await this.client.chat.completions.create({
+        model: this.model,
+        messages: [
+          { role: 'system', content: RACE_UPDATE_SYSTEM_PROMPT },
+          { role: 'user', content: userPrompt },
+        ],
+        temperature: 0.3,
+        max_tokens: 4000,
+        response_format: { type: 'json_object' },
+      });
+
+      const content = response.choices[0]?.message?.content;
+      if (!content) {
+        throw new Error('No response from OpenAI');
+      }
+
+      const parsed = JSON.parse(content) as RaceUpdateResult;
+
+      // Validate and clean the response
+      return this.validateAndCleanUpdateResult(parsed);
+    } catch (error) {
+      if (error instanceof SyntaxError) {
+        return {
+          success: false,
+          message: 'Failed to parse AI response',
+          waypointUpdates: [],
+        };
+      }
+      throw error;
+    }
+  }
+
+  private validateAndCleanUpdateResult(result: RaceUpdateResult): RaceUpdateResult {
+    // Ensure success is a boolean
+    result.success = !!result.success;
+
+    // Ensure message is a string
+    if (!result.message) {
+      result.message = result.success ? 'Updates generated successfully' : 'Failed to process instruction';
+    }
+
+    // Validate waypoint updates
+    if (!Array.isArray(result.waypointUpdates)) {
+      result.waypointUpdates = [];
+    }
+
+    result.waypointUpdates = result.waypointUpdates
+      .filter((wp): wp is WaypointUpdate => {
+        return wp && typeof wp.name === 'string' && wp.name.length > 0 &&
+          ['add', 'update', 'remove'].includes(wp.action);
+      })
+      .map(wp => ({
+        action: wp.action,
+        name: wp.name,
+        distanceKm: typeof wp.distanceKm === 'number' && !isNaN(wp.distanceKm) ? wp.distanceKm : null,
+        elevationM: typeof wp.elevationM === 'number' && !isNaN(wp.elevationM) ? wp.elevationM : null,
+        waypointType: wp.waypointType || 'milestone',
+        latitude: typeof wp.latitude === 'number' && !isNaN(wp.latitude) ? wp.latitude : null,
+        longitude: typeof wp.longitude === 'number' && !isNaN(wp.longitude) ? wp.longitude : null,
+      }))
+      // Sort by distance
+      .sort((a, b) => {
+        if (a.distanceKm === null && b.distanceKm === null) return 0;
+        if (a.distanceKm === null) return 1;
+        if (b.distanceKm === null) return -1;
+        return a.distanceKm - b.distanceKm;
+      });
 
     return result;
   }

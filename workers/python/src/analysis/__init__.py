@@ -19,6 +19,14 @@ from .performance_analyzer import (
     PerformanceProfile,
     SegmentMetrics,
 )
+from .terrain_segment_analyzer import (
+    GradeCategory,
+    TerrainSegment,
+    TerrainSegmentAnalysisResult,
+    TerrainSegmentAnalyzer,
+    TerrainType,
+    analyze_activity_terrain_segments,
+)
 
 __all__ = [
     "GPXCourseAnalyzer",
@@ -34,4 +42,10 @@ __all__ = [
     "FitTrackPoint",
     "parse_fit_content",
     "parse_fit_to_gpx",
+    "TerrainSegmentAnalyzer",
+    "TerrainSegment",
+    "TerrainSegmentAnalysisResult",
+    "TerrainType",
+    "GradeCategory",
+    "analyze_activity_terrain_segments",
 ]

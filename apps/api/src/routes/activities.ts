@@ -428,6 +428,108 @@ export async function activityRoutes(app: FastifyInstance) {
   });
 
   /**
+   * GET /api/activities/:id/terrain-segments
+   *
+   * Get terrain segment breakdown for an activity
+   * Breaks down the activity into climb/descent/flat sections with 5km blocks for flat/descent
+   */
+  app.get('/activities/:id/terrain-segments', async (
+    request: FastifyRequest<{ Params: { id: string } }>,
+    reply: FastifyReply
+  ): Promise<{
+    success: boolean;
+    data?: {
+      activityId: string;
+      totalDistanceKm: number;
+      totalElevationGainM: number;
+      totalElevationLossM: number;
+      totalTimeSeconds: number;
+      segments: Array<{
+        segmentIndex: number;
+        terrainType: string;
+        gradeCategory: string;
+        startDistanceKm: number;
+        endDistanceKm: number;
+        distanceKm: number;
+        elevationStartM: number;
+        elevationEndM: number;
+        elevationChangeM: number;
+        averageGradePercent: number;
+        timeSeconds: number;
+        paceMinKm: number;
+        gradeAdjustedPaceMinKm: number;
+      }>;
+      summary: {
+        climb: {
+          totalDistanceKm: number;
+          totalTimeSeconds: number;
+          totalElevationM: number;
+          averagePaceMinKm: number;
+          segmentCount: number;
+        };
+        descent: {
+          totalDistanceKm: number;
+          totalTimeSeconds: number;
+          totalElevationM: number;
+          averagePaceMinKm: number;
+          segmentCount: number;
+        };
+        flat: {
+          totalDistanceKm: number;
+          totalTimeSeconds: number;
+          averagePaceMinKm: number;
+          segmentCount: number;
+        };
+        totalSegments: number;
+      };
+    };
+    error?: string;
+  }> => {
+    try {
+      const { id } = request.params;
+
+      const activity = await getActivityById(id);
+
+      if (!activity) {
+        reply.status(404);
+        return {
+          success: false,
+          error: 'Activity not found',
+        };
+      }
+
+      if (!activity.gpxContent) {
+        reply.status(404);
+        return {
+          success: false,
+          error: 'No GPX data available for this activity',
+        };
+      }
+
+      // Parse and analyze terrain segments from GPX
+      const segments = parseTerrainSegments(activity.gpxContent, id);
+
+      logSuccess(app, 'Activity terrain segments retrieved', { activityId: id, segmentCount: segments.segments.length });
+
+      return {
+        success: true,
+        data: segments,
+      };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+
+      logFailure(app, 'Get activity terrain segments', errorMessage, { id: request.params.id });
+
+      reply.status(500);
+
+      return {
+        success: false,
+        error: errorMessage,
+      };
+    }
+  });
+
+  /**
    * GET /api/activities/:id/coordinates
    *
    * Get the coordinates for an activity (parsed from GPX)
@@ -1086,6 +1188,445 @@ function parseGpxBasicInfo(gpxContent: string): {
   } catch {
     return {};
   }
+}
+
+/**
+ * Terrain segment types
+ */
+interface TerrainSegmentData {
+  activityId: string;
+  totalDistanceKm: number;
+  totalElevationGainM: number;
+  totalElevationLossM: number;
+  totalTimeSeconds: number;
+  segments: Array<{
+    segmentIndex: number;
+    terrainType: string;
+    gradeCategory: string;
+    startDistanceKm: number;
+    endDistanceKm: number;
+    distanceKm: number;
+    elevationStartM: number;
+    elevationEndM: number;
+    elevationChangeM: number;
+    averageGradePercent: number;
+    timeSeconds: number;
+    paceMinKm: number;
+    gradeAdjustedPaceMinKm: number;
+  }>;
+  summary: {
+    climb: {
+      totalDistanceKm: number;
+      totalTimeSeconds: number;
+      totalElevationM: number;
+      averagePaceMinKm: number;
+      segmentCount: number;
+    };
+    descent: {
+      totalDistanceKm: number;
+      totalTimeSeconds: number;
+      totalElevationM: number;
+      averagePaceMinKm: number;
+      segmentCount: number;
+    };
+    flat: {
+      totalDistanceKm: number;
+      totalTimeSeconds: number;
+      averagePaceMinKm: number;
+      segmentCount: number;
+    };
+    totalSegments: number;
+  };
+}
+
+/**
+ * Parse terrain segments from GPX content.
+ * Breaks down activity into climb/descent/flat sections with 5km blocks for flat/descent.
+ */
+function parseTerrainSegments(gpxContent: string, activityId: string): TerrainSegmentData {
+  // Parse coordinates with elevation and time
+  const points = parseGpxPointsWithTime(gpxContent);
+
+  if (points.length < 10) {
+    throw new Error('Not enough GPS points for terrain analysis');
+  }
+
+  // Configuration
+  const CLIMB_THRESHOLD = 3.0; // >= 3% grade is a climb
+  const DESCENT_THRESHOLD = -3.0; // <= -3% grade is a descent
+  const MAX_SEGMENT_LENGTH_KM = 5.0; // Split flat/descent into 5km blocks
+  const MIN_SEGMENT_LENGTH_KM = 0.3; // Minimum segment to avoid fragments
+  const WINDOW_SIZE_M = 200; // Window for detecting terrain type
+
+  // Calculate cumulative distance and smoothed elevation
+  let cumulativeDistance = 0;
+  const processedPoints: Array<{
+    lat: number;
+    lon: number;
+    elevation: number;
+    time: Date | null;
+    distanceM: number;
+  }> = [];
+
+  for (let i = 0; i < points.length; i++) {
+    if (i > 0) {
+      cumulativeDistance += haversineDistance(
+        points[i - 1].lat,
+        points[i - 1].lon,
+        points[i].lat,
+        points[i].lon
+      );
+    }
+
+    processedPoints.push({
+      ...points[i],
+      distanceM: cumulativeDistance,
+    });
+  }
+
+  // Apply Kalman smoothing to elevation
+  const elevations = processedPoints.map(p => p.elevation);
+  const smoothedElevations = kalmanSmoothElevation(elevations);
+  processedPoints.forEach((p, i) => {
+    p.elevation = smoothedElevations[i];
+  });
+
+  const totalDistance = processedPoints[processedPoints.length - 1].distanceM;
+
+  // Detect terrain changes
+  type TerrainType = 'climb' | 'descent' | 'flat';
+  interface RawSegment {
+    startIdx: number;
+    endIdx: number;
+    terrainType: TerrainType;
+  }
+
+  function getTerrainType(gradePercent: number): TerrainType {
+    if (gradePercent >= CLIMB_THRESHOLD) return 'climb';
+    if (gradePercent <= DESCENT_THRESHOLD) return 'descent';
+    return 'flat';
+  }
+
+  function getGradeCategory(gradePercent: number): string {
+    if (gradePercent > 8) return 'steep_climb';
+    if (gradePercent > 5) return 'moderate_climb';
+    if (gradePercent >= 3) return 'gentle_climb';
+    if (gradePercent > -3) return 'flat';
+    if (gradePercent > -5) return 'gentle_descent';
+    if (gradePercent > -8) return 'moderate_descent';
+    return 'steep_descent';
+  }
+
+  function findPointAtDistance(targetM: number): number {
+    for (let i = 0; i < processedPoints.length; i++) {
+      if (processedPoints[i].distanceM >= targetM) return i;
+    }
+    return processedPoints.length - 1;
+  }
+
+  // Detect terrain changes using sliding window
+  const rawSegments: RawSegment[] = [];
+  let currentStartIdx = 0;
+  let currentTerrain: TerrainType | null = null;
+  let currentDistanceM = 0;
+
+  while (currentDistanceM < totalDistance) {
+    const windowEnd = Math.min(currentDistanceM + WINDOW_SIZE_M, totalDistance);
+    const startIdx = findPointAtDistance(currentDistanceM);
+    const endIdx = findPointAtDistance(windowEnd);
+
+    if (startIdx >= endIdx) {
+      currentDistanceM += WINDOW_SIZE_M;
+      continue;
+    }
+
+    const startPoint = processedPoints[startIdx];
+    const endPoint = processedPoints[endIdx];
+    const segDistanceM = endPoint.distanceM - startPoint.distanceM;
+
+    if (segDistanceM <= 0) {
+      currentDistanceM += WINDOW_SIZE_M;
+      continue;
+    }
+
+    const elevChange = endPoint.elevation - startPoint.elevation;
+    const gradePercent = (elevChange / segDistanceM) * 100;
+    const newTerrain = getTerrainType(gradePercent);
+
+    if (currentTerrain === null) {
+      currentTerrain = newTerrain;
+      currentStartIdx = startIdx;
+    } else if (newTerrain !== currentTerrain) {
+      rawSegments.push({
+        startIdx: currentStartIdx,
+        endIdx: startIdx,
+        terrainType: currentTerrain,
+      });
+      currentTerrain = newTerrain;
+      currentStartIdx = startIdx;
+    }
+
+    currentDistanceM += WINDOW_SIZE_M;
+  }
+
+  // Add final segment
+  if (currentTerrain !== null && currentStartIdx < processedPoints.length - 1) {
+    rawSegments.push({
+      startIdx: currentStartIdx,
+      endIdx: processedPoints.length - 1,
+      terrainType: currentTerrain,
+    });
+  }
+
+  // Merge short segments
+  const mergedSegments: RawSegment[] = [];
+  for (let i = 0; i < rawSegments.length; i++) {
+    const seg = rawSegments[i];
+    const startDist = processedPoints[seg.startIdx].distanceM;
+    const endDist = processedPoints[seg.endIdx].distanceM;
+    const lengthKm = (endDist - startDist) / 1000;
+
+    if (lengthKm < MIN_SEGMENT_LENGTH_KM && i + 1 < rawSegments.length) {
+      rawSegments[i + 1].startIdx = seg.startIdx;
+    } else if (lengthKm < MIN_SEGMENT_LENGTH_KM && mergedSegments.length > 0) {
+      mergedSegments[mergedSegments.length - 1].endIdx = seg.endIdx;
+    } else {
+      mergedSegments.push(seg);
+    }
+  }
+
+  // Split long flat/descent segments into 5km blocks
+  const finalSegments: RawSegment[] = [];
+  for (const seg of mergedSegments) {
+    const startDistM = processedPoints[seg.startIdx].distanceM;
+    const endDistM = processedPoints[seg.endIdx].distanceM;
+    const lengthKm = (endDistM - startDistM) / 1000;
+
+    if (seg.terrainType === 'climb' || lengthKm <= MAX_SEGMENT_LENGTH_KM) {
+      finalSegments.push(seg);
+    } else {
+      // Split into 5km blocks
+      let blockStartIdx = seg.startIdx;
+      let blockStartM = startDistM;
+
+      while (blockStartM < endDistM) {
+        const blockEndM = Math.min(blockStartM + MAX_SEGMENT_LENGTH_KM * 1000, endDistM);
+        const blockEndIdx = findPointAtDistance(blockEndM);
+
+        finalSegments.push({
+          startIdx: blockStartIdx,
+          endIdx: blockEndIdx,
+          terrainType: seg.terrainType,
+        });
+
+        blockStartIdx = blockEndIdx;
+        blockStartM = blockEndM;
+      }
+    }
+  }
+
+  // Calculate Minetti cost for GAP
+  function calculateMinettiCost(gradient: number): number {
+    const i = gradient;
+    return 155.4 * Math.pow(i, 5) - 30.4 * Math.pow(i, 4) - 43.3 * Math.pow(i, 3) + 46.3 * Math.pow(i, 2) + 19.5 * i + 3.6;
+  }
+
+  // Build final segment data
+  const segments: TerrainSegmentData['segments'] = [];
+  let totalElevGain = 0;
+  let totalElevLoss = 0;
+  let totalTime = 0;
+
+  const climbStats = { distanceKm: 0, timeSeconds: 0, elevationM: 0 };
+  const descentStats = { distanceKm: 0, timeSeconds: 0, elevationM: 0 };
+  const flatStats = { distanceKm: 0, timeSeconds: 0 };
+
+  for (let idx = 0; idx < finalSegments.length; idx++) {
+    const seg = finalSegments[idx];
+    const startPoint = processedPoints[seg.startIdx];
+    const endPoint = processedPoints[seg.endIdx];
+
+    const distanceM = endPoint.distanceM - startPoint.distanceM;
+    if (distanceM <= 0) continue;
+
+    const distanceKm = distanceM / 1000;
+    const elevChange = endPoint.elevation - startPoint.elevation;
+    const gradePercent = (elevChange / distanceM) * 100;
+
+    // Time calculation
+    let timeSeconds = 0;
+    if (startPoint.time && endPoint.time) {
+      timeSeconds = (endPoint.time.getTime() - startPoint.time.getTime()) / 1000;
+    }
+
+    // Pace calculation
+    let paceMinKm = 0;
+    if (timeSeconds > 0 && distanceKm > 0) {
+      paceMinKm = (timeSeconds / 60) / distanceKm;
+    }
+
+    // GAP calculation
+    const gradient = gradePercent / 100;
+    const flatCost = 3.6;
+    const actualCost = calculateMinettiCost(gradient);
+    const costRatio = actualCost / flatCost;
+    const gap = costRatio > 0 ? paceMinKm / costRatio : paceMinKm;
+
+    // Track stats
+    if (elevChange > 0) totalElevGain += elevChange;
+    else totalElevLoss += Math.abs(elevChange);
+    totalTime += timeSeconds;
+
+    if (seg.terrainType === 'climb') {
+      climbStats.distanceKm += distanceKm;
+      climbStats.timeSeconds += timeSeconds;
+      climbStats.elevationM += elevChange;
+    } else if (seg.terrainType === 'descent') {
+      descentStats.distanceKm += distanceKm;
+      descentStats.timeSeconds += timeSeconds;
+      descentStats.elevationM += Math.abs(elevChange);
+    } else {
+      flatStats.distanceKm += distanceKm;
+      flatStats.timeSeconds += timeSeconds;
+    }
+
+    segments.push({
+      segmentIndex: idx,
+      terrainType: seg.terrainType,
+      gradeCategory: getGradeCategory(gradePercent),
+      startDistanceKm: Math.round((startPoint.distanceM / 1000) * 100) / 100,
+      endDistanceKm: Math.round((endPoint.distanceM / 1000) * 100) / 100,
+      distanceKm: Math.round(distanceKm * 100) / 100,
+      elevationStartM: Math.round(startPoint.elevation),
+      elevationEndM: Math.round(endPoint.elevation),
+      elevationChangeM: Math.round(elevChange),
+      averageGradePercent: Math.round(gradePercent * 10) / 10,
+      timeSeconds: Math.round(timeSeconds),
+      paceMinKm: Math.round(paceMinKm * 100) / 100,
+      gradeAdjustedPaceMinKm: Math.round(gap * 100) / 100,
+    });
+  }
+
+  const climbCount = segments.filter(s => s.terrainType === 'climb').length;
+  const descentCount = segments.filter(s => s.terrainType === 'descent').length;
+  const flatCount = segments.filter(s => s.terrainType === 'flat').length;
+
+  return {
+    activityId,
+    totalDistanceKm: Math.round((totalDistance / 1000) * 100) / 100,
+    totalElevationGainM: Math.round(totalElevGain),
+    totalElevationLossM: Math.round(totalElevLoss),
+    totalTimeSeconds: Math.round(totalTime),
+    segments,
+    summary: {
+      climb: {
+        totalDistanceKm: Math.round(climbStats.distanceKm * 100) / 100,
+        totalTimeSeconds: Math.round(climbStats.timeSeconds),
+        totalElevationM: Math.round(climbStats.elevationM),
+        averagePaceMinKm: climbStats.distanceKm > 0
+          ? Math.round(((climbStats.timeSeconds / 60) / climbStats.distanceKm) * 100) / 100
+          : 0,
+        segmentCount: climbCount,
+      },
+      descent: {
+        totalDistanceKm: Math.round(descentStats.distanceKm * 100) / 100,
+        totalTimeSeconds: Math.round(descentStats.timeSeconds),
+        totalElevationM: Math.round(descentStats.elevationM),
+        averagePaceMinKm: descentStats.distanceKm > 0
+          ? Math.round(((descentStats.timeSeconds / 60) / descentStats.distanceKm) * 100) / 100
+          : 0,
+        segmentCount: descentCount,
+      },
+      flat: {
+        totalDistanceKm: Math.round(flatStats.distanceKm * 100) / 100,
+        totalTimeSeconds: Math.round(flatStats.timeSeconds),
+        averagePaceMinKm: flatStats.distanceKm > 0
+          ? Math.round(((flatStats.timeSeconds / 60) / flatStats.distanceKm) * 100) / 100
+          : 0,
+        segmentCount: flatCount,
+      },
+      totalSegments: segments.length,
+    },
+  };
+}
+
+/**
+ * Parse GPX points including time data
+ */
+function parseGpxPointsWithTime(gpxContent: string): Array<{
+  lat: number;
+  lon: number;
+  elevation: number;
+  time: Date | null;
+}> {
+  const points: Array<{ lat: number; lon: number; elevation: number; time: Date | null }> = [];
+
+  const trkptRegex = /<trkpt\s+lat="([^"]+)"\s+lon="([^"]+)"[^>]*>([^]*?)<\/trkpt>/g;
+  let match;
+
+  while ((match = trkptRegex.exec(gpxContent)) !== null) {
+    const lat = parseFloat(match[1]);
+    const lon = parseFloat(match[2]);
+    const content = match[3];
+
+    const eleMatch = content.match(/<ele>([^<]+)<\/ele>/);
+    const elevation = eleMatch ? parseFloat(eleMatch[1]) : 0;
+
+    const timeMatch = content.match(/<time>([^<]+)<\/time>/);
+    const time = timeMatch ? new Date(timeMatch[1]) : null;
+
+    if (!isNaN(lat) && !isNaN(lon)) {
+      points.push({ lat, lon, elevation, time });
+    }
+  }
+
+  return points;
+}
+
+/**
+ * Calculate Haversine distance between two points (meters)
+ */
+function haversineDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371000; // Earth radius in meters
+  const toRad = (deg: number) => (deg * Math.PI) / 180;
+
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.asin(Math.min(1, Math.sqrt(a)));
+
+  return R * c;
+}
+
+/**
+ * Apply Kalman filtering to smooth elevation data
+ */
+function kalmanSmoothElevation(elevations: number[]): number[] {
+  const n = elevations.length;
+  if (n < 2) return elevations;
+
+  const R = 10.0; // Measurement noise
+  const Q = 0.1; // Process noise
+
+  let x = elevations[0];
+  let P = 1.0;
+
+  const smoothed = [x];
+
+  for (let i = 1; i < n; i++) {
+    const xPred = x;
+    const PPred = P + Q;
+
+    const K = PPred / (PPred + R);
+    x = xPred + K * (elevations[i] - xPred);
+    P = (1 - K) * PPred;
+
+    smoothed.push(x);
+  }
+
+  return smoothed;
 }
 
 /**

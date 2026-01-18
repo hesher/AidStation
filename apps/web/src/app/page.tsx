@@ -7,6 +7,7 @@ import { RaceCard } from '@/components/RaceCard';
 import { AidStationTable } from '@/components/AidStationTable';
 import { RaceBrowser } from '@/components/RaceBrowser';
 import { RaceSettingsPanel } from '@/components/RaceSettingsPanel';
+import { AIUpdatePanel } from '@/components/AIUpdatePanel';
 import { Skeleton, SkeletonMap } from '@/components/Skeleton';
 import { searchRace, getCurrentRace, saveRace, updateRace, analyzeGpx } from '@/lib/api';
 import { RaceData, AidStation } from '@/lib/types';
@@ -558,6 +559,19 @@ export default function Home() {
                 coordinates={raceData.courseCoordinates}
                 aidStations={raceData.aidStations}
                 onAidStationClick={handleAidStationClick}
+              />
+            </section>
+          )}
+
+          {/* AI Update Panel - for AI-powered race modifications */}
+          {raceData.id && (
+            <section className={styles.section}>
+              <AIUpdatePanel
+                raceId={raceData.id}
+                onUpdateComplete={(updatedAidStations) => {
+                  setRaceData({ ...raceData, aidStations: updatedAidStations });
+                  setHasUnsavedChanges(true);
+                }}
               />
             </section>
           )}
