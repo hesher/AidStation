@@ -574,7 +574,7 @@ This is a non-negotiable requirement to ensure:
 
 ### Urgent Fixes
 
-
+- [ ] **Flat Pace calculation is incorrect**: The Performance Summary shows a "Flat Pace" of 13:18 /km, but all uploaded activities have faster average paces (11:26, 12:49, 8:17 /km). This is illogical—flat pace should represent running on flat terrain, which should be faster than overall race averages that include climbing sections. The flat pace calculation algorithm needs to be reviewed and fixed.
 
 ### Fast Follows
 
