@@ -17,6 +17,7 @@ export interface AidStationInfo {
   waypointType?: string | null; // aid_station, water_stop, view_point, toilet, milestone, peak, checkpoint, custom
   latitude?: number | null;
   longitude?: number | null;
+  servicesDescription?: string | null; // Brief description of services (food, drinks, medical, etc.)
 }
 
 export interface RaceSearchResult {
@@ -54,6 +55,11 @@ export interface WaypointUpdate {
   waypointType?: string | null;
   latitude?: number | null;
   longitude?: number | null;
+  cutoffTime?: string | null; // Time of day in HH:MM format
+  cutoffHoursFromStart?: number | null; // Hours from race start
+  hasDropBag?: boolean | null;
+  hasCrew?: boolean | null;
+  hasPacer?: boolean | null;
 }
 
 /**

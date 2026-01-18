@@ -93,7 +93,7 @@ docker-compose up -d postgres redis
 echo -e "  ${GREEN}✓ PostgreSQL and Redis containers started${NC}"
 
 # Wait for services to be ready
-wait_for_service localhost 5432 "PostgreSQL"
+wait_for_service localhost 5433 "PostgreSQL"
 wait_for_service localhost 6379 "Redis"
 
 # Run database migrations

@@ -5,6 +5,8 @@ Tests for user activity analysis and performance profile generation.
 """
 
 import pytest
+
+# Import directly from the module to avoid celery dependency in __init__.py
 from src.analysis.performance_analyzer import (
     ActivityAnalysisResult,
     ActivityPerformanceAnalyzer,
@@ -89,7 +91,7 @@ class TestGradientCategory:
         assert GradientCategory.STEEP_DOWNHILL.value == "steep_downhill"
 
     def test_flat_category(self):
-        """Flat terrain should be -1% to 1%"""
+        """Flat terrain should be -3% to 3%"""
         assert GradientCategory.FLAT.value == "flat"
 
     def test_steep_uphill(self):

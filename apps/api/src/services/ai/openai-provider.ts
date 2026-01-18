@@ -7,8 +7,8 @@
 import OpenAI from 'openai';
 import { AIProvider, AISearchOptions, RaceSearchResult, AidStationInfo, AIRaceUpdateOptions, RaceUpdateResult, WaypointUpdate } from './types';
 
-const RACE_SEARCH_SYSTEM_PROMPT = `You are an expert on ultra-marathon and endurance running races worldwide.
-When given a race name, you must provide detailed, accurate information about that race.
+const RACE_SEARCH_SYSTEM_PROMPT = `You are an expert on ultra-marathon and endurance running races worldwide with extensive knowledge of race courses, aid stations, and cutoff times.
+When given a race name, you must search your knowledge for detailed, accurate information about that race.
 
 CRITICAL: ONLY PROVIDE INFORMATION YOU ARE CERTAIN ABOUT. DO NOT MAKE UP OR FABRICATE DATA.
 
@@ -27,14 +27,15 @@ You must respond with valid JSON only, no other text. Use this exact structure:
   "websiteUrl": "Official race website URL" or null,
   "aidStations": [
     {
-      "name": "Station name",
+      "name": "Station name (e.g., location name or checkpoint name)",
       "distanceKm": number (distance from start) or null if unknown,
       "elevationM": number (elevation in meters) or null if unknown,
       "hasDropBag": boolean or null if unknown,
       "hasCrew": boolean or null if unknown,
       "hasPacer": boolean or null if unknown,
-      "cutoffTime": "HH:MM" or null,
-      "cutoffHoursFromStart": number or null
+      "cutoffTime": "HH:MM" (time of day when cutoff occurs, 24-hour format) or null,
+      "cutoffHoursFromStart": number (hours from race start when cutoff occurs) or null,
+      "servicesDescription": "Brief description of services available (food, drinks, medical, etc.)" or null
     }
   ],
   "courseCoordinates": [
@@ -49,6 +50,22 @@ STRICT GUIDELINES - YOU MUST FOLLOW THESE:
 4. NEVER FABRICATE ELEVATION DATA: If you don't know the actual elevation gain/loss or aid station elevations, use null.
 5. NEVER GUESS COORDINATES: Only provide courseCoordinates if you know the actual GPS coordinates. An empty array is acceptable.
 6. ACCURACY OVER COMPLETENESS: It is far better to return null values than to provide inaccurate data.
+
+AID STATION PRIORITIES - VERY IMPORTANT:
+Aid stations are critical for race planning. When you have knowledge about a race, prioritize finding:
+1. Official checkpoint/aid station names and locations
+2. Distances from the race start (in km)
+3. Cutoff times - both as hours from start (cutoffHoursFromStart) AND time of day if start time is known
+4. Services at each station (drop bags, crew access, pacer pickup points)
+5. Elevation of each station if known
+
+Well-known races (e.g., UTMB, Western States, Comrades, Leadville) have published aid station information - use your knowledge of these races.
+
+CUTOFF TIME GUIDANCE:
+- cutoffTime should be in 24-hour format (e.g., "14:30" for 2:30 PM)
+- cutoffHoursFromStart is the elapsed time from race start (e.g., 12.5 for 12 hours 30 minutes)
+- If only one is known, provide that one and leave the other null
+- Many races publish progressive cutoff times - include them if known
 
 For aid stations:
 - Only include stations you are confident exist in the race
@@ -79,7 +96,12 @@ You must respond with valid JSON only, no other text. Use this exact structure:
       "elevationM": number or null,
       "waypointType": "aid_station" | "water_stop" | "view_point" | "toilet" | "milestone" | "peak" | "checkpoint" | "custom",
       "latitude": number or null,
-      "longitude": number or null
+      "longitude": number or null,
+      "cutoffTime": "HH:MM" (24-hour format, time of day) or null,
+      "cutoffHoursFromStart": number (hours from race start, e.g., 7 for 7 hours, 12.5 for 12h30m) or null,
+      "hasDropBag": boolean or null,
+      "hasCrew": boolean or null,
+      "hasPacer": boolean or null
     }
   ],
   "raceFieldUpdates": {
@@ -100,19 +122,33 @@ WAYPOINT TYPES:
 - "checkpoint": Timing checkpoint or control point
 - "custom": User-defined waypoint
 
+CUTOFF TIME HANDLING - VERY IMPORTANT:
+When the user specifies a cutoff time, you MUST include it in the response:
+- "cutoff of 7 hours" → cutoffHoursFromStart: 7
+- "cutoff at 12:30" → cutoffTime: "12:30"
+- "7 hour cutoff" → cutoffHoursFromStart: 7
+- "cutoff 10h30m" → cutoffHoursFromStart: 10.5
+- Always extract and include any cutoff time mentioned by the user
+
 COMMON INSTRUCTIONS AND HOW TO HANDLE THEM:
 1. "Add a milestone every X km" - Create milestone waypoints at regular intervals (e.g., 5km, 10km, 15km...)
-2. "Add milestones at mountain peaks" - If course coordinates with elevation are provided, identify peaks (local maxima in elevation) and add peak waypoints
+2. "Add a milestone on every mountain peak" - If course coordinates with elevation are provided, identify peaks (local maxima in elevation) and add peak waypoints
 3. "Add a water stop at X km" - Add a water_stop waypoint at the specified distance
 4. "Convert X to a view point" - Update the waypointType of an existing waypoint
 5. "Remove the checkpoint at X km" - Set action to "remove" for that waypoint
+6. "Add an aid station at mile X with cutoff of Y hours" - Convert miles to km (1 mile = 1.60934 km), add aid_station with cutoffHoursFromStart set to Y
+
+DISTANCE CONVERSION:
+- If the user specifies distance in miles, convert to kilometers: miles × 1.60934 = km
+- Example: "mile 50" = 50 × 1.60934 = 80.467 km
 
 IMPORTANT:
 - When adding milestones at intervals, use the race distance to determine how many to add
 - When adding milestones for peaks, look at the elevation data from course coordinates
-- Always provide meaningful names (e.g., "5km Marker", "Summit 1", "Ridge View")
+- Always provide meaningful names (e.g., "5km Marker", "Summit 1", "Ridge View", "Aid Station at Mile 50")
 - If you can't fulfill the request (missing data, unclear instruction), set success to false and explain in the message
 - For elevation-based waypoints, try to find the elevation from the course coordinates if provided
+- ALWAYS include cutoff information when the user mentions cutoffs
 
 COURSE DATA:
 - If course coordinates are provided, use them to:
@@ -346,6 +382,13 @@ Please interpret this instruction and generate the appropriate waypoint updates.
         waypointType: wp.waypointType || 'milestone',
         latitude: typeof wp.latitude === 'number' && !isNaN(wp.latitude) ? wp.latitude : null,
         longitude: typeof wp.longitude === 'number' && !isNaN(wp.longitude) ? wp.longitude : null,
+        // Include cutoff fields
+        cutoffTime: typeof wp.cutoffTime === 'string' && wp.cutoffTime.length > 0 ? wp.cutoffTime : null,
+        cutoffHoursFromStart: typeof wp.cutoffHoursFromStart === 'number' && !isNaN(wp.cutoffHoursFromStart) ? wp.cutoffHoursFromStart : null,
+        // Include service fields
+        hasDropBag: typeof wp.hasDropBag === 'boolean' ? wp.hasDropBag : null,
+        hasCrew: typeof wp.hasCrew === 'boolean' ? wp.hasCrew : null,
+        hasPacer: typeof wp.hasPacer === 'boolean' ? wp.hasPacer : null,
       }))
       // Sort by distance
       .sort((a, b) => {

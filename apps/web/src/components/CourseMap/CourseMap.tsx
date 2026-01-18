@@ -8,7 +8,7 @@
 
 import React, { useEffect, useRef, useState, memo } from 'react';
 import mapboxgl from 'mapbox-gl';
-import { CourseCoordinate, AidStation } from '@/lib/types';
+import { CourseCoordinate, AidStation, WaypointType } from '@/lib/types';
 import styles from './CourseMap.module.css';
 import 'mapbox-gl/dist/mapbox-gl.css';
 
@@ -28,6 +28,16 @@ const MAX_COORDINATE_POINTS = 1000;
 
 // Default terrain exaggeration factor
 const DEFAULT_TERRAIN_EXAGGERATION = 1.5;
+
+// Waypoint type configuration for markers
+const WAYPOINT_MARKER_CONFIG: Record<WaypointType, { color: string; icon: string; label: string }> = {
+  aid_station: { color: '#22c55e', icon: '🏕️', label: 'Aid Station' },
+  water_stop: { color: '#3b82f6', icon: '💧', label: 'Water Stop' },
+  viewpoint: { color: '#a855f7', icon: '👀', label: 'Viewpoint' },
+  toilet: { color: '#64748b', icon: '🚻', label: 'Toilet' },
+  milestone: { color: '#f59e0b', icon: '📍', label: 'Milestone' },
+  custom: { color: '#ec4899', icon: '⭐', label: 'Custom' },
+};
 
 /**
  * Simplify coordinates array to reduce rendering load
@@ -271,20 +281,27 @@ function CourseMapComponent({
         }
 
       if (stationCoord && map.current) {
-        // Create custom marker element
+        // Get marker config based on waypoint type
+        const waypointType = station.waypointType || 'aid_station';
+        const markerConfig = WAYPOINT_MARKER_CONFIG[waypointType] || WAYPOINT_MARKER_CONFIG.aid_station;
+        
+        // Create custom marker element with waypoint-specific styling
         const el = document.createElement('div');
         el.className = styles.aidStationMarker;
+        el.style.backgroundColor = markerConfig.color;
         el.innerHTML = `<span class="${styles.aidStationNumber}">${index + 1}</span>`;
-        el.title = station.name;
+        el.title = `${station.name} (${markerConfig.label})`;
 
         const popup = new mapboxgl.Popup({ offset: 25 }).setHTML(`
           <div class="${styles.popupContent}">
-            <strong>${station.name}</strong><br/>
+            <strong>${markerConfig.icon} ${station.name}</strong><br/>
+            <span style="color: ${markerConfig.color}; font-weight: 500;">${markerConfig.label}</span><br/>
             📍 ${station.distanceKm?.toFixed(1) ?? '--'} km<br/>
             ⬆️ ${station.elevationM ? Math.round(station.elevationM) + ' m' : '--'}
             ${station.hasDropBag ? '<br/>🎒 Drop Bag' : ''}
             ${station.hasCrew ? '<br/>👥 Crew Access' : ''}
             ${station.hasPacer ? '<br/>🏃 Pacer Pickup' : ''}
+            ${station.cutoffHoursFromStart ? `<br/>⏱️ Cutoff: ${station.cutoffHoursFromStart}h` : ''}
           </div>
         `);
 
@@ -345,6 +362,16 @@ function CourseMapComponent({
     }
   };
 
+  // Calculate unique waypoint types present in aid stations for legend
+  const uniqueWaypointTypes = React.useMemo(() => {
+    if (!aidStations) return [];
+    const types = new Set<WaypointType>();
+    aidStations.forEach(station => {
+      types.add(station.waypointType || 'aid_station');
+    });
+    return Array.from(types);
+  }, [aidStations]);
+
   if (mapError) {
     return (
       <div className={styles.container} data-testid="course-map">
@@ -377,10 +404,15 @@ function CourseMapComponent({
           <span className={styles.legendMarker} style={{ backgroundColor: '#F44336' }} />
           Finish
         </span>
-        <span className={styles.legendItem}>
-          <span className={styles.legendMarker} style={{ backgroundColor: '#4CAF50' }} />
-          Aid Station
-        </span>
+        {uniqueWaypointTypes.map(type => {
+          const config = WAYPOINT_MARKER_CONFIG[type];
+          return (
+            <span key={type} className={styles.legendItem}>
+              <span className={styles.legendMarker} style={{ backgroundColor: config.color }} />
+              {config.label}
+            </span>
+          );
+        })}
       </div>
     </div>
   );
@@ -418,10 +450,15 @@ export const CourseMap = memo(CourseMapComponent, (prevProps, nextProps) => {
     if (prevStations.length !== nextStations.length) {
       return false;
     }
-    // Check if any station's distance changed (affects marker position)
+    // Check if any station's key properties changed
     for (let i = 0; i < prevStations.length; i++) {
       if (prevStations[i].distanceKm !== nextStations[i].distanceKm ||
-          prevStations[i].name !== nextStations[i].name) {
+          prevStations[i].name !== nextStations[i].name ||
+          prevStations[i].waypointType !== nextStations[i].waypointType ||
+          prevStations[i].cutoffHoursFromStart !== nextStations[i].cutoffHoursFromStart ||
+          prevStations[i].hasDropBag !== nextStations[i].hasDropBag ||
+          prevStations[i].hasCrew !== nextStations[i].hasCrew ||
+          prevStations[i].hasPacer !== nextStations[i].hasPacer) {
         return false;
       }
     }

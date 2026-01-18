@@ -4,13 +4,7 @@ Analysis Module
 Provides GPX/FIT course and activity analysis.
 """
 
-from .fit_parser import (
-    FitActivityData,
-    FitTrackPoint,
-    parse_fit_content,
-    parse_fit_to_gpx,
-)
-from .gpx_analyzer import AidStationAnalysis, CoursePoint, GPXCourseAnalyzer
+# Import performance_analyzer first (no external dependencies except gpxpy)
 from .performance_analyzer import (
     ActivityAnalysisResult,
     ActivityPerformanceAnalyzer,
@@ -19,6 +13,8 @@ from .performance_analyzer import (
     PerformanceProfile,
     SegmentMetrics,
 )
+
+from .gpx_analyzer import AidStationAnalysis, CoursePoint, GPXCourseAnalyzer
 from .terrain_segment_analyzer import (
     analyze_activity_terrain_segments,
     GradeCategory,
@@ -27,6 +23,22 @@ from .terrain_segment_analyzer import (
     TerrainSegmentAnalyzer,
     TerrainType,
 )
+
+# FIT parser is optional (requires fitparse library)
+try:
+    from .fit_parser import (
+        FitActivityData,
+        FitTrackPoint,
+        parse_fit_content,
+        parse_fit_to_gpx,
+    )
+    _FIT_AVAILABLE = True
+except ImportError:
+    FitActivityData = None
+    FitTrackPoint = None
+    parse_fit_content = None
+    parse_fit_to_gpx = None
+    _FIT_AVAILABLE = False
 
 __all__ = [
     "GPXCourseAnalyzer",

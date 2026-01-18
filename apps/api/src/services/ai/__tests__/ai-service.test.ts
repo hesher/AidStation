@@ -18,7 +18,7 @@ vi.mock('openai', () => {
     default: class MockOpenAI {
       chat = {
         completions: {
-          create: mockCreate,
+          create: (...args: unknown[]) => mockCreate(...args),
         },
       };
     },

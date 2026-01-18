@@ -17,14 +17,14 @@ import gpxpy
 
 
 class GradientCategory(Enum):
-    """Gradient categories for pace analysis"""
+    """Categories for terrain gradient"""
 
     STEEP_DOWNHILL = "steep_downhill"  # < -8%
-    DOWNHILL = "downhill"  # -8% to -3%
-    GENTLE_DOWNHILL = "gentle_downhill"  # -3% to -1%
-    FLAT = "flat"  # -1% to 1%
-    GENTLE_UPHILL = "gentle_uphill"  # 1% to 3%
-    UPHILL = "uphill"  # 3% to 8%
+    DOWNHILL = "downhill"  # -8% to -5%
+    GENTLE_DOWNHILL = "gentle_downhill"  # -5% to -3%
+    FLAT = "flat"  # -3% to 3%
+    GENTLE_UPHILL = "gentle_uphill"  # 3% to 5%
+    UPHILL = "uphill"  # 5% to 8%
     STEEP_UPHILL = "steep_uphill"  # > 8%
 
 
@@ -259,18 +259,22 @@ class ActivityPerformanceAnalyzer:
         return smoothed
 
     def _categorize_gradient(self, gradient_percent: float) -> GradientCategory:
-        """Categorize gradient into standard categories"""
+        """Categorize gradient into standard categories.
+        
+        Uses wider 'flat' band (-3% to 3%) which is more realistic for trail
+        running and matches common industry definitions of 'flat' terrain.
+        """
         if gradient_percent < -8:
             return GradientCategory.STEEP_DOWNHILL
-        elif gradient_percent < -3:
+        elif gradient_percent < -5:
             return GradientCategory.DOWNHILL
-        elif gradient_percent < -1:
+        elif gradient_percent < -3:
             return GradientCategory.GENTLE_DOWNHILL
-        elif gradient_percent < 1:
+        elif gradient_percent <= 3:
             return GradientCategory.FLAT
-        elif gradient_percent < 3:
+        elif gradient_percent <= 5:
             return GradientCategory.GENTLE_UPHILL
-        elif gradient_percent < 8:
+        elif gradient_percent <= 8:
             return GradientCategory.UPHILL
         else:
             return GradientCategory.STEEP_UPHILL
@@ -371,19 +375,39 @@ class ActivityPerformanceAnalyzer:
         return segments
 
     def _calculate_pace_by_gradient(self) -> Dict[str, float]:
-        """Calculate average pace for each gradient category"""
+        """Calculate distance-weighted average pace for each gradient category.
+        
+        Uses distance weighting so that longer segments contribute more to the
+        average, which gives a more accurate representation of actual performance.
+        Short anomalous segments (GPS errors, brief pauses) have less impact.
+        """
         if not self._segments:
             self._analyze_segments()
 
-        pace_sums: Dict[str, List[float]] = {cat.value: [] for cat in GradientCategory}
+        # Accumulate weighted pace and total distance per category
+        pace_weighted: Dict[str, Dict[str, float]] = {
+            cat.value: {"weighted_pace_sum": 0.0, "total_distance": 0.0}
+            for cat in GradientCategory
+        }
 
         for segment in self._segments:
-            pace_sums[segment.gradient_category].append(segment.actual_pace_min_km)
+            category = segment.gradient_category
+            distance = segment.distance_km
+            pace = segment.actual_pace_min_km
+            
+            # Skip invalid segments (unrealistic pace values)
+            if pace <= 0 or pace > 30:  # 30 min/km = walking pace threshold
+                continue
+                
+            pace_weighted[category]["weighted_pace_sum"] += pace * distance
+            pace_weighted[category]["total_distance"] += distance
 
         result = {}
-        for category, paces in pace_sums.items():
-            if paces:
-                result[category] = round(sum(paces) / len(paces), 2)
+        for category, data in pace_weighted.items():
+            total_dist = data["total_distance"]
+            if total_dist > 0:
+                weighted_avg = data["weighted_pace_sum"] / total_dist
+                result[category] = round(weighted_avg, 2)
             else:
                 result[category] = None
 

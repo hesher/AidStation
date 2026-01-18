@@ -119,6 +119,14 @@ describe('LocalStorageProvider', () => {
 
       expect(result).toBe(false);
     });
+
+    it('should throw for other errors', async () => {
+      const error = new Error('Permission denied') as NodeJS.ErrnoException;
+      error.code = 'EACCES';
+      vi.mocked(fs.unlink).mockRejectedValueOnce(error);
+
+      await expect(provider.delete('test.gpx')).rejects.toThrow('Permission denied');
+    });
   });
 
   describe('exists', () => {

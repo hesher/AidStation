@@ -8,6 +8,10 @@ This module provides Celery tasks for:
 - Performance analysis
 """
 
-from .celery_app import app
+# Delay Celery import to allow testing without celery installed
+def get_celery_app():
+    from .celery_app import app
+    return app
 
-__all__ = ['app']
+# Only export get_celery_app function, not the app directly
+__all__ = ['get_celery_app']

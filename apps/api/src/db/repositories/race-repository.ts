@@ -172,24 +172,40 @@ export async function updateRace(
   raceData: Partial<RaceData>,
   aidStationList?: AidStationData[]
 ): Promise<RaceWithAidStations | null> {
-  const [updatedRace] = await db
-    .update(races)
-    .set({
-      name: raceData.name,
-      date: raceData.date ? new Date(raceData.date) : undefined,
-      location: raceData.location,
-      country: raceData.country,
-      distanceKm: raceData.distanceKm,
-      elevationGainM: raceData.elevationGainM,
-      elevationLossM: raceData.elevationLossM,
-      startTime: raceData.startTime,
-      overallCutoffHours: raceData.overallCutoffHours,
-      courseGpx: raceData.courseGpx,
-      isPublic: raceData.isPublic,
-      metadata: raceData.metadata,
-    })
-    .where(eq(races.id, id))
-    .returning();
+  // Build the update object, filtering out undefined values
+  const updateValues: Record<string, unknown> = {};
+  
+  if (raceData.name !== undefined) updateValues.name = raceData.name;
+  if (raceData.date !== undefined) updateValues.date = raceData.date ? new Date(raceData.date) : null;
+  if (raceData.location !== undefined) updateValues.location = raceData.location;
+  if (raceData.country !== undefined) updateValues.country = raceData.country;
+  if (raceData.distanceKm !== undefined) updateValues.distanceKm = raceData.distanceKm;
+  if (raceData.elevationGainM !== undefined) updateValues.elevationGainM = raceData.elevationGainM;
+  if (raceData.elevationLossM !== undefined) updateValues.elevationLossM = raceData.elevationLossM;
+  if (raceData.startTime !== undefined) updateValues.startTime = raceData.startTime;
+  if (raceData.overallCutoffHours !== undefined) updateValues.overallCutoffHours = raceData.overallCutoffHours;
+  if (raceData.courseGpx !== undefined) updateValues.courseGpx = raceData.courseGpx;
+  if (raceData.isPublic !== undefined) updateValues.isPublic = raceData.isPublic;
+  if (raceData.metadata !== undefined) updateValues.metadata = raceData.metadata;
+
+  let updatedRace: typeof races.$inferSelect | undefined;
+
+  // Only update the race if there are fields to update
+  if (Object.keys(updateValues).length > 0) {
+    const [result] = await db
+      .update(races)
+      .set(updateValues)
+      .where(eq(races.id, id))
+      .returning();
+    updatedRace = result;
+  } else {
+    // No race fields to update, just fetch the existing race
+    const [existingRace] = await db
+      .select()
+      .from(races)
+      .where(eq(races.id, id));
+    updatedRace = existingRace;
+  }
 
   if (!updatedRace) {
     return null;
