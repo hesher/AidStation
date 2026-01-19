@@ -264,6 +264,41 @@
   box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.2);
 }
 
+.editInputSelect {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid #4caf50;
+  color: white;
+  padding: 6px 8px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.editInputSelect:focus {
+  outline: none;
+  border-color: #81c784;
+  box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.2);
+}
+
+.editInputSelect option {
+  background: #1a1a2e;
+  color: white;
+}
+
+.cutoffEditGroup {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.cutoffEditGroup .editInputSelect {
+  width: 70px;
+}
+
+.cutoffEditGroup .editInputNumber {
+  width: 55px;
+}
+
 /* Action buttons column */
 .thActions {
   min-width: 80px;

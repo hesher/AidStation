@@ -65,6 +65,7 @@ export interface AidStationData {
   hasPacer?: boolean | null;
   cutoffTime?: string | null;
   cutoffHoursFromStart?: number | null;
+  cutoffDayOffset?: number | null; // Day offset from race start (0 = race day, 1 = day 2, etc.)
   latitude?: number | null;
   longitude?: number | null;
   terrainType?: string | null; // road, gravel, single_track, technical, alpine, trail, etc.

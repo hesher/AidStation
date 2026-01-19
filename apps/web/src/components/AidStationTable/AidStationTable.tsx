@@ -79,15 +79,40 @@ export function AidStationTable({
     return `${Math.round(m)} m`;
   };
 
-  const formatCutoff = (time?: string | null, hours?: number | null) => {
+  const formatCutoff = (
+    time?: string | null,
+    hours?: number | null,
+    dayOffset?: number | null
+  ) => {
     if (time) return time;
     if (hours !== undefined && hours !== null) {
-      const h = Math.floor(hours);
-      const m = Math.round((hours - h) * 60);
-      if (m === 0) return `${h}:00`;
-      return `${h}:${m.toString().padStart(2, '0')}`;
+      // Calculate day offset if not provided
+      const effectiveDayOffset = dayOffset ?? Math.floor(hours / 24);
+      // Get hours within the day
+      const hoursInDay = hours - effectiveDayOffset * 24;
+      const h = Math.floor(hoursInDay);
+      const m = Math.round((hoursInDay - h) * 60);
+      const timeStr = m === 0 ? `${h}:00` : `${h}:${m.toString().padStart(2, '0')}`;
+
+      // For multi-day events (>=24 hours), show "Day X + HH:MM" format
+      if (hours >= 24) {
+        return `Day ${effectiveDayOffset + 1} + ${timeStr}`;
+      }
+      return timeStr;
     }
     return '--';
+  };
+
+  // Format cutoff for editing - returns just the hours portion within the day
+  const getCutoffHoursInDay = (hours?: number | null, dayOffset?: number | null): number => {
+    if (hours === undefined || hours === null) return 0;
+    const effectiveDayOffset = dayOffset ?? Math.floor(hours / 24);
+    return hours - effectiveDayOffset * 24;
+  };
+
+  // Calculate total hours from day offset and hours within day
+  const calculateTotalHours = (dayOffset: number, hoursInDay: number): number => {
+    return dayOffset * 24 + hoursInDay;
   };
 
   const WaypointTypeBadge = ({ type }: { type?: WaypointType }) => {
@@ -355,17 +380,51 @@ export function AidStationTable({
           />
         </td>
         <td className={styles.tdNumber}>
-          <input
-            type="number"
-            value={editingStation.cutoffHoursFromStart ?? ''}
-            onChange={(e) =>
-              handleEditingChange('cutoffHoursFromStart', parseNumber(e.target.value))
-            }
-            className={styles.editInputNumber}
-            step="0.5"
-            onClick={(e) => e.stopPropagation()}
-            placeholder="hours"
-          />
+          <div className={styles.cutoffEditGroup}>
+            {/* Day offset selector - only show for multi-day or when hours > 24 */}
+            <select
+              value={Math.floor((editingStation.cutoffHoursFromStart ?? 0) / 24)}
+              onChange={(e) => {
+                const dayOffset = parseInt(e.target.value, 10);
+                const currentHoursInDay = getCutoffHoursInDay(
+                  editingStation.cutoffHoursFromStart,
+                  editingStation.cutoffDayOffset
+                );
+                const newTotalHours = calculateTotalHours(dayOffset, currentHoursInDay);
+                handleEditingChange('cutoffHoursFromStart', newTotalHours);
+                handleEditingChange('cutoffDayOffset', dayOffset);
+              }}
+              className={styles.editInputSelect}
+              onClick={(e) => e.stopPropagation()}
+              title="Day"
+            >
+              <option value="0">Day 1</option>
+              <option value="1">Day 2</option>
+              <option value="2">Day 3</option>
+              <option value="3">Day 4</option>
+              <option value="4">Day 5</option>
+            </select>
+            <input
+              type="number"
+              value={getCutoffHoursInDay(
+                editingStation.cutoffHoursFromStart,
+                editingStation.cutoffDayOffset
+              ).toFixed(1)}
+              onChange={(e) => {
+                const hoursInDay = parseFloat(e.target.value) || 0;
+                const dayOffset = Math.floor((editingStation.cutoffHoursFromStart ?? 0) / 24);
+                const newTotalHours = calculateTotalHours(dayOffset, hoursInDay);
+                handleEditingChange('cutoffHoursFromStart', newTotalHours);
+              }}
+              className={styles.editInputNumber}
+              step="0.5"
+              min="0"
+              max="24"
+              onClick={(e) => e.stopPropagation()}
+              placeholder="hrs"
+              title="Hours within day (0-24)"
+            />
+          </div>
         </td>
         <td className={styles.tdActions}>
           <button
@@ -426,7 +485,7 @@ export function AidStationTable({
         <ServiceBadge available={station.hasPacer} label="Pacer" />
       </td>
       <td className={styles.tdNumber}>
-        {formatCutoff(station.cutoffTime, station.cutoffHoursFromStart)}
+        {formatCutoff(station.cutoffTime, station.cutoffHoursFromStart, station.cutoffDayOffset)}
       </td>
       {editable && (
         <td className={styles.tdActions}>

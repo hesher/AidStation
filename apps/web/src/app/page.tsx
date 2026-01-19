@@ -559,6 +559,7 @@ export default function Home() {
                 coordinates={raceData.courseCoordinates}
                 aidStations={raceData.aidStations}
                 onAidStationClick={handleAidStationClick}
+                totalRaceDistanceKm={raceData.distanceKm}
               />
             </section>
           )}

@@ -260,7 +260,7 @@ class ActivityPerformanceAnalyzer:
 
     def _categorize_gradient(self, gradient_percent: float) -> GradientCategory:
         """Categorize gradient into standard categories.
-        
+
         Uses wider 'flat' band (-3% to 3%) which is more realistic for trail
         running and matches common industry definitions of 'flat' terrain.
         """
@@ -376,7 +376,7 @@ class ActivityPerformanceAnalyzer:
 
     def _calculate_pace_by_gradient(self) -> Dict[str, float]:
         """Calculate distance-weighted average pace for each gradient category.
-        
+
         Uses distance weighting so that longer segments contribute more to the
         average, which gives a more accurate representation of actual performance.
         Short anomalous segments (GPS errors, brief pauses) have less impact.
@@ -394,11 +394,11 @@ class ActivityPerformanceAnalyzer:
             category = segment.gradient_category
             distance = segment.distance_km
             pace = segment.actual_pace_min_km
-            
+
             # Skip invalid segments (unrealistic pace values)
             if pace <= 0 or pace > 30:  # 30 min/km = walking pace threshold
                 continue
-                
+
             pace_weighted[category]["weighted_pace_sum"] += pace * distance
             pace_weighted[category]["total_distance"] += distance
 

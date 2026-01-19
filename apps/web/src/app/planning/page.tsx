@@ -59,6 +59,25 @@ function formatTime(isoString: string | undefined | null): string {
   }
 }
 
+/**
+ * Format cutoff hours in a multi-day friendly format
+ * For cutoffs >= 24 hours, shows "Day X + HH:MM" format
+ * For cutoffs < 24 hours, shows just "HH:MM"
+ */
+function formatCutoffHours(hours: number | undefined | null): string {
+  if (hours === undefined || hours === null) return '-';
+  const dayOffset = Math.floor(hours / 24);
+  const hoursInDay = hours - dayOffset * 24;
+  const h = Math.floor(hoursInDay);
+  const m = Math.round((hoursInDay - h) * 60);
+  const timeStr = m === 0 ? `${h}h` : `${h}h ${m}m`;
+
+  if (hours >= 24) {
+    return `D${dayOffset + 1} +${timeStr}`;
+  }
+  return timeStr;
+}
+
 function formatDate(dateString: string | undefined | null): string {
   if (!dateString) return '-';
   try {
@@ -620,7 +639,7 @@ export default function PlanningPage() {
                         <span>{formatDuration(station.predictedArrivalMinutes)}</span>
                         <span>
                           {station.cutoffHoursFromStart
-                            ? `${station.cutoffHoursFromStart}h`
+                            ? formatCutoffHours(station.cutoffHoursFromStart)
                             : '-'}
                         </span>
                         <span

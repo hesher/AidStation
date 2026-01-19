@@ -78,6 +78,7 @@ export const aidStations = pgTable('aid_stations', {
   hasPacer: boolean('has_pacer').default(false),
   cutoffTime: text('cutoff_time'), // ISO time or duration
   cutoffHoursFromStart: real('cutoff_hours_from_start'),
+  cutoffDayOffset: integer('cutoff_day_offset'), // Day offset from race start (0 = race day, 1 = day 2, etc.)
   sortOrder: integer('sort_order').notNull(),
   latitude: real('latitude'),
   longitude: real('longitude'),

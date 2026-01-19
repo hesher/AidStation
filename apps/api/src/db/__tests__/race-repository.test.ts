@@ -199,6 +199,39 @@ describe('Race Repository Data Validation', () => {
       expect(fullStation).toBeDefined();
       expect(fullStation.latitude).toBe(39.5);
     });
+
+    it('should support multi-day cutoff with cutoffDayOffset field', () => {
+      const multiDayStation: AidStationData = {
+        name: 'Day 2 Station',
+        distanceKm: 100,
+        cutoffHoursFromStart: 30, // 30 hours from start = Day 2 + 6h
+        cutoffDayOffset: 1, // Day offset = 1 means Day 2
+      };
+
+      expect(multiDayStation.cutoffHoursFromStart).toBe(30);
+      expect(multiDayStation.cutoffDayOffset).toBe(1);
+        
+      // Verify day offset calculation (30 hours / 24 = 1.25, floor = 1)
+      const calculatedDayOffset = Math.floor((multiDayStation.cutoffHoursFromStart ?? 0) / 24);
+      expect(calculatedDayOffset).toBe(1);
+    });
+
+    it('should calculate hours within day correctly for multi-day cutoffs', () => {
+      const testCases = [
+        { hours: 12, expectedDay: 0, expectedHoursInDay: 12 },
+        { hours: 24, expectedDay: 1, expectedHoursInDay: 0 },
+        { hours: 30, expectedDay: 1, expectedHoursInDay: 6 },
+        { hours: 48, expectedDay: 2, expectedHoursInDay: 0 },
+        { hours: 52.5, expectedDay: 2, expectedHoursInDay: 4.5 },
+      ];
+
+      for (const tc of testCases) {
+        const dayOffset = Math.floor(tc.hours / 24);
+        const hoursInDay = tc.hours - dayOffset * 24;
+        expect(dayOffset).toBe(tc.expectedDay);
+        expect(hoursInDay).toBe(tc.expectedHoursInDay);
+      }
+    });
   });
 });
 

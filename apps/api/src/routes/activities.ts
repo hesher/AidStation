@@ -1544,19 +1544,19 @@ function parseTerrainSegments(gpxContent: string, activityId: string): TerrainSe
   // SECOND PASS: Merge consecutive flat and rolling_hills segments < 1km
   const MIN_FLAT_ROLLING_LENGTH_KM = 1.0;
   const finalConsolidatedSegments: ConsolidatedSegment[] = [];
-  
+
   for (let idx = 0; idx < consolidatedSegments.length; idx++) {
     const seg = consolidatedSegments[idx];
     const startDistM = processedPoints[seg.startIdx].distanceM;
     const endDistM = processedPoints[seg.endIdx].distanceM;
     const lengthKm = (endDistM - startDistM) / 1000;
-    
+
     // Check if this is a short flat or rolling segment that should be merged
     const isShortFlatOrRolling = (seg.terrainType === 'flat' || seg.terrainType === 'rolling_hills') && lengthKm < MIN_FLAT_ROLLING_LENGTH_KM;
-    
+
     if (isShortFlatOrRolling && finalConsolidatedSegments.length > 0) {
       const prevSeg = finalConsolidatedSegments[finalConsolidatedSegments.length - 1];
-      
+
       // Merge with previous if it's also flat or rolling
       if (prevSeg.terrainType === 'flat' || prevSeg.terrainType === 'rolling_hills') {
         prevSeg.endIdx = seg.endIdx;
@@ -1569,11 +1569,11 @@ function parseTerrainSegments(gpxContent: string, activityId: string): TerrainSe
         continue;
       }
     }
-    
+
     // Check if we should merge with next segment
     if (isShortFlatOrRolling && idx + 1 < consolidatedSegments.length) {
       const nextSeg = consolidatedSegments[idx + 1];
-      
+
       // If next is also flat or rolling, let the next iteration handle merging
       if (nextSeg.terrainType === 'flat' || nextSeg.terrainType === 'rolling_hills') {
         // Merge this into the next segment
@@ -1587,10 +1587,10 @@ function parseTerrainSegments(gpxContent: string, activityId: string): TerrainSe
         continue;
       }
     }
-    
+
     finalConsolidatedSegments.push({ ...seg });
   }
-  
+
   // One more pass to merge any remaining consecutive segments of the same type
   const mergedSegments: ConsolidatedSegment[] = [];
   for (const seg of finalConsolidatedSegments) {
@@ -1598,11 +1598,11 @@ function parseTerrainSegments(gpxContent: string, activityId: string): TerrainSe
       const prevSeg = mergedSegments[mergedSegments.length - 1];
       const prevDistKm = (processedPoints[prevSeg.endIdx].distanceM - processedPoints[prevSeg.startIdx].distanceM) / 1000;
       const currDistKm = (processedPoints[seg.endIdx].distanceM - processedPoints[seg.startIdx].distanceM) / 1000;
-      
+
       // Merge consecutive flat/rolling sections if either is < 1km
       if ((prevSeg.terrainType === 'flat' || prevSeg.terrainType === 'rolling_hills') &&
-          (seg.terrainType === 'flat' || seg.terrainType === 'rolling_hills') &&
-          (prevDistKm < MIN_FLAT_ROLLING_LENGTH_KM || currDistKm < MIN_FLAT_ROLLING_LENGTH_KM)) {
+        (seg.terrainType === 'flat' || seg.terrainType === 'rolling_hills') &&
+        (prevDistKm < MIN_FLAT_ROLLING_LENGTH_KM || currDistKm < MIN_FLAT_ROLLING_LENGTH_KM)) {
         prevSeg.endIdx = seg.endIdx;
         prevSeg.totalElevationGain += seg.totalElevationGain;
         prevSeg.totalElevationLoss += seg.totalElevationLoss;
@@ -1611,7 +1611,7 @@ function parseTerrainSegments(gpxContent: string, activityId: string): TerrainSe
         }
         continue;
       }
-      
+
       // Merge consecutive climbs
       if (prevSeg.terrainType === 'climb' && seg.terrainType === 'climb') {
         prevSeg.endIdx = seg.endIdx;
@@ -1619,7 +1619,7 @@ function parseTerrainSegments(gpxContent: string, activityId: string): TerrainSe
         prevSeg.totalElevationLoss += seg.totalElevationLoss;
         continue;
       }
-      
+
       // Merge consecutive descents
       if (prevSeg.terrainType === 'descent' && seg.terrainType === 'descent') {
         prevSeg.endIdx = seg.endIdx;

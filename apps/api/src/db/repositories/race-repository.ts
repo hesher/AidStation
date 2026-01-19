@@ -108,25 +108,36 @@ export async function createRace(
     insertedAidStations = await db
       .insert(aidStations)
       .values(
-        aidStationList.map((station, index) => ({
-          raceId: insertedRace.id,
-          name: station.name,
-          distanceKm: station.distanceKm,
-          distanceFromPrevKm: station.distanceFromPrevKm,
-          elevationM: station.elevationM,
-          elevationGainFromPrevM: station.elevationGainFromPrevM,
-          elevationLossFromPrevM: station.elevationLossFromPrevM,
-          hasDropBag: station.hasDropBag ?? false,
-          hasCrew: station.hasCrew ?? false,
-          hasPacer: station.hasPacer ?? false,
-          cutoffTime: station.cutoffTime,
-          cutoffHoursFromStart: station.cutoffHoursFromStart,
-          sortOrder: index,
-          latitude: station.latitude,
-          longitude: station.longitude,
-          terrainType: station.terrainType ?? 'trail',
-          waypointType: station.waypointType ?? 'aid_station',
-        }))
+        aidStationList.map((station, index) => {
+          // Auto-calculate cutoffDayOffset if cutoffHoursFromStart is provided and cutoffDayOffset is not
+          const cutoffDayOffset =
+            station.cutoffDayOffset !== undefined && station.cutoffDayOffset !== null
+              ? station.cutoffDayOffset
+              : station.cutoffHoursFromStart !== undefined && station.cutoffHoursFromStart !== null
+                ? Math.floor(station.cutoffHoursFromStart / 24)
+                : null;
+
+          return {
+            raceId: insertedRace.id,
+            name: station.name,
+            distanceKm: station.distanceKm,
+            distanceFromPrevKm: station.distanceFromPrevKm,
+            elevationM: station.elevationM,
+            elevationGainFromPrevM: station.elevationGainFromPrevM,
+            elevationLossFromPrevM: station.elevationLossFromPrevM,
+            hasDropBag: station.hasDropBag ?? false,
+            hasCrew: station.hasCrew ?? false,
+            hasPacer: station.hasPacer ?? false,
+            cutoffTime: station.cutoffTime,
+            cutoffHoursFromStart: station.cutoffHoursFromStart,
+            cutoffDayOffset,
+            sortOrder: index,
+            latitude: station.latitude,
+            longitude: station.longitude,
+            terrainType: station.terrainType ?? 'trail',
+            waypointType: station.waypointType ?? 'aid_station',
+          };
+        })
       )
       .returning();
   }
@@ -174,7 +185,7 @@ export async function updateRace(
 ): Promise<RaceWithAidStations | null> {
   // Build the update object, filtering out undefined values
   const updateValues: Record<string, unknown> = {};
-  
+
   if (raceData.name !== undefined) updateValues.name = raceData.name;
   if (raceData.date !== undefined) updateValues.date = raceData.date ? new Date(raceData.date) : null;
   if (raceData.location !== undefined) updateValues.location = raceData.location;
@@ -227,25 +238,36 @@ export async function updateRace(
       updatedAidStations = await db
         .insert(aidStations)
         .values(
-          aidStationList.map((station, index) => ({
-            raceId: id,
-            name: station.name,
-            distanceKm: station.distanceKm,
-            distanceFromPrevKm: station.distanceFromPrevKm,
-            elevationM: station.elevationM,
-            elevationGainFromPrevM: station.elevationGainFromPrevM,
-            elevationLossFromPrevM: station.elevationLossFromPrevM,
-            hasDropBag: station.hasDropBag ?? false,
-            hasCrew: station.hasCrew ?? false,
-            hasPacer: station.hasPacer ?? false,
-            cutoffTime: station.cutoffTime,
-            cutoffHoursFromStart: station.cutoffHoursFromStart,
-            sortOrder: index,
-            latitude: station.latitude,
-            longitude: station.longitude,
-            terrainType: station.terrainType ?? 'trail',
-            waypointType: station.waypointType ?? 'aid_station',
-          }))
+          aidStationList.map((station, index) => {
+            // Auto-calculate cutoffDayOffset if cutoffHoursFromStart is provided and cutoffDayOffset is not
+            const cutoffDayOffset =
+              station.cutoffDayOffset !== undefined && station.cutoffDayOffset !== null
+                ? station.cutoffDayOffset
+                : station.cutoffHoursFromStart !== undefined && station.cutoffHoursFromStart !== null
+                  ? Math.floor(station.cutoffHoursFromStart / 24)
+                  : null;
+
+            return {
+              raceId: id,
+              name: station.name,
+              distanceKm: station.distanceKm,
+              distanceFromPrevKm: station.distanceFromPrevKm,
+              elevationM: station.elevationM,
+              elevationGainFromPrevM: station.elevationGainFromPrevM,
+              elevationLossFromPrevM: station.elevationLossFromPrevM,
+              hasDropBag: station.hasDropBag ?? false,
+              hasCrew: station.hasCrew ?? false,
+              hasPacer: station.hasPacer ?? false,
+              cutoffTime: station.cutoffTime,
+              cutoffHoursFromStart: station.cutoffHoursFromStart,
+              cutoffDayOffset,
+              sortOrder: index,
+              latitude: station.latitude,
+              longitude: station.longitude,
+              terrainType: station.terrainType ?? 'trail',
+              waypointType: station.waypointType ?? 'aid_station',
+            };
+          })
         )
         .returning();
     }

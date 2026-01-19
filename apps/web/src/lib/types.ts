@@ -24,6 +24,7 @@ export interface AidStation {
   hasPacer?: boolean | null;
   cutoffTime?: string | null;
   cutoffHoursFromStart?: number | null;
+  cutoffDayOffset?: number | null; // Day offset from race start (0 = race day, 1 = day 2, etc.)
   waypointType?: WaypointType;
 }
 

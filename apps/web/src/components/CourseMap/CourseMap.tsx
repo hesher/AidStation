@@ -18,6 +18,7 @@ interface CourseMapProps {
   onAidStationClick?: (station: AidStation, index: number) => void;
   enable3D?: boolean;
   terrainExaggeration?: number;
+  totalRaceDistanceKm?: number;
 }
 
 const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
@@ -68,12 +69,13 @@ function simplifyCoordinates(coords: CourseCoordinate[], maxPoints: number): Cou
   return result;
 }
 
-function CourseMapComponent({ 
-  coordinates, 
-  aidStations, 
+function CourseMapComponent({
+  coordinates,
+  aidStations,
   onAidStationClick,
   enable3D = true,
-  terrainExaggeration = DEFAULT_TERRAIN_EXAGGERATION
+  terrainExaggeration = DEFAULT_TERRAIN_EXAGGERATION,
+  totalRaceDistanceKm
 }: CourseMapProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
@@ -239,52 +241,62 @@ function CourseMapComponent({
     markersRef.current = [];
 
     // For each aid station, try to find its position on the course
-      aidStations.forEach((station, index) => {
-        // Find the closest coordinate based on distance
-        let stationCoord: CourseCoordinate | undefined;
+    aidStations.forEach((station, index) => {
+      // Find the closest coordinate based on distance
+      let stationCoord: CourseCoordinate | undefined;
 
-        if (station.distanceKm !== null && station.distanceKm !== undefined && coordinates.length > 0) {
-          // Get the total distance - use the race's total distance or estimate from coordinates
-          // We estimate by treating the coordinate index as a fraction of total distance
-          // Find position along the course based on ratio of station distance to total race distance
-          // For now, we use a simple approximation: station index ratio along the course
+      if (station.distanceKm !== null && station.distanceKm !== undefined && coordinates.length > 0) {
+        // Get the total distance - use the passed total race distance
+        let totalDistance = totalRaceDistanceKm;
 
-          // Get total race distance from the last aid station (if available) or use max known distance
-          const maxDistance = aidStations.reduce((max, s) => {
-            return s.distanceKm !== null && s.distanceKm !== undefined && s.distanceKm > max
-              ? s.distanceKm
-              : max;
-          }, 0);
-
-          if (maxDistance > 0) {
-            const ratio = station.distanceKm / maxDistance;
-            const targetIndex = Math.min(
-              Math.floor(ratio * (coordinates.length - 1)),
-              coordinates.length - 1
-            );
-            stationCoord = coordinates[targetIndex];
-          } else {
-            // Fallback: distribute stations evenly along the course
-            const targetIndex = Math.min(
-              Math.floor((index / aidStations.length) * (coordinates.length - 1)),
-              coordinates.length - 1
-            );
-            stationCoord = coordinates[targetIndex];
+        // Fallback: estimate total distance using Haversine formula
+        if (!totalDistance || totalDistance <= 0) {
+          let approxDistance = 0;
+          for (let i = 1; i < coordinates.length; i++) {
+            const prev = coordinates[i - 1];
+            const curr = coordinates[i];
+            // Haversine approximation for small distances
+            const dLat = (curr.lat - prev.lat) * Math.PI / 180;
+            const dLon = (curr.lon - prev.lon) * Math.PI / 180;
+            const lat1 = prev.lat * Math.PI / 180;
+            const lat2 = curr.lat * Math.PI / 180;
+            const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+              Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            approxDistance += 6371 * c; // Earth radius in km
           }
-        } else if (coordinates.length > 0) {
-          // Station has no distance - distribute evenly along course
+          totalDistance = approxDistance;
+        }
+
+        if (totalDistance > 0) {
+          const ratio = station.distanceKm / totalDistance;
           const targetIndex = Math.min(
-            Math.floor(((index + 1) / (aidStations.length + 1)) * (coordinates.length - 1)),
+            Math.floor(ratio * (coordinates.length - 1)),
+            coordinates.length - 1
+          );
+          stationCoord = coordinates[targetIndex];
+        } else {
+          // Fallback: distribute stations evenly along the course
+          const targetIndex = Math.min(
+            Math.floor((index / aidStations.length) * (coordinates.length - 1)),
             coordinates.length - 1
           );
           stationCoord = coordinates[targetIndex];
         }
+      } else if (coordinates.length > 0) {
+        // Station has no distance - distribute evenly along course
+        const targetIndex = Math.min(
+          Math.floor(((index + 1) / (aidStations.length + 1)) * (coordinates.length - 1)),
+          coordinates.length - 1
+        );
+        stationCoord = coordinates[targetIndex];
+      }
 
       if (stationCoord && map.current) {
         // Get marker config based on waypoint type
         const waypointType = station.waypointType || 'aid_station';
         const markerConfig = WAYPOINT_MARKER_CONFIG[waypointType] || WAYPOINT_MARKER_CONFIG.aid_station;
-        
+
         // Create custom marker element with waypoint-specific styling
         const el = document.createElement('div');
         el.className = styles.aidStationMarker;
@@ -317,12 +329,12 @@ function CourseMapComponent({
         markersRef.current.push(marker);
       }
     });
-  }, [aidStations, coordinates, onAidStationClick]);
+  }, [aidStations, coordinates, onAidStationClick, totalRaceDistanceKm]);
 
   // Toggle 3D mode
   const toggle3D = () => {
     if (!map.current) return;
-    
+
     const new3DState = !is3DEnabled;
     setIs3DEnabled(new3DState);
 
@@ -423,7 +435,12 @@ function CourseMapComponent({
 export const CourseMap = memo(CourseMapComponent, (prevProps, nextProps) => {
   // Custom comparison for performance
   // Return true if props are equal (should NOT re-render)
-  
+
+  // Check if totalRaceDistanceKm changed
+  if (prevProps.totalRaceDistanceKm !== nextProps.totalRaceDistanceKm) {
+    return false;
+  }
+
   // Check if coordinates array reference or length changed
   if (prevProps.coordinates !== nextProps.coordinates) {
     // Do a shallow length check - if length differs, definitely re-render
@@ -437,12 +454,12 @@ export const CourseMap = memo(CourseMapComponent, (prevProps, nextProps) => {
       const prevLast = prevProps.coordinates[prevProps.coordinates.length - 1];
       const nextLast = nextProps.coordinates[nextProps.coordinates.length - 1];
       if (prevFirst.lat !== nextFirst.lat || prevFirst.lon !== nextFirst.lon ||
-          prevLast.lat !== nextLast.lat || prevLast.lon !== nextLast.lon) {
+        prevLast.lat !== nextLast.lat || prevLast.lon !== nextLast.lon) {
         return false;
       }
     }
   }
-  
+
   // Check if aidStations array changed
   if (prevProps.aidStations !== nextProps.aidStations) {
     const prevStations = prevProps.aidStations || [];
@@ -453,17 +470,17 @@ export const CourseMap = memo(CourseMapComponent, (prevProps, nextProps) => {
     // Check if any station's key properties changed
     for (let i = 0; i < prevStations.length; i++) {
       if (prevStations[i].distanceKm !== nextStations[i].distanceKm ||
-          prevStations[i].name !== nextStations[i].name ||
-          prevStations[i].waypointType !== nextStations[i].waypointType ||
-          prevStations[i].cutoffHoursFromStart !== nextStations[i].cutoffHoursFromStart ||
-          prevStations[i].hasDropBag !== nextStations[i].hasDropBag ||
-          prevStations[i].hasCrew !== nextStations[i].hasCrew ||
-          prevStations[i].hasPacer !== nextStations[i].hasPacer) {
+        prevStations[i].name !== nextStations[i].name ||
+        prevStations[i].waypointType !== nextStations[i].waypointType ||
+        prevStations[i].cutoffHoursFromStart !== nextStations[i].cutoffHoursFromStart ||
+        prevStations[i].hasDropBag !== nextStations[i].hasDropBag ||
+        prevStations[i].hasCrew !== nextStations[i].hasCrew ||
+        prevStations[i].hasPacer !== nextStations[i].hasPacer) {
         return false;
       }
     }
   }
-  
+
   // Props are considered equal
   return true;
 });

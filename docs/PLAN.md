@@ -597,7 +597,7 @@ This is a non-negotiable requirement to ensure:
     4. Added `rolling_hills` terrain type with 🌊 emoji indicator
     5. **Additional fix**: Added second-pass consolidation to merge consecutive flat and rolling sections < 1km
 - [x] The "Terrain Segments Breakdown" should show Total Ascent and Total Descent (not just net elevation change)
-  - **Fixed**: 
+  - **Fixed**:
     1. Replaced single "Elev Δ" column with separate "Ascent" and "Descent" columns
     2. Calculate actual ascent/descent by iterating through all points in each segment (not just net change)
     3. Display as "+X m" (red) for ascent and "-X m" (blue) for descent
@@ -616,9 +616,21 @@ This is a non-negotiable requirement to ensure:
     4. Added `servicesDescription` field to capture available services at each station
     5. Maintained strict accuracy guidelines (no fabrication)
 
+### Completed Future Work
+
+- [x] **Multi-day event support for cutoff times**: Added `cutoff_day_offset` column to aid_stations table to support multi-day events (100+ mile races spanning 2-3 days).
+  - **Implemented**:
+    1. Database migration `006_cutoff_day_offset.sql` adds `cutoff_day_offset` INTEGER column
+    2. Schema updated with `cutoffDayOffset` field in aidStations table
+    3. Repository auto-calculates `cutoffDayOffset` from `cutoffHoursFromStart` when not explicitly provided
+    4. AidStationTable UI displays "Day X + HH:MM" format for cutoffs >= 24 hours
+    5. AidStationTable edit mode includes Day selector + hours input for cutoff editing
+    6. Planning page uses `formatCutoffHours()` helper for multi-day display (e.g., "D2 +6h")
+    7. Backward compatible: existing races continue to work unchanged
+    8. Added 2 new unit tests for multi-day cutoff calculations
+
 ### Future Work
 
-- [ ] **Multi-language support**: Add internationalization (i18n) support for multiple languages, starting with common endurance sports markets (German, French, Spanish, Japanese)
 - [ ] **Strava integration**: Allow users to import activities directly from Strava using OAuth, instead of manually uploading GPX files
 - [ ] **Weather integration**: Pull historical weather data for the race date/location and factor temperature, humidity, and conditions into pace predictions
 - [ ] **Nutrition planning**: Add nutrition and hydration planning based on predicted effort levels and time at each segment
