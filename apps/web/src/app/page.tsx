@@ -263,6 +263,28 @@ export default function Home() {
     setHasUnsavedChanges(true);
   }, [raceData]);
 
+  // Helper to create a valid Date from race date/time, or null if invalid
+  const getRaceStartTime = useCallback((): Date | null => {
+    if (!raceData) return null;
+
+    // Need at least a date to create a valid Date object
+    if (!raceData.date) return null;
+
+    let dateString: string;
+    if (raceData.startTime) {
+      dateString = `${raceData.date}T${raceData.startTime}`;
+    } else {
+      dateString = raceData.date;
+    }
+
+    const date = new Date(dateString);
+    // Check if the date is valid
+    if (isNaN(date.getTime())) {
+      return null;
+    }
+    return date;
+  }, [raceData]);
+
   // Handle race date change
   const handleDateChange = useCallback((date: string) => {
     if (!raceData) return;
@@ -741,13 +763,7 @@ export default function Home() {
                 totalElevationLossM={raceData.elevationLossM}
                 overallCutoffHours={raceData.overallCutoffHours}
                 onOverallCutoffChange={handleOverallCutoffChange}
-                raceStartTime={
-                  raceData.date && raceData.startTime
-                    ? new Date(`${raceData.date}T${raceData.startTime}`)
-                    : raceData.date
-                      ? new Date(raceData.date)
-                      : null
-                }
+                raceStartTime={getRaceStartTime()}
               />
             </section>
           )}
@@ -767,13 +783,7 @@ export default function Home() {
                 totalElevationLossM={raceData.elevationLossM}
                 overallCutoffHours={raceData.overallCutoffHours}
                 onOverallCutoffChange={handleOverallCutoffChange}
-                raceStartTime={
-                  raceData.date && raceData.startTime
-                    ? new Date(`${raceData.date}T${raceData.startTime}`)
-                    : raceData.date
-                      ? new Date(raceData.date)
-                      : null
-                }
+                raceStartTime={getRaceStartTime()}
               />
             </section>
           )}
