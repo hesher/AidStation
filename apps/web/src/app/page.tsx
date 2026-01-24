@@ -38,6 +38,14 @@ export default function Home() {
   const [autoSaveEnabled, setAutoSaveEnabled] = useState(true);
   const [lastSaveTime, setLastSaveTime] = useState<Date | null>(null);
 
+  // State for GPX waypoint import confirmation dialog
+  const [showWaypointConfirm, setShowWaypointConfirm] = useState(false);
+  const [pendingWaypoints, setPendingWaypoints] = useState<AidStation[] | null>(null);
+  const [pendingGpxData, setPendingGpxData] = useState<{
+    coordinates: Array<{ lat: number; lon: number; elevation?: number }>;
+    gpxContent: string;
+  } | null>(null);
+
   // Ref to track auto-save timer
   const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -189,6 +197,8 @@ export default function Home() {
       aidStations.map(s => ({
         name: s.name,
         distanceKm: s.distanceKm ?? undefined,
+        lat: s.latitude ?? undefined,
+        lon: s.longitude ?? undefined,
       }))
     );
 
@@ -219,10 +229,13 @@ export default function Home() {
     // Update aid station data with calculated elevation metrics
     if (analyzedAidStations && analyzedAidStations.length > 0 && updatedRaceData.aidStations) {
       const updatedAidStations = updatedRaceData.aidStations.map(station => {
-        // Match by name OR by distance (for newly added stations)
+        // Match by name OR by distance (for newly added stations) OR by coordinates
         const analyzed = analyzedAidStations.find(
           a => a.name.toLowerCase() === station.name.toLowerCase() ||
-            (station.distanceKm && Math.abs((a.distance_km || 0) - station.distanceKm) < 0.5)
+            (station.distanceKm && Math.abs((a.distance_km || 0) - station.distanceKm) < 0.5) ||
+            (station.latitude && station.longitude && a.latitude && a.longitude &&
+              Math.abs(a.latitude - station.latitude) < 0.0001 &&
+              Math.abs(a.longitude - station.longitude) < 0.0001)
         );
 
         if (analyzed) {
@@ -247,6 +260,20 @@ export default function Home() {
   const handleOverallCutoffChange = useCallback((hours: number | null) => {
     if (!raceData) return;
     setRaceData({ ...raceData, overallCutoffHours: hours ?? undefined });
+    setHasUnsavedChanges(true);
+  }, [raceData]);
+
+  // Handle race date change
+  const handleDateChange = useCallback((date: string) => {
+    if (!raceData) return;
+    setRaceData({ ...raceData, date });
+    setHasUnsavedChanges(true);
+  }, [raceData]);
+
+  // Handle race start time change
+  const handleStartTimeChange = useCallback((startTime: string) => {
+    if (!raceData) return;
+    setRaceData({ ...raceData, startTime });
     setHasUnsavedChanges(true);
   }, [raceData]);
 
@@ -329,7 +356,7 @@ export default function Home() {
         });
       }
 
-      // If no route points, try waypoints
+      // If no route points, try waypoints for course coordinates
       if (coordinates.length === 0) {
         const wpts = xmlDoc.querySelectorAll('wpt');
         wpts.forEach((pt) => {
@@ -349,22 +376,65 @@ export default function Home() {
         return;
       }
 
-      // Update race data with new course coordinates immediately for visualization
-      const updatedRaceData = {
-        ...raceData,
-        courseCoordinates: coordinates,
-      };
-      setRaceData(updatedRaceData);
-      setHasUnsavedChanges(true);
+      // Extract waypoints as potential aid stations
+      const wpts = xmlDoc.querySelectorAll('wpt');
+      const waypointAidStations: AidStation[] = [];
 
-      // Analyze GPX and update elevation metrics
-      const finalRaceData = await analyzeAndUpdateElevation(
-        gpxContent,
-        updatedRaceData,
-        raceData.aidStations || []
-      );
+      wpts.forEach((wpt, index) => {
+        const lat = parseFloat(wpt.getAttribute('lat') || '0');
+        const lon = parseFloat(wpt.getAttribute('lon') || '0');
+        const nameEl = wpt.querySelector('name');
+        const eleEl = wpt.querySelector('ele');
 
-      setRaceData(finalRaceData);
+        const name = nameEl?.textContent || `Waypoint ${index + 1}`;
+        const elevation = eleEl ? parseFloat(eleEl.textContent || '0') : undefined;
+
+        if (lat && lon) {
+          waypointAidStations.push({
+            name,
+            distanceKm: null,
+            elevationM: elevation ?? null,
+            hasDropBag: false,
+            hasCrew: false,
+            hasPacer: false,
+            waypointType: 'aid_station',
+            latitude: lat,
+            longitude: lon,
+          });
+        }
+      });
+
+      // Check if we have waypoints and existing aid stations
+      const hasExistingAidStations = raceData.aidStations && raceData.aidStations.length > 0;
+      const hasWaypoints = waypointAidStations.length > 0;
+
+      if (hasWaypoints && hasExistingAidStations) {
+        // Store pending data and show confirmation dialog
+        setPendingWaypoints(waypointAidStations);
+        setPendingGpxData({ coordinates, gpxContent });
+        setShowWaypointConfirm(true);
+      } else {
+        // No conflict - apply directly
+        const newAidStations = hasWaypoints ? waypointAidStations : (raceData.aidStations || []);
+
+        // Update race data with new course coordinates immediately for visualization
+        const updatedRaceData = {
+          ...raceData,
+          courseCoordinates: coordinates,
+          aidStations: newAidStations,
+        };
+        setRaceData(updatedRaceData);
+        setHasUnsavedChanges(true);
+
+        // Analyze GPX and update elevation metrics
+        const finalRaceData = await analyzeAndUpdateElevation(
+          gpxContent,
+          updatedRaceData,
+          newAidStations
+        );
+
+        setRaceData(finalRaceData);
+      }
 
       // Clear the input so the same file can be re-uploaded
       e.target.value = '';
@@ -373,6 +443,65 @@ export default function Home() {
       setError('Failed to parse GPX file');
     }
   }, [raceData, analyzeAndUpdateElevation]);
+
+  // Confirm replacing aid stations with GPX waypoints
+  const handleConfirmWaypointImport = useCallback(async () => {
+    if (!pendingWaypoints || !pendingGpxData || !raceData) return;
+
+    const updatedRaceData = {
+      ...raceData,
+      courseCoordinates: pendingGpxData.coordinates,
+      aidStations: pendingWaypoints,
+    };
+    setRaceData(updatedRaceData);
+    setHasUnsavedChanges(true);
+
+    // Analyze GPX and update elevation metrics
+    const finalRaceData = await analyzeAndUpdateElevation(
+      pendingGpxData.gpxContent,
+      updatedRaceData,
+      pendingWaypoints
+    );
+
+    setRaceData(finalRaceData);
+
+    // Clear pending state
+    setShowWaypointConfirm(false);
+    setPendingWaypoints(null);
+    setPendingGpxData(null);
+  }, [pendingWaypoints, pendingGpxData, raceData, analyzeAndUpdateElevation]);
+
+  // Cancel waypoint import and keep existing aid stations
+  const handleCancelWaypointImport = useCallback(async () => {
+    if (!pendingGpxData || !raceData) {
+      setShowWaypointConfirm(false);
+      setPendingWaypoints(null);
+      setPendingGpxData(null);
+      return;
+    }
+
+    // Apply the GPX course data but keep existing aid stations
+    const updatedRaceData = {
+      ...raceData,
+      courseCoordinates: pendingGpxData.coordinates,
+    };
+    setRaceData(updatedRaceData);
+    setHasUnsavedChanges(true);
+
+    // Analyze GPX and update elevation metrics for existing aid stations
+    const finalRaceData = await analyzeAndUpdateElevation(
+      pendingGpxData.gpxContent,
+      updatedRaceData,
+      raceData.aidStations || []
+    );
+
+    setRaceData(finalRaceData);
+
+    // Clear pending state
+    setShowWaypointConfirm(false);
+    setPendingWaypoints(null);
+    setPendingGpxData(null);
+  }, [pendingGpxData, raceData, analyzeAndUpdateElevation]);
 
   // Handle save race
   const handleSaveRace = useCallback(async () => {
@@ -522,7 +651,12 @@ export default function Home() {
         <div className={styles.raceLayout}>
           {/* Race Overview Card */}
           <section className={styles.section}>
-            <RaceCard race={raceData} />
+            <RaceCard
+              race={raceData}
+              editable
+              onDateChange={handleDateChange}
+              onStartTimeChange={handleStartTimeChange}
+            />
           </section>
 
           {/* Race Settings Panel */}
@@ -569,9 +703,23 @@ export default function Home() {
             <section className={styles.section}>
               <AIUpdatePanel
                 raceId={raceData.id}
-                onUpdateComplete={(updatedAidStations) => {
-                  setRaceData({ ...raceData, aidStations: updatedAidStations });
-                  setHasUnsavedChanges(true);
+                onUpdateComplete={(updates) => {
+                  // Use functional update to avoid stale closure issues
+                  setRaceData((prev) => {
+                    if (!prev) return prev;
+                    
+                    // Start with the updated race data if provided, otherwise previous state
+                    let newData = updates.updatedRace ? { ...prev, ...updates.updatedRace } : { ...prev };
+                    
+                    // Apply aid station updates if provided
+                    if (updates.updatedAidStations) {
+                      newData = { ...newData, aidStations: updates.updatedAidStations };
+                    }
+                    
+                    return newData;
+                  });
+                  // Don't set hasUnsavedChanges - the AI endpoint already saved to the database
+                  setLastSaveTime(new Date());
                 }}
               />
             </section>
@@ -593,6 +741,13 @@ export default function Home() {
                 totalElevationLossM={raceData.elevationLossM}
                 overallCutoffHours={raceData.overallCutoffHours}
                 onOverallCutoffChange={handleOverallCutoffChange}
+                raceStartTime={
+                  raceData.date && raceData.startTime
+                    ? new Date(`${raceData.date}T${raceData.startTime}`)
+                    : raceData.date
+                      ? new Date(raceData.date)
+                      : null
+                }
               />
             </section>
           )}
@@ -612,6 +767,13 @@ export default function Home() {
                 totalElevationLossM={raceData.elevationLossM}
                 overallCutoffHours={raceData.overallCutoffHours}
                 onOverallCutoffChange={handleOverallCutoffChange}
+                raceStartTime={
+                  raceData.date && raceData.startTime
+                    ? new Date(`${raceData.date}T${raceData.startTime}`)
+                    : raceData.date
+                      ? new Date(raceData.date)
+                      : null
+                }
               />
             </section>
           )}
@@ -662,6 +824,41 @@ export default function Home() {
         onSelectRace={handleLoadRace}
         hasUnsavedChanges={hasUnsavedChanges}
       />
+
+      {/* Waypoint Import Confirmation Dialog */}
+      {showWaypointConfirm && pendingWaypoints && (
+        <div className={styles.waypointConfirmOverlay}>
+          <div className={styles.waypointConfirmDialog}>
+            <h3>Import Waypoints as Aid Stations?</h3>
+            <p>
+              Found <strong>{pendingWaypoints.length}</strong> waypoint{pendingWaypoints.length !== 1 ? 's' : ''} in the GPX file.
+              This will replace your existing <strong>{raceData?.aidStations?.length || 0}</strong> aid station{(raceData?.aidStations?.length || 0) !== 1 ? 's' : ''}.
+            </p>
+            <div className={styles.waypointPreview}>
+              {pendingWaypoints.slice(0, 5).map((wp, i) => (
+                <span key={i} className={styles.waypointChip}>{wp.name}</span>
+              ))}
+              {pendingWaypoints.length > 5 && (
+                <span className={styles.waypointMore}>+{pendingWaypoints.length - 5} more</span>
+              )}
+            </div>
+            <div className={styles.waypointConfirmButtons}>
+              <button
+                onClick={handleCancelWaypointImport}
+                className={styles.waypointKeepButton}
+              >
+                Keep Existing
+              </button>
+              <button
+                onClick={handleConfirmWaypointImport}
+                className={styles.waypointReplaceButton}
+              >
+                Replace with Waypoints
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

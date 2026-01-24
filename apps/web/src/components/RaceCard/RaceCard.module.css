@@ -61,6 +61,82 @@
   gap: 6px;
 }
 
+.metaEditable {
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: background-color 0.2s ease;
+}
+
+.metaEditable:hover {
+  background-color: rgba(100, 181, 246, 0.15);
+}
+
+.editHint {
+  font-size: 0.75rem;
+  opacity: 0.5;
+  margin-left: 4px;
+}
+
+.metaEditable:hover .editHint {
+  opacity: 1;
+}
+
+.editGroup {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.editInput {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid #64b5f6;
+  border-radius: 4px;
+  color: #fff;
+  padding: 4px 8px;
+  font-size: 0.875rem;
+  font-family: inherit;
+}
+
+.editInput:focus {
+  outline: none;
+  border-color: #90caf9;
+  box-shadow: 0 0 0 2px rgba(100, 181, 246, 0.2);
+}
+
+/* Fix for date/time input color on dark background */
+.editInput::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+}
+
+.editSave,
+.editCancel {
+  background: transparent;
+  border: none;
+  color: #fff;
+  cursor: pointer;
+  font-size: 0.875rem;
+  padding: 4px 6px;
+  border-radius: 4px;
+  transition: background-color 0.2s ease;
+}
+
+.editSave {
+  color: #4caf50;
+}
+
+.editSave:hover {
+  background-color: rgba(76, 175, 80, 0.2);
+}
+
+.editCancel {
+  color: #f44336;
+}
+
+.editCancel:hover {
+  background-color: rgba(244, 67, 54, 0.2);
+}
+
 .stats {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
