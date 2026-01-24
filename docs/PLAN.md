@@ -580,13 +580,13 @@ This is a non-negotiable requirement to ensure:
 ## Phase 8: Follow Ups, Fixes, Ideas and Future Work
 
 ### Urgent Fixes
+- [x] Race start time doesn't show up anywhere on the race page
+  - **Fixed**: Start time was already displaying in RaceCard component
+- [x] Race start time should be editable on the race page
+  - **Fixed**: Added inline editing for race date and start time in RaceCard with editable prop and callbacks
+- [x] Race start time should sync to the first aid station time (cutoff)
+  - **Fixed**: Already working via architecture - raceStartTime prop passed to AidStationTable updates automatically when startTime changes
 
-- [x] **Flat Pace calculation is incorrect**: The Performance Summary shows a "Flat Pace" of 13:18 /km, but all uploaded activities have faster average paces (11:26, 12:49, 8:17 /km). This is illogical—flat pace should represent running on flat terrain, which should be faster than overall race averages that include climbing sections. The flat pace calculation algorithm needs to be reviewed and fixed.
-  - **Fixed**: Made two key changes:
-    1. Widened the "flat" gradient category from -1% to 1% → -3% to 3%, which is more realistic for trail running
-    2. Added distance weighting to pace calculations so longer segments contribute more (prevents short GPS anomalies from skewing results)
-- [x] **AI race update fails with "No values to set"**: When using the AI update feature (e.g., "Add a water stop at 15 km"), it fails with error "No values to set".
-  - **Fixed**: Modified `updateRace()` in race-repository.ts to handle cases where only aid stations are being updated (no race field changes). Now it explicitly builds the update object and skips the race update if there are no fields to change, while still proceeding with aid station updates.
 
 ### Fast Follows
 - [x] The "Terrain Segments Breakdown" table is breaking down into every climb and descent, which makes is noisy. It should breakdown into climbs that are more than 50 meters of total ascent and more than 100 meters of descent, otherwise just blend them into a "rolling hills" section.
