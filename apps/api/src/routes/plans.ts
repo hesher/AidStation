@@ -394,6 +394,18 @@ export async function planRoutes(app: FastifyInstance) {
         });
       }
 
+      // Validate that race has sufficient data for predictions
+      const hasAidStations = raceData.aidStations.length > 0;
+      const hasDistance = raceData.race.distanceKm !== null && raceData.race.distanceKm > 0;
+        
+      if (!hasAidStations && !hasDistance) {
+        return reply.status(400).send({
+          success: false,
+          error: 'This race has no course data yet. Please add aid stations or set the race distance before generating predictions.',
+          code: 'MISSING_COURSE_DATA',
+        });
+      }
+
       // Get user performance profile
       const performanceRaw = await getUserPerformanceForPrediction(userId);
 
@@ -747,9 +759,12 @@ function generatePredictions(
 
   const waypoints: Waypoint[] = [];
 
-  // Add Start waypoint if first station isn't at 0km
+  // Add Start waypoint if:
+  // 1. There are no aid stations at all (we still need Start/Finish for distance-only races), OR
+  // 2. First station isn't at 0km
   const firstStationDistance = raceData.aidStations[0]?.distanceKm ?? 0;
-  if (firstStationDistance > 0.1) {
+  const hasNoStations = raceData.aidStations.length === 0;
+  if (hasNoStations || firstStationDistance > 0.1) {
     waypoints.push({
       id: 'start',
       name: 'Start',
