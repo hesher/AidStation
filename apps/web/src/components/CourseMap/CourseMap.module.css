@@ -86,13 +86,6 @@
   font-weight: 700;
 }
 
-/* Popup styles */
-.popupContent {
-  font-size: 13px;
-  line-height: 1.5;
-  color: #333;
-}
-
 /* Responsive adjustments */
 @media (max-width: 768px) {
   .map {
@@ -109,9 +102,11 @@
 .container :global(.mapboxgl-popup-content) {
   background: rgba(26, 26, 46, 0.95);
   color: #e0e0e0;
-  border-radius: 8px;
-  padding: 12px 16px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  border-radius: 10px;
+  padding: 0;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+  min-width: 160px;
 }
 
 .container :global(.mapboxgl-popup-tip) {
@@ -120,13 +115,84 @@
 
 .container :global(.mapboxgl-popup-close-button) {
   color: #888;
-  font-size: 18px;
-  padding: 4px 8px;
+  font-size: 16px;
+  padding: 6px 10px;
+  right: 2px;
+  top: 2px;
 }
 
 .container :global(.mapboxgl-popup-close-button:hover) {
   color: #fff;
   background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+}
+
+/* New popup content styles */
+.popupContent {
+  padding: 14px 16px;
+}
+
+.popupHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.popupIcon {
+  font-size: 18px;
+}
+
+.popupName {
+  font-size: 15px;
+  font-weight: 600;
+  color: #fff;
+}
+
+.popupCutoff {
+  background: rgba(76, 175, 80, 0.15);
+  border: 1px solid rgba(76, 175, 80, 0.3);
+  border-radius: 6px;
+  padding: 8px 10px;
+  margin-bottom: 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.popupCutoffLabel {
+  font-size: 11px;
+  color: #81c784;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.popupCutoffValue {
+  font-size: 14px;
+  font-weight: 600;
+  color: #81c784;
+}
+
+.popupStats {
+  display: flex;
+  gap: 12px;
+  font-size: 12px;
+  color: #a0a8b4;
+  margin-bottom: 6px;
+}
+
+.popupStats span {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.popupServices {
+  font-size: 11px;
+  color: #8892a0;
+  padding-top: 8px;
+  border-top: 1px solid rgba(48, 71, 94, 0.5);
+  margin-top: 6px;
 }
 
 /* 3D Toggle Button */

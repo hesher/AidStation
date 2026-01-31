@@ -19,6 +19,8 @@ interface CourseMapProps {
   enable3D?: boolean;
   terrainExaggeration?: number;
   totalRaceDistanceKm?: number;
+  /** Index of the focused aid station (will pan and highlight) */
+  focusedStationIndex?: number | null;
 }
 
 const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
@@ -27,8 +29,25 @@ const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
 // More points = smoother line but slower performance
 const MAX_COORDINATE_POINTS = 1000;
 
-// Default terrain exaggeration factor
 const DEFAULT_TERRAIN_EXAGGERATION = 1.5;
+
+/**
+ * Format cutoff hours into a readable string
+ * For cutoffs >= 24 hours, shows "Day X + HH:MM" format
+ */
+function formatCutoffTime(hours: number | undefined | null): string {
+  if (hours === undefined || hours === null) return '';
+  const dayOffset = Math.floor(hours / 24);
+  const hoursInDay = hours - dayOffset * 24;
+  const h = Math.floor(hoursInDay);
+  const m = Math.round((hoursInDay - h) * 60);
+  const timeStr = `${h}h ${m > 0 ? `${m}m` : ''}`.trim();
+
+  if (hours >= 24) {
+    return `Day ${dayOffset + 1}, ${timeStr}`;
+  }
+  return timeStr;
+}
 
 // Waypoint type configuration for markers
 const WAYPOINT_MARKER_CONFIG: Record<WaypointType, { color: string; icon: string; label: string }> = {
@@ -69,19 +88,80 @@ function simplifyCoordinates(coords: CourseCoordinate[], maxPoints: number): Cou
   return result;
 }
 
+/**
+ * Find the coordinate for an aid station based on its distance along the course
+ */
+function findStationCoordinate(
+  station: AidStation,
+  stationIndex: number,
+  aidStationsLength: number,
+  coordinates: CourseCoordinate[],
+  totalRaceDistanceKm?: number
+): CourseCoordinate | undefined {
+  if (coordinates.length === 0) return undefined;
+
+  if (station.distanceKm !== null && station.distanceKm !== undefined) {
+    // Get the total distance - use the passed total race distance
+    let totalDistance = totalRaceDistanceKm;
+
+    // Fallback: estimate total distance using Haversine formula
+    if (!totalDistance || totalDistance <= 0) {
+      let approxDistance = 0;
+      for (let i = 1; i < coordinates.length; i++) {
+        const prev = coordinates[i - 1];
+        const curr = coordinates[i];
+        const dLat = (curr.lat - prev.lat) * Math.PI / 180;
+        const dLon = (curr.lon - prev.lon) * Math.PI / 180;
+        const lat1 = prev.lat * Math.PI / 180;
+        const lat2 = curr.lat * Math.PI / 180;
+        const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+          Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        approxDistance += 6371 * c;
+      }
+      totalDistance = approxDistance;
+    }
+
+    if (totalDistance > 0) {
+      const ratio = station.distanceKm / totalDistance;
+      const targetIndex = Math.min(
+        Math.floor(ratio * (coordinates.length - 1)),
+        coordinates.length - 1
+      );
+      return coordinates[targetIndex];
+    }
+    
+    // Fallback: distribute stations evenly
+    const targetIndex = Math.min(
+      Math.floor((stationIndex / aidStationsLength) * (coordinates.length - 1)),
+      coordinates.length - 1
+    );
+    return coordinates[targetIndex];
+  }
+  
+  // Station has no distance - distribute evenly along course
+  const targetIndex = Math.min(
+    Math.floor(((stationIndex + 1) / (aidStationsLength + 1)) * (coordinates.length - 1)),
+    coordinates.length - 1
+  );
+  return coordinates[targetIndex];
+}
+
 function CourseMapComponent({
   coordinates,
   aidStations,
   onAidStationClick,
   enable3D = true,
   terrainExaggeration = DEFAULT_TERRAIN_EXAGGERATION,
-  totalRaceDistanceKm
+  totalRaceDistanceKm,
+  focusedStationIndex
 }: CourseMapProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const markersRef = useRef<mapboxgl.Marker[]>([]);
   const [mapError, setMapError] = useState<string | null>(null);
   const [is3DEnabled, setIs3DEnabled] = useState(enable3D);
+  const [mapLoaded, setMapLoaded] = useState(false);
 
   // Simplify coordinates for performance if there are too many points
   const displayCoordinates = React.useMemo(
@@ -89,6 +169,7 @@ function CourseMapComponent({
     [coordinates]
   );
 
+  // Initialize the map
   useEffect(() => {
     if (!mapContainer.current) return;
 
@@ -122,10 +203,10 @@ function CourseMapComponent({
 
     map.current.on('load', () => {
       if (!map.current) return;
+      setMapLoaded(true);
 
       // Add 3D terrain if enabled
       if (is3DEnabled) {
-        // Add terrain source
         map.current.addSource('mapbox-dem', {
           type: 'raster-dem',
           url: 'mapbox://mapbox.mapbox-terrain-dem-v1',
@@ -133,13 +214,11 @@ function CourseMapComponent({
           maxzoom: 14,
         });
 
-        // Set terrain with exaggeration
         map.current.setTerrain({
           source: 'mapbox-dem',
           exaggeration: terrainExaggeration,
         });
 
-        // Add sky layer for better 3D aesthetics
         map.current.addLayer({
           id: 'sky',
           type: 'sky',
@@ -217,15 +296,15 @@ function CourseMapComponent({
     // Add navigation controls
     map.current.addControl(new mapboxgl.NavigationControl({ visualizePitch: true }), 'top-right');
     map.current.addControl(new mapboxgl.ScaleControl(), 'bottom-left');
-    map.current.addControl(
-      new mapboxgl.FullscreenControl(),
-      'top-right'
-    );
+    map.current.addControl(new mapboxgl.FullscreenControl(), 'top-right');
 
     return () => {
       // Clean up markers
       markersRef.current.forEach(marker => marker.remove());
       markersRef.current = [];
+
+      // Reset map loaded state
+      setMapLoaded(false);
 
       // Clean up map
       map.current?.remove();
@@ -242,55 +321,13 @@ function CourseMapComponent({
 
     // For each aid station, try to find its position on the course
     aidStations.forEach((station, index) => {
-      // Find the closest coordinate based on distance
-      let stationCoord: CourseCoordinate | undefined;
-
-      if (station.distanceKm !== null && station.distanceKm !== undefined && coordinates.length > 0) {
-        // Get the total distance - use the passed total race distance
-        let totalDistance = totalRaceDistanceKm;
-
-        // Fallback: estimate total distance using Haversine formula
-        if (!totalDistance || totalDistance <= 0) {
-          let approxDistance = 0;
-          for (let i = 1; i < coordinates.length; i++) {
-            const prev = coordinates[i - 1];
-            const curr = coordinates[i];
-            // Haversine approximation for small distances
-            const dLat = (curr.lat - prev.lat) * Math.PI / 180;
-            const dLon = (curr.lon - prev.lon) * Math.PI / 180;
-            const lat1 = prev.lat * Math.PI / 180;
-            const lat2 = curr.lat * Math.PI / 180;
-            const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-              Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
-            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-            approxDistance += 6371 * c; // Earth radius in km
-          }
-          totalDistance = approxDistance;
-        }
-
-        if (totalDistance > 0) {
-          const ratio = station.distanceKm / totalDistance;
-          const targetIndex = Math.min(
-            Math.floor(ratio * (coordinates.length - 1)),
-            coordinates.length - 1
-          );
-          stationCoord = coordinates[targetIndex];
-        } else {
-          // Fallback: distribute stations evenly along the course
-          const targetIndex = Math.min(
-            Math.floor((index / aidStations.length) * (coordinates.length - 1)),
-            coordinates.length - 1
-          );
-          stationCoord = coordinates[targetIndex];
-        }
-      } else if (coordinates.length > 0) {
-        // Station has no distance - distribute evenly along course
-        const targetIndex = Math.min(
-          Math.floor(((index + 1) / (aidStations.length + 1)) * (coordinates.length - 1)),
-          coordinates.length - 1
-        );
-        stationCoord = coordinates[targetIndex];
-      }
+      const stationCoord = findStationCoordinate(
+        station,
+        index,
+        aidStations.length,
+        coordinates,
+        totalRaceDistanceKm
+      );
 
       if (stationCoord && map.current) {
         // Get marker config based on waypoint type
@@ -304,16 +341,32 @@ function CourseMapComponent({
         el.innerHTML = `<span class="${styles.aidStationNumber}">${index + 1}</span>`;
         el.title = `${station.name} (${markerConfig.label})`;
 
+        // Format cutoff time for display
+        const cutoffDisplay = formatCutoffTime(station.cutoffHoursFromStart);
+        const hasCutoff = cutoffDisplay !== '';
+
+        // Build services list
+        const services: string[] = [];
+        if (station.hasDropBag) services.push('Drop Bag');
+        if (station.hasCrew) services.push('Crew');
+        if (station.hasPacer) services.push('Pacer');
+        const servicesDisplay = services.length > 0 ? services.join(' • ') : '';
+
         const popup = new mapboxgl.Popup({ offset: 25 }).setHTML(`
           <div class="${styles.popupContent}">
-            <strong>${markerConfig.icon} ${station.name}</strong><br/>
-            <span style="color: ${markerConfig.color}; font-weight: 500;">${markerConfig.label}</span><br/>
-            📍 ${station.distanceKm?.toFixed(1) ?? '--'} km<br/>
-            ⬆️ ${station.elevationM ? Math.round(station.elevationM) + ' m' : '--'}
-            ${station.hasDropBag ? '<br/>🎒 Drop Bag' : ''}
-            ${station.hasCrew ? '<br/>👥 Crew Access' : ''}
-            ${station.hasPacer ? '<br/>🏃 Pacer Pickup' : ''}
-            ${station.cutoffHoursFromStart ? `<br/>⏱️ Cutoff: ${station.cutoffHoursFromStart}h` : ''}
+            <div class="${styles.popupHeader}">
+              <span class="${styles.popupIcon}">${markerConfig.icon}</span>
+              <span class="${styles.popupName}">${station.name}</span>
+            </div>
+            ${hasCutoff ? `<div class="${styles.popupCutoff}">
+              <span class="${styles.popupCutoffLabel}">Cutoff</span>
+              <span class="${styles.popupCutoffValue}">${cutoffDisplay}</span>
+            </div>` : ''}
+            <div class="${styles.popupStats}">
+              <span>${station.distanceKm?.toFixed(1) ?? '--'} km</span>
+              <span>${station.elevationM ? Math.round(station.elevationM) + ' m' : '--'}</span>
+            </div>
+            ${servicesDisplay ? `<div class="${styles.popupServices}">${servicesDisplay}</div>` : ''}
           </div>
         `);
 
@@ -330,6 +383,41 @@ function CourseMapComponent({
       }
     });
   }, [aidStations, coordinates, onAidStationClick, totalRaceDistanceKm]);
+
+  // Effect to focus on a specific aid station when focusedStationIndex changes
+  useEffect(() => {
+    if (!map.current || !mapLoaded) return;
+    if (focusedStationIndex === null || focusedStationIndex === undefined) return;
+    if (!aidStations || focusedStationIndex >= aidStations.length) return;
+
+    const station = aidStations[focusedStationIndex];
+    if (!station) return;
+
+    // Find the station's coordinate
+    const stationCoord = findStationCoordinate(
+      station,
+      focusedStationIndex,
+      aidStations.length,
+      coordinates,
+      totalRaceDistanceKm
+    );
+
+    if (stationCoord && map.current) {
+      // Pan and zoom to the focused station
+      map.current.flyTo({
+        center: [stationCoord.lon, stationCoord.lat],
+        zoom: 12,
+        duration: 800,
+        essential: true
+      });
+
+      // Open the popup for this marker if it exists
+      const marker = markersRef.current[focusedStationIndex];
+      if (marker) {
+        marker.togglePopup();
+      }
+    }
+  }, [focusedStationIndex, aidStations, coordinates, totalRaceDistanceKm, mapLoaded]);
 
   // Toggle 3D mode
   const toggle3D = () => {
@@ -435,6 +523,11 @@ function CourseMapComponent({
 export const CourseMap = memo(CourseMapComponent, (prevProps, nextProps) => {
   // Custom comparison for performance
   // Return true if props are equal (should NOT re-render)
+
+  // Always re-render if focusedStationIndex changed
+  if (prevProps.focusedStationIndex !== nextProps.focusedStationIndex) {
+    return false;
+  }
 
   // Check if totalRaceDistanceKm changed
   if (prevProps.totalRaceDistanceKm !== nextProps.totalRaceDistanceKm) {

@@ -24,6 +24,7 @@ export interface RaceData {
   elevationGainM?: number | null;
   elevationLossM?: number | null;
   startTime?: string | null;
+  startCutoffHours?: number | null;
   overallCutoffHours?: number | null;
   courseGpx?: string;
   isPublic?: boolean;

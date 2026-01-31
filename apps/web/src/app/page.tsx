@@ -37,6 +37,7 @@ export default function Home() {
   const [isSaving, setIsSaving] = useState(false);
   const [autoSaveEnabled, setAutoSaveEnabled] = useState(true);
   const [lastSaveTime, setLastSaveTime] = useState<Date | null>(null);
+  const [focusedStationIndex, setFocusedStationIndex] = useState<number | null>(null);
 
   // State for GPX waypoint import confirmation dialog
   const [showWaypointConfirm, setShowWaypointConfirm] = useState(false);
@@ -168,6 +169,11 @@ export default function Home() {
     setSelectedStation(index);
   }, []);
 
+  // Handle focusing an aid station (from table editing)
+  const handleAidStationFocus = useCallback((station: AidStation, index: number) => {
+    setFocusedStationIndex(index);
+  }, []);
+
   // Handle loading a race from the browser
   const handleLoadRace = useCallback((race: RaceData) => {
     setRaceData(race);
@@ -260,6 +266,20 @@ export default function Home() {
   const handleOverallCutoffChange = useCallback((hours: number | null) => {
     if (!raceData) return;
     setRaceData({ ...raceData, overallCutoffHours: hours ?? undefined });
+    setHasUnsavedChanges(true);
+  }, [raceData]);
+
+  // Handle start elevation change from start row
+  const handleStartElevationChange = useCallback((elevation: number | null) => {
+    if (!raceData) return;
+    setRaceData({ ...raceData, startElevationM: elevation ?? undefined });
+    setHasUnsavedChanges(true);
+  }, [raceData]);
+
+  // Handle start cutoff change from start row
+  const handleStartCutoffChange = useCallback((hours: number | null) => {
+    if (!raceData) return;
+    setRaceData({ ...raceData, startCutoffHours: hours ?? undefined });
     setHasUnsavedChanges(true);
   }, [raceData]);
 
@@ -555,41 +575,200 @@ export default function Home() {
     }
   }, [raceData]);
 
+  // Handle GPX file upload for new race creation (from onboarding)
+  const handleNewRaceGpxUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setAppState('searching');
+    setError(null);
+
+    try {
+      const gpxContent = await file.text();
+
+      // Store GPX content for future re-analysis
+      gpxContentRef.current = gpxContent;
+
+      const parser = new DOMParser();
+      const xmlDoc = parser.parseFromString(gpxContent, 'text/xml');
+
+      // Check for parse errors
+      const parseError = xmlDoc.querySelector('parsererror');
+      if (parseError) {
+        console.error('GPX parse error:', parseError.textContent);
+        setError('Invalid GPX file format');
+        setAppState('error');
+        return;
+      }
+
+      // Extract track points from GPX for immediate visualization
+      const coordinates: Array<{ lat: number; lon: number; elevation?: number }> = [];
+
+      // Try to get track points first (most common)
+      const trkpts = xmlDoc.querySelectorAll('trkpt');
+      if (trkpts.length > 0) {
+        trkpts.forEach((pt) => {
+          const lat = parseFloat(pt.getAttribute('lat') || '0');
+          const lon = parseFloat(pt.getAttribute('lon') || '0');
+          const eleEl = pt.querySelector('ele');
+          const elevation = eleEl ? parseFloat(eleEl.textContent || '0') : undefined;
+
+          if (lat && lon) {
+            coordinates.push({ lat, lon, elevation });
+          }
+        });
+      }
+
+      // If no track points, try route points
+      if (coordinates.length === 0) {
+        const rtepts = xmlDoc.querySelectorAll('rtept');
+        rtepts.forEach((pt) => {
+          const lat = parseFloat(pt.getAttribute('lat') || '0');
+          const lon = parseFloat(pt.getAttribute('lon') || '0');
+          const eleEl = pt.querySelector('ele');
+          const elevation = eleEl ? parseFloat(eleEl.textContent || '0') : undefined;
+
+          if (lat && lon) {
+            coordinates.push({ lat, lon, elevation });
+          }
+        });
+      }
+
+      if (coordinates.length === 0) {
+        setError('No track points found in GPX file. Please upload a GPX file with a track or route.');
+        setAppState('error');
+        return;
+      }
+
+      // Extract waypoints as aid stations
+      const wpts = xmlDoc.querySelectorAll('wpt');
+      const waypointAidStations: AidStation[] = [];
+
+      wpts.forEach((wpt, index) => {
+        const lat = parseFloat(wpt.getAttribute('lat') || '0');
+        const lon = parseFloat(wpt.getAttribute('lon') || '0');
+        const nameEl = wpt.querySelector('name');
+        const eleEl = wpt.querySelector('ele');
+
+        const name = nameEl?.textContent || `Waypoint ${index + 1}`;
+        const elevation = eleEl ? parseFloat(eleEl.textContent || '0') : undefined;
+
+        if (lat && lon) {
+          waypointAidStations.push({
+            name,
+            distanceKm: null,
+            elevationM: elevation ?? null,
+            hasDropBag: false,
+            hasCrew: false,
+            hasPacer: false,
+            waypointType: 'aid_station',
+            latitude: lat,
+            longitude: lon,
+          });
+        }
+      });
+
+      // Extract race name from GPX metadata or filename
+      const gpxName = xmlDoc.querySelector('metadata > name')?.textContent
+        || xmlDoc.querySelector('trk > name')?.textContent
+        || file.name.replace(/\.gpx$/i, '');
+
+      // Create new race data from GPX
+      const newRaceData: RaceData = {
+        name: gpxName,
+        courseCoordinates: coordinates,
+        aidStations: waypointAidStations,
+        isPublic: false,
+      };
+
+      // Update race data immediately for visualization
+      setRaceData(newRaceData);
+      setAppState('success');
+      setHasUnsavedChanges(true);
+
+      // Analyze GPX and update elevation metrics
+      const finalRaceData = await analyzeAndUpdateElevation(
+        gpxContent,
+        newRaceData,
+        waypointAidStations
+      );
+
+      setRaceData(finalRaceData);
+
+      // Clear the input so the same file can be re-uploaded
+      e.target.value = '';
+    } catch (err) {
+      console.error('Error parsing GPX file:', err);
+      setError('Failed to parse GPX file');
+      setAppState('error');
+    }
+  }, [analyzeAndUpdateElevation]);
+
   // Render the search/onboarding form
   const renderSearchForm = () => (
     <div className={styles.onboarding}>
-      <h2 className={styles.onboardingTitle}>Find Your Race</h2>
+      <h2 className={styles.onboardingTitle}>Create Your Race</h2>
       <p className={styles.onboardingDescription}>
-        Enter the name of an ultra-marathon or endurance race, and we&apos;ll help you plan your strategy.
+        Upload a GPX file to start planning your race. The GPX should contain the course route and optionally waypoints for aid stations.
       </p>
 
-      <form onSubmit={handleSearch} className={styles.searchForm} role="search">
-        <label htmlFor="race-search" className="sr-only">
-          Search for a race
-        </label>
+      {/* Primary: GPX Upload */}
+      <div className={styles.gpxUploadSection}>
         <input
-          id="race-search"
-          type="text"
-          value={raceName}
-          onChange={(e) => setRaceName(e.target.value)}
-          placeholder="e.g., Western States 100, UTMB, Leadville 100..."
-          className={styles.searchInput}
+          type="file"
+          accept=".gpx"
+          onChange={handleNewRaceGpxUpload}
+          className={styles.gpxUploadInput}
+          id="new-race-gpx-upload"
           disabled={appState === 'searching'}
-          data-testid="race-search-input"
-          aria-describedby="race-search-hint"
         />
-        <span id="race-search-hint" className="sr-only">
-          Enter the name of an ultra-marathon or endurance race
-        </span>
-        <button
-          type="submit"
-          className={styles.searchButton}
-          disabled={appState === 'searching' || !raceName.trim()}
-          data-testid="race-search-button"
-        >
-          {appState === 'searching' ? 'Searching...' : 'Find Race'}
-        </button>
-      </form>
+        <label htmlFor="new-race-gpx-upload" className={styles.primaryGpxUploadButton}>
+          <span className={styles.uploadIcon}>📤</span>
+          <span className={styles.uploadText}>Upload GPX File</span>
+          <span className={styles.uploadHint}>Required - Contains your course route</span>
+        </label>
+      </div>
+
+      <div className={styles.orDivider}>
+        <span>or</span>
+      </div>
+
+      {/* Secondary: AI Search (optional, for race info lookup) */}
+      <div className={styles.aiSearchSection}>
+        <p className={styles.aiSearchHint}>
+          Know your race name? Search for additional race details like cutoff times:
+        </p>
+        <form onSubmit={handleSearch} className={styles.searchForm} role="search">
+          <label htmlFor="race-search" className="sr-only">
+            Search for race information
+          </label>
+          <input
+            id="race-search"
+            type="text"
+            value={raceName}
+            onChange={(e) => setRaceName(e.target.value)}
+            placeholder="e.g., Western States 100, UTMB..."
+            className={styles.searchInput}
+            disabled={appState === 'searching'}
+            data-testid="race-search-input"
+            aria-describedby="race-search-hint"
+          />
+          <span id="race-search-hint" className="sr-only">
+            Search for race information to auto-fill details
+          </span>
+          <button
+            type="submit"
+            className={styles.secondarySearchButton}
+            disabled={appState === 'searching' || !raceName.trim()}
+            data-testid="race-search-button"
+          >
+            {appState === 'searching' ? 'Searching...' : 'Search'}
+          </button>
+        </form>
+        <p className={styles.aiSearchNote}>
+          ⚠️ AI search may have limited knowledge. GPX upload is recommended for accurate course data.
+        </p>
+      </div>
 
       <div className={styles.orDivider}>
         <span>or</span>
@@ -716,6 +895,7 @@ export default function Home() {
                 aidStations={raceData.aidStations}
                 onAidStationClick={handleAidStationClick}
                 totalRaceDistanceKm={raceData.distanceKm}
+                focusedStationIndex={focusedStationIndex}
               />
             </section>
           )}
@@ -754,16 +934,20 @@ export default function Home() {
                 aidStations={raceData.aidStations}
                 onStationClick={handleAidStationClick}
                 onAidStationsChange={handleAidStationsChange}
+                onStationFocus={handleAidStationFocus}
                 editable
                 hasCourseData={!!(raceData.courseCoordinates && raceData.courseCoordinates.length > 0)}
                 raceDistanceKm={raceData.distanceKm}
-                startElevationM={raceData.courseCoordinates?.[0]?.elevation}
+                startElevationM={raceData.courseCoordinates?.[0]?.elevation ?? raceData.startElevationM}
+                onStartElevationChange={handleStartElevationChange}
                 finishElevationM={raceData.courseCoordinates?.[raceData.courseCoordinates.length - 1]?.elevation}
                 totalElevationGainM={raceData.elevationGainM}
                 totalElevationLossM={raceData.elevationLossM}
                 overallCutoffHours={raceData.overallCutoffHours}
                 onOverallCutoffChange={handleOverallCutoffChange}
                 raceStartTime={getRaceStartTime()}
+                startCutoffHours={raceData.startCutoffHours}
+                onStartCutoffChange={handleStartCutoffChange}
               />
             </section>
           )}
@@ -774,14 +958,18 @@ export default function Home() {
               <AidStationTable
                 aidStations={[]}
                 onAidStationsChange={handleAidStationsChange}
+                onStationFocus={handleAidStationFocus}
                 editable
                 hasCourseData={!!(raceData.courseCoordinates && raceData.courseCoordinates.length > 0)}
                 raceDistanceKm={raceData.distanceKm}
-                startElevationM={raceData.courseCoordinates?.[0]?.elevation}
+                startElevationM={raceData.courseCoordinates?.[0]?.elevation ?? raceData.startElevationM}
+                onStartElevationChange={handleStartElevationChange}
                 finishElevationM={raceData.courseCoordinates?.[raceData.courseCoordinates.length - 1]?.elevation}
                 totalElevationGainM={raceData.elevationGainM}
                 totalElevationLossM={raceData.elevationLossM}
                 overallCutoffHours={raceData.overallCutoffHours}
+                startCutoffHours={raceData.startCutoffHours}
+                onStartCutoffChange={handleStartCutoffChange}
                 onOverallCutoffChange={handleOverallCutoffChange}
                 raceStartTime={getRaceStartTime()}
               />

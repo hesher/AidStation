@@ -109,6 +109,89 @@
   padding: 0 16px;
 }
 
+/* Primary GPX Upload Section */
+.gpxUploadSection {
+  margin-bottom: 8px;
+}
+
+.primaryGpxUploadButton {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 32px 24px;
+  background: linear-gradient(135deg, rgba(76, 175, 80, 0.15) 0%, rgba(46, 125, 50, 0.15) 100%);
+  border: 2px dashed #4CAF50;
+  border-radius: 16px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.primaryGpxUploadButton:hover {
+  background: linear-gradient(135deg, rgba(76, 175, 80, 0.25) 0%, rgba(46, 125, 50, 0.25) 100%);
+  border-color: #66BB6A;
+  transform: translateY(-2px);
+}
+
+.uploadIcon {
+  font-size: 2.5rem;
+}
+
+.uploadText {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: #fff;
+}
+
+.uploadHint {
+  font-size: 0.85rem;
+  color: #888;
+}
+
+/* AI Search Section (secondary) */
+.aiSearchSection {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid #30475e;
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.aiSearchHint {
+  font-size: 0.9rem;
+  color: #888;
+  margin: 0 0 16px 0;
+}
+
+.secondarySearchButton {
+  padding: 14px 24px;
+  font-size: 1rem;
+  font-weight: 500;
+  color: #fff;
+  background: #30475e;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.secondarySearchButton:hover:not(:disabled) {
+  background: #3d5a73;
+}
+
+.secondarySearchButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.aiSearchNote {
+  font-size: 0.8rem;
+  color: #666;
+  margin: 12px 0 0 0;
+  font-style: italic;
+}
+
 /* Load Race Button */
 .loadRaceButton {
   display: inline-block;
@@ -500,5 +583,123 @@
   .searchButton {
     width: auto;
     white-space: nowrap;
+  }
+}
+
+/* Waypoint Import Confirmation Dialog */
+.waypointConfirmOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  z-index: 1100;
+}
+
+.waypointConfirmDialog {
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+  border: 1px solid #30475e;
+  border-radius: 16px;
+  padding: 28px;
+  max-width: 480px;
+  width: 100%;
+  text-align: center;
+}
+
+.waypointConfirmDialog h3 {
+  font-size: 1.25rem;
+  color: #fff;
+  margin: 0 0 16px 0;
+}
+
+.waypointConfirmDialog p {
+  font-size: 0.95rem;
+  color: #888;
+  margin: 0 0 20px 0;
+  line-height: 1.6;
+}
+
+.waypointConfirmDialog p strong {
+  color: #64b5f6;
+}
+
+.waypointPreview {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  margin-bottom: 24px;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 8px;
+}
+
+.waypointChip {
+  display: inline-block;
+  padding: 6px 12px;
+  font-size: 0.85rem;
+  color: #fff;
+  background: rgba(76, 175, 80, 0.2);
+  border: 1px solid rgba(76, 175, 80, 0.4);
+  border-radius: 16px;
+}
+
+.waypointMore {
+  display: inline-block;
+  padding: 6px 12px;
+  font-size: 0.85rem;
+  color: #888;
+  font-style: italic;
+}
+
+.waypointConfirmButtons {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+.waypointKeepButton,
+.waypointReplaceButton {
+  padding: 12px 24px;
+  font-size: 0.95rem;
+  font-weight: 500;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.waypointKeepButton {
+  background: #30475e;
+  color: #fff;
+}
+
+.waypointKeepButton:hover {
+  background: #3d5a73;
+}
+
+.waypointReplaceButton {
+  background: linear-gradient(135deg, #4CAF50 0%, #2e7d32 100%);
+  color: #fff;
+}
+
+.waypointReplaceButton:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(76, 175, 80, 0.4);
+}
+
+@media (max-width: 480px) {
+  .waypointConfirmButtons {
+    flex-direction: column;
+  }
+
+  .waypointKeepButton,
+  .waypointReplaceButton {
+    width: 100%;
   }
 }

@@ -127,8 +127,8 @@ class TestGPXCourseAnalyzer:
         result = analyzer.to_dict()
 
         assert 'total_distance_km' in result
-        assert 'elevation_gain_m' in result
-        assert 'elevation_loss_m' in result
+        assert 'total_elevation_gain_m' in result
+        assert 'total_elevation_loss_m' in result
         assert 'points_count' in result
         assert 'min_elevation_m' in result
         assert 'max_elevation_m' in result

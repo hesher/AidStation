@@ -182,8 +182,14 @@
   border-bottom: none;
 }
 
+.raceRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .raceButton {
-  width: 100%;
+  flex: 1;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -198,6 +204,29 @@
 
 .raceButton:hover {
   background: rgba(100, 181, 246, 0.1);
+}
+
+.deleteButton {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  margin-right: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: #888;
+  font-size: 1.1rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.deleteButton:hover {
+  background: rgba(244, 67, 54, 0.15);
+  border-color: rgba(244, 67, 54, 0.3);
+  color: #f44336;
 }
 
 .raceInfo {

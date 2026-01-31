@@ -4,10 +4,10 @@
  * Displays aid station information in a detailed table format with editing capabilities.
  */
 
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import { AidStation, WaypointType } from '@/lib/types';
 import { SmartDurationInput, SmartDurationInputValue } from '@/components/SmartDurationInput';
-import { addMinutes, format, isValid } from 'date-fns';
+import { addMinutes, isValid } from 'date-fns';
 import styles from './AidStationTable.module.css';
 
 // Waypoint type configuration for icons and labels
@@ -20,19 +20,12 @@ const WAYPOINT_CONFIG: Record<WaypointType, { icon: string; label: string; color
   custom: { icon: '⭐', label: 'Custom', color: '#ec4899' },
 };
 
-const WAYPOINT_OPTIONS: WaypointType[] = [
-  'aid_station',
-  'water_stop',
-  'viewpoint',
-  'toilet',
-  'milestone',
-  'custom',
-];
-
 interface AidStationTableProps {
   aidStations: AidStation[];
   onStationClick?: (station: AidStation, index: number) => void;
   onAidStationsChange?: (aidStations: AidStation[]) => void;
+  /** Callback when user starts editing a station - used to focus map on that station */
+  onStationFocus?: (station: AidStation, index: number) => void;
   editable?: boolean;
   /** When true, distance and elevation fields are calculated from GPX course data and cannot be manually edited */
   hasCourseData?: boolean;
@@ -40,6 +33,8 @@ interface AidStationTableProps {
   raceDistanceKm?: number | null;
   /** Elevation at race start in meters */
   startElevationM?: number | null;
+  /** Callback when start elevation changes */
+  onStartElevationChange?: (elevation: number | null) => void;
   /** Elevation at race finish in meters */
   finishElevationM?: number | null;
   /** Total race elevation gain */
@@ -52,34 +47,37 @@ interface AidStationTableProps {
   onOverallCutoffChange?: (hours: number | null) => void;
   /** Race start time - used for SmartDurationInput calculations */
   raceStartTime?: Date | null;
+  /** Cutoff hours for first aid station (from start) */
+  startCutoffHours?: number | null;
+  /** Callback when start cutoff hours changes */
+  onStartCutoffChange?: (hours: number | null) => void;
 }
 
 export function AidStationTable({
   aidStations,
   onStationClick,
   onAidStationsChange,
+  onStationFocus,
   editable = false,
   hasCourseData = false,
   raceDistanceKm,
   startElevationM,
+  onStartElevationChange,
   finishElevationM,
   totalElevationGainM,
   totalElevationLossM,
   overallCutoffHours,
   onOverallCutoffChange,
   raceStartTime,
+  startCutoffHours,
+  onStartCutoffChange,
 }: AidStationTableProps) {
-  const [editingRow, setEditingRow] = useState<number | null>(null);
-  const [editingStation, setEditingStation] = useState<AidStation | null>(null);
-  const [editingFinish, setEditingFinish] = useState(false);
-  const [editingFinishCutoff, setEditingFinishCutoff] = useState<number | null>(null);
 
-  // Default race start time if not provided or invalid (use today at 6:00 AM)
+  // Use the provided race start time, or null if not provided/invalid
+  // The SmartDurationInput will handle the null case appropriately
   const effectiveRaceStartTime = useMemo(() => {
     if (raceStartTime && isValid(raceStartTime)) return raceStartTime;
-    const defaultStart = new Date();
-    defaultStart.setHours(6, 0, 0, 0);
-    return defaultStart;
+    return null;
   }, [raceStartTime]);
 
   const formatDistance = (km?: number | null) => {
@@ -99,48 +97,18 @@ export function AidStationTable({
   ) => {
     if (time) return time;
     if (hours !== undefined && hours !== null) {
-      // Calculate day offset if not provided
       const effectiveDayOffset = dayOffset ?? Math.floor(hours / 24);
-      // Get hours within the day
       const hoursInDay = hours - effectiveDayOffset * 24;
       const h = Math.floor(hoursInDay);
       const m = Math.round((hoursInDay - h) * 60);
       const timeStr = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
 
-      // For multi-day events (>=24 hours), show "Day X, HH:MM" format
       if (hours >= 24) {
         return `Day ${effectiveDayOffset + 1}, ${timeStr}`;
       }
       return timeStr;
     }
     return '--';
-  };
-
-  // Format cutoff for editing - returns just the hours portion within the day
-  const getCutoffHoursInDay = (hours?: number | null, dayOffset?: number | null): number => {
-    if (hours === undefined || hours === null) return 0;
-    const effectiveDayOffset = dayOffset ?? Math.floor(hours / 24);
-    return hours - effectiveDayOffset * 24;
-  };
-
-  // Calculate total hours from day offset and hours within day
-  const calculateTotalHours = (dayOffset: number, hoursInDay: number): number => {
-    return dayOffset * 24 + hoursInDay;
-  };
-
-  // Generate time options for dropdown (00:00 to 23:30 in 30-minute intervals)
-  const TIME_OPTIONS = Array.from({ length: 48 }, (_, i) => {
-    const hours = Math.floor(i / 2);
-    const minutes = (i % 2) * 30;
-    const value = hours + minutes / 60;
-    const label = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
-    return { value, label };
-  });
-
-  // Find the closest time option value
-  const getClosestTimeValue = (hoursInDay: number): number => {
-    const rounded = Math.round(hoursInDay * 2) / 2;
-    return Math.max(0, Math.min(23.5, rounded));
   };
 
   const WaypointTypeBadge = ({ type }: { type?: WaypointType }) => {
@@ -183,14 +151,11 @@ export function AidStationTable({
 
   const handleRowClick = useCallback(
     (station: AidStation, index: number) => {
-      if (editable && editingRow === null) {
-        setEditingRow(index);
-        setEditingStation({ ...station });
-      } else if (!editable && onStationClick) {
+      if (!editable && onStationClick) {
         onStationClick(station, index);
       }
     },
-    [editable, editingRow, onStationClick]
+    [editable, onStationClick]
   );
 
   /**
@@ -219,22 +184,37 @@ export function AidStationTable({
     });
   }, []);
 
-  const handleSaveEdit = useCallback(() => {
-    if (editingRow !== null && editingStation && onAidStationsChange) {
+  const handleStationChange = useCallback(
+    (index: number, field: keyof AidStation, value: string | number | boolean | null) => {
+      if (!onAidStationsChange) return;
       const updated = [...aidStations];
-      updated[editingRow] = editingStation;
-      // Recalculate distanceFromPrevKm for all stations after the edit
+      updated[index] = { ...updated[index], [field]: value };
       const recalculated = recalculateDistancesFromPrev(updated);
       onAidStationsChange(recalculated);
-    }
-    setEditingRow(null);
-    setEditingStation(null);
-  }, [editingRow, editingStation, aidStations, onAidStationsChange, recalculateDistancesFromPrev]);
+    },
+    [aidStations, onAidStationsChange, recalculateDistancesFromPrev]
+  );
 
-  const handleCancelEdit = useCallback(() => {
-    setEditingRow(null);
-    setEditingStation(null);
-  }, []);
+  const handleStationChangeMultiple = useCallback(
+    (index: number, changes: Partial<AidStation>) => {
+      if (!onAidStationsChange) return;
+      const updated = [...aidStations];
+      updated[index] = { ...updated[index], ...changes };
+      const recalculated = recalculateDistancesFromPrev(updated);
+      onAidStationsChange(recalculated);
+    },
+    [aidStations, onAidStationsChange, recalculateDistancesFromPrev]
+  );
+
+  // Focus map on a station when user starts editing (on input focus, not on every change)
+  const handleInputFocus = useCallback(
+    (station: AidStation, index: number) => {
+      if (onStationFocus) {
+        onStationFocus(station, index);
+      }
+    },
+    [onStationFocus]
+  );
 
   const handleDeleteStation = useCallback(
     (index: number) => {
@@ -265,255 +245,291 @@ export function AidStationTable({
     }
   }, [aidStations, onAidStationsChange]);
 
-  const handleEditingChange = useCallback(
-    (field: keyof AidStation, value: string | number | boolean | null) => {
-      if (!editingStation) return;
-      setEditingStation({ ...editingStation, [field]: value });
-    },
-    [editingStation]
-  );
 
   const parseNumber = (value: string): number | null => {
     const num = parseFloat(value);
     return isNaN(num) ? null : num;
   };
 
-  const renderEditRow = (index: number) => {
-    if (!editingStation) return null;
 
+  const renderRow = (station: AidStation, index: number) => {
     // Fields that are auto-calculated from GPX course data
     const courseCalculatedFields = hasCourseData;
 
+    if (editable) {
+      return (
+        <tr
+          key={`${station.name}-${index}`}
+          className={`${styles.row} ${styles.editingRow}`}
+          data-testid={`aid-station-row-${index}`}
+        >
+          <td className={styles.tdStation}>
+            <span className={styles.stationNumber}>{index + 1}</span>
+            <input
+              type="text"
+              value={station.name}
+              onChange={(e) => handleStationChange(index, 'name', e.target.value)}
+              onFocus={() => handleInputFocus(station, index)}
+              className={styles.editInput}
+              onClick={(e) => e.stopPropagation()}
+            />
+          </td>
+          <td className={styles.tdNumber}>
+            <input
+              type="number"
+              value={station.distanceKm ?? ''}
+              onChange={(e) =>
+                handleStationChange(index, 'distanceKm', parseNumber(e.target.value))
+              }
+              onFocus={() => handleInputFocus(station, index)}
+              className={styles.editInputNumber}
+              step="0.1"
+              onClick={(e) => e.stopPropagation()}
+              placeholder="km"
+              title="Distance from start (editable)"
+            />
+          </td>
+          <td className={styles.tdNumber}>
+            <span className={styles.calculatedValue} title="Auto-calculated from distance changes">
+              {formatDistance(station.distanceFromPrevKm)}
+              <span className={styles.calculatedIcon}>🔄</span>
+            </span>
+          </td>
+          <td className={styles.tdNumber}>
+            {courseCalculatedFields ? (
+              <span className={styles.calculatedValue} title="Calculated from GPX course">
+                {formatElevation(station.elevationM)}
+                <span className={styles.calculatedIcon}>📍</span>
+              </span>
+            ) : (
+              <input
+                type="number"
+                value={station.elevationM ?? ''}
+                onChange={(e) =>
+                  handleStationChange(index, 'elevationM', parseNumber(e.target.value))
+                }
+                onFocus={() => handleInputFocus(station, index)}
+                className={styles.editInputNumber}
+                onClick={(e) => e.stopPropagation()}
+                placeholder="m"
+              />
+            )}
+          </td>
+          <td className={`${styles.tdNumber} ${styles.gain}`}>
+            {courseCalculatedFields ? (
+              <span className={styles.calculatedValue} title="Calculated from GPX course">
+                {station.elevationGainFromPrevM !== undefined
+                  ? `+${Math.round(station.elevationGainFromPrevM)}`
+                  : '--'}
+                <span className={styles.calculatedIcon}>📍</span>
+              </span>
+            ) : (
+              <input
+                type="number"
+                value={station.elevationGainFromPrevM ?? ''}
+                onChange={(e) =>
+                  handleStationChange(index, 'elevationGainFromPrevM', parseNumber(e.target.value))
+                }
+                onFocus={() => handleInputFocus(station, index)}
+                className={styles.editInputNumber}
+                onClick={(e) => e.stopPropagation()}
+                placeholder="m"
+              />
+            )}
+          </td>
+          <td className={`${styles.tdNumber} ${styles.loss}`}>
+            {courseCalculatedFields ? (
+              <span className={styles.calculatedValue} title="Calculated from GPX course">
+                {station.elevationLossFromPrevM !== undefined
+                  ? `-${Math.round(station.elevationLossFromPrevM)}`
+                  : '--'}
+                <span className={styles.calculatedIcon}>📍</span>
+              </span>
+            ) : (
+              <input
+                type="number"
+                value={station.elevationLossFromPrevM ?? ''}
+                onChange={(e) =>
+                  handleStationChange(index, 'elevationLossFromPrevM', parseNumber(e.target.value))
+                }
+                onFocus={() => handleInputFocus(station, index)}
+                className={styles.editInputNumber}
+                onClick={(e) => e.stopPropagation()}
+                placeholder="m"
+              />
+            )}
+          </td>
+          <td className={styles.tdServices}>
+            <ServiceBadge
+              available={station.hasDropBag}
+              label="Drop"
+              editable
+              onClick={() =>
+                handleStationChange(index, 'hasDropBag', !station.hasDropBag)
+              }
+            />
+            <ServiceBadge
+              available={station.hasCrew}
+              label="Crew"
+              editable
+              onClick={() =>
+                handleStationChange(index, 'hasCrew', !station.hasCrew)
+              }
+            />
+            <ServiceBadge
+              available={station.hasPacer}
+              label="Pacer"
+              editable
+              onClick={() =>
+                handleStationChange(index, 'hasPacer', !station.hasPacer)
+              }
+            />
+          </td>
+          <td 
+            className={styles.tdCutoff} 
+            onClick={(e) => e.stopPropagation()}
+            onFocus={() => handleInputFocus(station, index)}
+          >
+            <SmartDurationInput
+              raceStartTime={effectiveRaceStartTime}
+              value={{
+                durationMinutes: station.cutoffHoursFromStart != null
+                  ? station.cutoffHoursFromStart * 60
+                  : null,
+                targetDate: station.cutoffHoursFromStart != null && effectiveRaceStartTime
+                  ? addMinutes(effectiveRaceStartTime, station.cutoffHoursFromStart * 60)
+                  : null,
+              }}
+              onChange={(val: SmartDurationInputValue) => {
+                if (val.durationMinutes != null) {
+                  const hours = val.durationMinutes / 60;
+                  handleStationChangeMultiple(index, {
+                    cutoffHoursFromStart: hours,
+                    cutoffDayOffset: Math.floor(hours / 24),
+                  });
+                } else {
+                  handleStationChangeMultiple(index, {
+                    cutoffHoursFromStart: null,
+                    cutoffDayOffset: null,
+                  });
+                }
+              }}
+              placeholder="e.g., 33h, Day 2 08:00"
+            />
+          </td>
+          <td className={styles.tdActions}>
+            <button
+              className={styles.deleteButton}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleDeleteStation(index);
+              }}
+              title="Delete aid station"
+            >
+              🗑
+            </button>
+          </td>
+        </tr>
+      );
+    }
+
     return (
       <tr
-        key={`editing-${index}`}
-        className={`${styles.row} ${styles.editingRow}`}
-        data-testid={`aid-station-row-editing-${index}`}
+        key={`${station.name}-${index}`}
+        className={styles.row}
+        onClick={() => handleRowClick(station, index)}
+        data-testid={`aid-station-row-${index}`}
       >
         <td className={styles.tdStation}>
           <span className={styles.stationNumber}>{index + 1}</span>
-          <input
-            type="text"
-            value={editingStation.name}
-            onChange={(e) => handleEditingChange('name', e.target.value)}
-            className={styles.editInput}
-            onClick={(e) => e.stopPropagation()}
-          />
+          <WaypointTypeBadge type={station.waypointType} />
+          <span className={styles.stationName}>{station.name}</span>
         </td>
+        <td className={styles.tdNumber}>{formatDistance(station.distanceKm)}</td>
         <td className={styles.tdNumber}>
-          <input
-            type="number"
-            value={editingStation.distanceKm ?? ''}
-            onChange={(e) =>
-              handleEditingChange('distanceKm', parseNumber(e.target.value))
-            }
-            className={styles.editInputNumber}
-            step="0.1"
-            onClick={(e) => e.stopPropagation()}
-            placeholder="km"
-            title="Distance from start (editable)"
-          />
+          {formatDistance(station.distanceFromPrevKm)}
         </td>
-        <td className={styles.tdNumber}>
-          <span className={styles.calculatedValue} title="Auto-calculated from distance changes">
-            {formatDistance(editingStation.distanceFromPrevKm)}
-            <span className={styles.calculatedIcon}>🔄</span>
-          </span>
-        </td>
-        <td className={styles.tdNumber}>
-          {courseCalculatedFields ? (
-            <span className={styles.calculatedValue} title="Calculated from GPX course">
-              {formatElevation(editingStation.elevationM)}
-              <span className={styles.calculatedIcon}>📍</span>
-            </span>
-          ) : (
-            <input
-              type="number"
-              value={editingStation.elevationM ?? ''}
-              onChange={(e) =>
-                handleEditingChange('elevationM', parseNumber(e.target.value))
-              }
-              className={styles.editInputNumber}
-              onClick={(e) => e.stopPropagation()}
-              placeholder="m"
-            />
-          )}
-        </td>
+        <td className={styles.tdNumber}>{formatElevation(station.elevationM)}</td>
         <td className={`${styles.tdNumber} ${styles.gain}`}>
-          {courseCalculatedFields ? (
-            <span className={styles.calculatedValue} title="Calculated from GPX course">
-              {editingStation.elevationGainFromPrevM !== undefined
-                ? `+${Math.round(editingStation.elevationGainFromPrevM)}`
-                : '--'}
-              <span className={styles.calculatedIcon}>📍</span>
-            </span>
-          ) : (
-            <input
-              type="number"
-              value={editingStation.elevationGainFromPrevM ?? ''}
-              onChange={(e) =>
-                handleEditingChange('elevationGainFromPrevM', parseNumber(e.target.value))
-              }
-              className={styles.editInputNumber}
-              onClick={(e) => e.stopPropagation()}
-              placeholder="m"
-            />
-          )}
+          {station.elevationGainFromPrevM !== undefined
+            ? `+${Math.round(station.elevationGainFromPrevM)}`
+            : '--'}
         </td>
         <td className={`${styles.tdNumber} ${styles.loss}`}>
-          {courseCalculatedFields ? (
-            <span className={styles.calculatedValue} title="Calculated from GPX course">
-              {editingStation.elevationLossFromPrevM !== undefined
-                ? `-${Math.round(editingStation.elevationLossFromPrevM)}`
-                : '--'}
-              <span className={styles.calculatedIcon}>📍</span>
-            </span>
-          ) : (
-            <input
-              type="number"
-              value={editingStation.elevationLossFromPrevM ?? ''}
-              onChange={(e) =>
-                handleEditingChange('elevationLossFromPrevM', parseNumber(e.target.value))
-              }
-              className={styles.editInputNumber}
-              onClick={(e) => e.stopPropagation()}
-              placeholder="m"
-            />
-          )}
+          {station.elevationLossFromPrevM !== undefined
+            ? `-${Math.round(station.elevationLossFromPrevM)}`
+            : '--'}
         </td>
         <td className={styles.tdServices}>
-          <ServiceBadge
-            available={editingStation.hasDropBag}
-            label="Drop"
-            editable
-            onClick={() =>
-              handleEditingChange('hasDropBag', !editingStation.hasDropBag)
-            }
-          />
-          <ServiceBadge
-            available={editingStation.hasCrew}
-            label="Crew"
-            editable
-            onClick={() =>
-              handleEditingChange('hasCrew', !editingStation.hasCrew)
-            }
-          />
-          <ServiceBadge
-            available={editingStation.hasPacer}
-            label="Pacer"
-            editable
-            onClick={() =>
-              handleEditingChange('hasPacer', !editingStation.hasPacer)
-            }
-          />
+          <ServiceBadge available={station.hasDropBag} label="Drop" />
+          <ServiceBadge available={station.hasCrew} label="Crew" />
+          <ServiceBadge available={station.hasPacer} label="Pacer" />
         </td>
-        <td className={styles.tdCutoff} onClick={(e) => e.stopPropagation()}>
-          <SmartDurationInput
-            raceStartTime={effectiveRaceStartTime}
-            value={{
-              durationMinutes: editingStation.cutoffHoursFromStart != null
-                ? editingStation.cutoffHoursFromStart * 60
-                : null,
-              targetDate: editingStation.cutoffHoursFromStart != null
-                ? addMinutes(effectiveRaceStartTime, editingStation.cutoffHoursFromStart * 60)
-                : null,
-            }}
-            onChange={(val: SmartDurationInputValue) => {
-              if (val.durationMinutes != null) {
-                const hours = val.durationMinutes / 60;
-                handleEditingChange('cutoffHoursFromStart', hours);
-                handleEditingChange('cutoffDayOffset', Math.floor(hours / 24));
-              } else {
-                handleEditingChange('cutoffHoursFromStart', null);
-                handleEditingChange('cutoffDayOffset', null);
-              }
-            }}
-            placeholder="e.g., 33h, Day 2 08:00"
-          />
-        </td>
-        <td className={styles.tdActions}>
-          <button
-            className={styles.saveButton}
-            onClick={(e) => {
-              e.stopPropagation();
-              handleSaveEdit();
-            }}
-            title="Save changes"
-          >
-            ✓
-          </button>
-          <button
-            className={styles.cancelButton}
-            onClick={(e) => {
-              e.stopPropagation();
-              handleCancelEdit();
-            }}
-            title="Cancel editing"
-          >
-            ✕
-          </button>
+        <td className={styles.tdNumber}>
+          {formatCutoff(station.cutoffTime, station.cutoffHoursFromStart, station.cutoffDayOffset)}
         </td>
       </tr>
     );
   };
 
-  const renderReadRow = (station: AidStation, index: number) => (
-    <tr
-      key={`${station.name}-${index}`}
-      className={`${styles.row} ${editable ? styles.editableRow : ''}`}
-      onClick={() => handleRowClick(station, index)}
-      data-testid={`aid-station-row-${index}`}
-    >
-      <td className={styles.tdStation}>
-        <span className={styles.stationNumber}>{index + 1}</span>
-        <WaypointTypeBadge type={station.waypointType} />
-        <span className={styles.stationName}>{station.name}</span>
-      </td>
-      <td className={styles.tdNumber}>{formatDistance(station.distanceKm)}</td>
-      <td className={styles.tdNumber}>
-        {formatDistance(station.distanceFromPrevKm)}
-      </td>
-      <td className={styles.tdNumber}>{formatElevation(station.elevationM)}</td>
-      <td className={`${styles.tdNumber} ${styles.gain}`}>
-        {station.elevationGainFromPrevM !== undefined
-          ? `+${Math.round(station.elevationGainFromPrevM)}`
-          : '--'}
-      </td>
-      <td className={`${styles.tdNumber} ${styles.loss}`}>
-        {station.elevationLossFromPrevM !== undefined
-          ? `-${Math.round(station.elevationLossFromPrevM)}`
-          : '--'}
-      </td>
-      <td className={styles.tdServices}>
-        <ServiceBadge available={station.hasDropBag} label="Drop" />
-        <ServiceBadge available={station.hasCrew} label="Crew" />
-        <ServiceBadge available={station.hasPacer} label="Pacer" />
-      </td>
-      <td className={styles.tdNumber}>
-        {formatCutoff(station.cutoffTime, station.cutoffHoursFromStart, station.cutoffDayOffset)}
-      </td>
-      {editable && (
-        <td className={styles.tdActions}>
-          <button
-            className={styles.deleteButton}
-            onClick={(e) => {
-              e.stopPropagation();
-              handleDeleteStation(index);
-            }}
-            title="Delete aid station"
-          >
-            🗑
-          </button>
-        </td>
-      )}
-    </tr>
-  );
-
   const renderStartRow = () => {
-    // Format the race start time for display (with validation)
-    const startTimeDisplay = raceStartTime && isValid(raceStartTime)
-      ? format(raceStartTime, 'EEE HH:mm')
-      : '--';
+    const courseCalculatedFields = hasCourseData;
+
+    if (editable && (onStartElevationChange || onStartCutoffChange)) {
+      return (
+        <tr
+          key="start"
+          className={`${styles.row} ${styles.startRow} ${styles.editingRow}`}
+          data-testid="aid-station-row-start"
+        >
+          <td className={styles.tdStation}>
+            <span className={`${styles.stationNumber} ${styles.startMarker}`}>S</span>
+            <span className={styles.stationName}>Start</span>
+          </td>
+          <td className={styles.tdNumber}>{formatDistance(0)}</td>
+          <td className={styles.tdNumber}>--</td>
+          <td className={styles.tdNumber}>
+            {courseCalculatedFields ? (
+              <span className={styles.calculatedValue} title="Calculated from GPX course">
+                {formatElevation(startElevationM)}
+                <span className={styles.calculatedIcon}>📍</span>
+              </span>
+            ) : (
+              <input
+                type="number"
+                value={startElevationM ?? ''}
+                onChange={(e) => onStartElevationChange?.(parseNumber(e.target.value))}
+                className={styles.editInputNumber}
+                placeholder="m"
+              />
+            )}
+          </td>
+          <td className={`${styles.tdNumber} ${styles.gain}`}>--</td>
+          <td className={`${styles.tdNumber} ${styles.loss}`}>--</td>
+          <td className={styles.tdServices}>--</td>
+          <td className={styles.tdCutoff}>
+            <SmartDurationInput
+              raceStartTime={effectiveRaceStartTime}
+              value={{
+                durationMinutes: startCutoffHours != null ? startCutoffHours * 60 : null,
+                targetDate: startCutoffHours != null && effectiveRaceStartTime
+                  ? addMinutes(effectiveRaceStartTime, startCutoffHours * 60)
+                  : null,
+              }}
+              onChange={(val: SmartDurationInputValue) => {
+                if (val.durationMinutes != null) {
+                  onStartCutoffChange?.(val.durationMinutes / 60);
+                } else {
+                  onStartCutoffChange?.(null);
+                }
+              }}
+              placeholder="e.g., 33h, Day 2 08:00"
+            />
+          </td>
+          <td className={styles.tdActions}></td>
+        </tr>
+      );
+    }
     
     return (
       <tr
@@ -531,31 +547,12 @@ export function AidStationTable({
         <td className={`${styles.tdNumber} ${styles.gain}`}>--</td>
         <td className={`${styles.tdNumber} ${styles.loss}`}>--</td>
         <td className={styles.tdServices}>--</td>
-        <td className={styles.tdCutoff}>{startTimeDisplay}</td>
-        {editable && <td className={styles.tdActions}></td>}
+        <td className={styles.tdCutoff}>
+          {formatCutoff(null, startCutoffHours)}
+        </td>
       </tr>
     );
   };
-
-  const handleFinishClick = useCallback(() => {
-    if (editable && onOverallCutoffChange && editingRow === null) {
-      setEditingFinish(true);
-      setEditingFinishCutoff(overallCutoffHours ?? null);
-    }
-  }, [editable, onOverallCutoffChange, editingRow, overallCutoffHours]);
-
-  const handleSaveFinishEdit = useCallback(() => {
-    if (onOverallCutoffChange) {
-      onOverallCutoffChange(editingFinishCutoff);
-    }
-    setEditingFinish(false);
-    setEditingFinishCutoff(null);
-  }, [editingFinishCutoff, onOverallCutoffChange]);
-
-  const handleCancelFinishEdit = useCallback(() => {
-    setEditingFinish(false);
-    setEditingFinishCutoff(null);
-  }, []);
 
   const renderFinishRow = () => {
     const lastStation = aidStations[aidStations.length - 1];
@@ -563,21 +560,17 @@ export function AidStationTable({
       ? raceDistanceKm - lastStation.distanceKm
       : raceDistanceKm;
 
-    // Calculate gain/loss from last station to finish
-    // For total race: we have totalElevationGainM/LossM
-    // Sum of all aid station gains should equal roughly total race gain
-    // Finish gain = total - sum of all aid station gains (approximation)
     const sumOfGains = aidStations.reduce((sum, s) => sum + (s.elevationGainFromPrevM ?? 0), 0);
     const sumOfLosses = aidStations.reduce((sum, s) => sum + (s.elevationLossFromPrevM ?? 0), 0);
     const finishGain = totalElevationGainM ? totalElevationGainM - sumOfGains : undefined;
     const finishLoss = totalElevationLossM ? totalElevationLossM - sumOfLosses : undefined;
 
-    if (editingFinish) {
+    if (editable && onOverallCutoffChange) {
       return (
         <tr
-          key="finish-editing"
+          key="finish"
           className={`${styles.row} ${styles.finishRow} ${styles.editingRow}`}
-          data-testid="aid-station-row-finish-editing"
+          data-testid="aid-station-row-finish"
         >
           <td className={styles.tdStation}>
             <span className={`${styles.stationNumber} ${styles.finishMarker}`}>F</span>
@@ -593,49 +586,26 @@ export function AidStationTable({
             {finishLoss !== undefined && finishLoss > 0 ? `-${Math.round(finishLoss)}` : '--'}
           </td>
           <td className={styles.tdServices}>--</td>
-          <td className={styles.tdCutoff} onClick={(e) => e.stopPropagation()}>
+          <td className={styles.tdCutoff}>
             <SmartDurationInput
               raceStartTime={effectiveRaceStartTime}
               value={{
-                durationMinutes: editingFinishCutoff != null
-                  ? editingFinishCutoff * 60
-                  : null,
-                targetDate: editingFinishCutoff != null
-                  ? addMinutes(effectiveRaceStartTime, editingFinishCutoff * 60)
+                durationMinutes: overallCutoffHours != null ? overallCutoffHours * 60 : null,
+                targetDate: overallCutoffHours != null && effectiveRaceStartTime
+                  ? addMinutes(effectiveRaceStartTime, overallCutoffHours * 60)
                   : null,
               }}
               onChange={(val: SmartDurationInputValue) => {
                 if (val.durationMinutes != null) {
-                  setEditingFinishCutoff(val.durationMinutes / 60);
+                  onOverallCutoffChange(val.durationMinutes / 60);
                 } else {
-                  setEditingFinishCutoff(null);
+                  onOverallCutoffChange(null);
                 }
               }}
               placeholder="e.g., 33h, Day 2 08:00"
             />
           </td>
-          <td className={styles.tdActions}>
-            <button
-              className={styles.saveButton}
-              onClick={(e) => {
-                e.stopPropagation();
-                handleSaveFinishEdit();
-              }}
-              title="Save changes"
-            >
-              ✓
-            </button>
-            <button
-              className={styles.cancelButton}
-              onClick={(e) => {
-                e.stopPropagation();
-                handleCancelFinishEdit();
-              }}
-              title="Cancel editing"
-            >
-              ✕
-            </button>
-          </td>
+          <td className={styles.tdActions}></td>
         </tr>
       );
     }
@@ -643,8 +613,7 @@ export function AidStationTable({
     return (
       <tr
         key="finish"
-        className={`${styles.row} ${styles.finishRow} ${editable && onOverallCutoffChange ? styles.editableRow : ''}`}
-        onClick={handleFinishClick}
+        className={`${styles.row} ${styles.finishRow}`}
         data-testid="aid-station-row-finish"
       >
         <td className={styles.tdStation}>
@@ -664,7 +633,6 @@ export function AidStationTable({
         <td className={styles.tdNumber}>
           {formatCutoff(null, overallCutoffHours)}
         </td>
-        {editable && <td className={styles.tdActions}></td>}
       </tr>
     );
   };
@@ -684,9 +652,9 @@ export function AidStationTable({
         )}
       </div>
 
-      {editable && (
+    {editable && (
         <p className={styles.editHint}>
-          Click on a row to edit. Click the ✓ to save or ✕ to cancel.
+          All changes are saved automatically.
         </p>
       )}
 
@@ -707,11 +675,7 @@ export function AidStationTable({
           </thead>
           <tbody>
             {renderStartRow()}
-            {aidStations.map((station, index) =>
-              editingRow === index
-                ? renderEditRow(index)
-                : renderReadRow(station, index)
-            )}
+            {aidStations.map((station, index) => renderRow(station, index))}
             {raceDistanceKm && renderFinishRow()}
           </tbody>
         </table>

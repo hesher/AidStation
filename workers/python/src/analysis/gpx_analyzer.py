@@ -435,8 +435,8 @@ class GPXCourseAnalyzer:
 
         return {
             'total_distance_km': round(self.get_total_distance_km(), 2),
-            'elevation_gain_m': elevation_stats['elevation_gain_m'],
-            'elevation_loss_m': elevation_stats['elevation_loss_m'],
+            'total_elevation_gain_m': elevation_stats['elevation_gain_m'],
+            'total_elevation_loss_m': elevation_stats['elevation_loss_m'],
             'points_count': len(self._points),
             'start_elevation_m': round(self._smoothed_elevations[0], 1) if self._smoothed_elevations else 0,
             'end_elevation_m': round(self._smoothed_elevations[-1], 1) if self._smoothed_elevations else 0,

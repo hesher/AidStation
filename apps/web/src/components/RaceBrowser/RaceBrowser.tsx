@@ -9,12 +9,15 @@
 import { useState, useEffect, useCallback } from 'react';
 import styles from './RaceBrowser.module.css';
 import { RaceData } from '@/lib/types';
+import { deleteRace } from '@/lib/api';
 
 interface RaceBrowserProps {
   isOpen: boolean;
   onClose: () => void;
   onSelectRace: (race: RaceData) => void;
+  onRaceDeleted?: (raceId: string) => void;
   hasUnsavedChanges?: boolean;
+  currentRaceId?: string;
 }
 
 interface RaceListItem {
@@ -42,7 +45,9 @@ export function RaceBrowser({
   isOpen,
   onClose,
   onSelectRace,
+  onRaceDeleted,
   hasUnsavedChanges = false,
+  currentRaceId,
 }: RaceBrowserProps) {
   const [races, setRaces] = useState<RaceListItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -52,6 +57,9 @@ export function RaceBrowser({
   const [countries, setCountries] = useState<string[]>([]);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [selectedRaceId, setSelectedRaceId] = useState<string | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [raceToDelete, setRaceToDelete] = useState<RaceListItem | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   // Fetch races
   const fetchRaces = useCallback(async () => {
@@ -162,6 +170,45 @@ export function RaceBrowser({
     setSelectedRaceId(null);
   };
 
+  // Handle delete button click
+  const handleDeleteClick = (e: React.MouseEvent, race: RaceListItem) => {
+    e.stopPropagation();
+    setRaceToDelete(race);
+    setShowDeleteConfirm(true);
+  };
+
+  // Confirm delete
+  const handleConfirmDelete = async () => {
+    if (!raceToDelete) return;
+
+    setDeleting(true);
+    try {
+      const result = await deleteRace(raceToDelete.id);
+      if (result.success) {
+        // Remove from local list
+        setRaces((prevRaces) => prevRaces.filter((r) => r.id !== raceToDelete.id));
+        // Notify parent if this was the current race
+        if (onRaceDeleted && raceToDelete.id === currentRaceId) {
+          onRaceDeleted(raceToDelete.id);
+        }
+      } else {
+        setError(result.error || 'Failed to delete race');
+      }
+    } catch {
+      setError('Failed to delete race');
+    } finally {
+      setDeleting(false);
+      setShowDeleteConfirm(false);
+      setRaceToDelete(null);
+    }
+  };
+
+  // Cancel delete
+  const handleCancelDelete = () => {
+    setShowDeleteConfirm(false);
+    setRaceToDelete(null);
+  };
+
   // Format date for display
   const formatDate = (dateString?: string) => {
     if (!dateString) return '';
@@ -248,27 +295,37 @@ export function RaceBrowser({
             <ul className={styles.raceList} data-testid="race-browser-list">
               {races.map((race) => (
                 <li key={race.id} className={styles.raceItem}>
-                  <button
-                    className={styles.raceButton}
-                    onClick={() => handleSelectRace(race.id)}
-                  >
-                    <div className={styles.raceInfo}>
-                      <span className={styles.raceName}>{race.name}</span>
-                      <span className={styles.raceDetails}>
-                        {race.location && <span>{race.location}</span>}
-                        {race.country && <span>{race.country}</span>}
-                        {race.distanceKm && <span>{race.distanceKm} km</span>}
-                        {race.date && <span>{formatDate(race.date)}</span>}
-                      </span>
-                    </div>
-                    <div className={styles.raceVisibility}>
-                      {race.isPublic ? (
-                        <span className={styles.publicBadge}>🌍 Public</span>
-                      ) : (
-                        <span className={styles.privateBadge}>🔒 Private</span>
-                      )}
-                    </div>
-                  </button>
+                  <div className={styles.raceRow}>
+                    <button
+                      className={styles.raceButton}
+                      onClick={() => handleSelectRace(race.id)}
+                    >
+                      <div className={styles.raceInfo}>
+                        <span className={styles.raceName}>{race.name}</span>
+                        <span className={styles.raceDetails}>
+                          {race.location && <span>{race.location}</span>}
+                          {race.country && <span>{race.country}</span>}
+                          {race.distanceKm && <span>{race.distanceKm} km</span>}
+                          {race.date && <span>{formatDate(race.date)}</span>}
+                        </span>
+                      </div>
+                      <div className={styles.raceVisibility}>
+                        {race.isPublic ? (
+                          <span className={styles.publicBadge}>🌍 Public</span>
+                        ) : (
+                          <span className={styles.privateBadge}>🔒 Private</span>
+                        )}
+                      </div>
+                    </button>
+                    <button
+                      className={styles.deleteButton}
+                      onClick={(e) => handleDeleteClick(e, race)}
+                      title="Delete race"
+                      aria-label={`Delete ${race.name}`}
+                    >
+                      🗑️
+                    </button>
+                  </div>
                 </li>
               ))}
             </ul>
@@ -296,6 +353,34 @@ export function RaceBrowser({
                   className={styles.discardButton}
                 >
                   Discard & Load
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Delete Confirmation Dialog */}
+        {showDeleteConfirm && raceToDelete && (
+          <div className={styles.confirmOverlay}>
+            <div className={styles.confirmDialog}>
+              <h3>Delete Race?</h3>
+              <p>
+                Are you sure you want to delete &quot;{raceToDelete.name}&quot;? This action cannot be undone.
+              </p>
+              <div className={styles.confirmButtons}>
+                <button
+                  onClick={handleCancelDelete}
+                  className={styles.cancelButton}
+                  disabled={deleting}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleConfirmDelete}
+                  className={styles.discardButton}
+                  disabled={deleting}
+                >
+                  {deleting ? 'Deleting...' : 'Delete'}
                 </button>
               </div>
             </div>

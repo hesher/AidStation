@@ -12,6 +12,11 @@ When given a race name, you must search your knowledge for detailed, accurate in
 
 CRITICAL: ONLY PROVIDE INFORMATION YOU ARE CERTAIN ABOUT. DO NOT MAKE UP OR FABRICATE DATA.
 
+**MOST IMPORTANT INFORMATION FOR RACE PLANNING:**
+1. RACE START TIME - Essential for calculating all cutoff times. Many ultra races start before dawn (e.g., 04:00, 05:00, 06:00).
+2. OVERALL CUTOFF TIME - The total time limit for completing the race in hours.
+3. CHECKPOINT/AID STATION CUTOFFS - Progressive cutoff times at each station are critical for pacing.
+
 You must respond with valid JSON only, no other text. Use this exact structure:
 {
   "name": "Official race name",
@@ -21,8 +26,8 @@ You must respond with valid JSON only, no other text. Use this exact structure:
   "distanceKm": number (race distance in kilometers) or null,
   "elevationGainM": number (total elevation gain in meters) or null,
   "elevationLossM": number (total elevation loss in meters) or null,
-  "startTime": "HH:MM" (24-hour format) or null if unknown,
-  "overallCutoffHours": number (overall time limit in hours) or null,
+  "startTime": "HH:MM" (24-hour format) or null if unknown - THIS IS VERY IMPORTANT,
+  "overallCutoffHours": number (overall time limit in hours) or null - THIS IS VERY IMPORTANT,
   "description": "Brief description of the race",
   "websiteUrl": "Official race website URL" or null,
   "aidStations": [
@@ -33,8 +38,8 @@ You must respond with valid JSON only, no other text. Use this exact structure:
       "hasDropBag": boolean or null if unknown,
       "hasCrew": boolean or null if unknown,
       "hasPacer": boolean or null if unknown,
-      "cutoffTime": "HH:MM" (time of day when cutoff occurs, 24-hour format) or null,
-      "cutoffHoursFromStart": number (hours from race start when cutoff occurs) or null,
+      "cutoffTime": "HH:MM" (time of day when cutoff occurs, 24-hour format) or null - PRIORITIZE THIS,
+      "cutoffHoursFromStart": number (hours from race start when cutoff occurs) or null - PRIORITIZE THIS,
       "servicesDescription": "Brief description of services available (food, drinks, medical, etc.)" or null
     }
   ],
@@ -53,9 +58,11 @@ STRICT GUIDELINES - YOU MUST FOLLOW THESE:
 
 AID STATION PRIORITIES - VERY IMPORTANT:
 Aid stations are critical for race planning. When you have knowledge about a race, prioritize finding:
-1. Official checkpoint/aid station names and locations
-2. Distances from the race start (in km)
-3. Cutoff times - both as hours from start (cutoffHoursFromStart) AND time of day if start time is known
+1. CUTOFF TIMES - This is the MOST important information for race planning!
+   - cutoffHoursFromStart: hours elapsed from race start (e.g., 7, 12.5, 24)
+   - cutoffTime: time of day in 24-hour format (e.g., "12:00", "18:30")
+2. Official checkpoint/aid station names and locations
+3. Distances from the race start (in km)
 4. Services at each station (drop bags, crew access, pacer pickup points)
 5. Elevation of each station if known
 
@@ -83,8 +90,10 @@ The user will use this data for race planning - inaccurate data could be dangero
 
 const RACE_UPDATE_SYSTEM_PROMPT = `You are an AI assistant that helps endurance athletes update and modify their race details.
 Your job is to interpret natural language instructions and generate structured updates to a race's waypoints and details.
+You will be provided with the CURRENT RACE DATA so you can understand the existing state and make informed updates.
 
-You must respond with valid JSON only, no other text. Use this exact structure:
+You must respond with valid JSON only, no other text. Use this EXACT structure:
+
 {
   "success": true,
   "message": "Brief description of what was done",
@@ -105,12 +114,22 @@ You must respond with valid JSON only, no other text. Use this exact structure:
     }
   ],
   "raceFieldUpdates": {
-    "name": "string or omit if not changing",
-    "date": "YYYY-MM-DD or omit if not changing",
-    "distanceKm": number or omit if not changing,
-    ...etc
+    "name": string,
+    "date": "YYYY-MM-DD",
+    "location": string,
+    "country": string,
+    "distanceKm": number,
+    "elevationGainM": number,
+    "elevationLossM": number,
+    "startTime": "HH:MM" (24-hour format),
+    "startCutoffHours": number (time allowed before start cutoff),
+    "overallCutoffHours": number (total race time limit in hours),
+    "description": string,
+    "websiteUrl": string
   }
 }
+
+IMPORTANT: Only include fields in raceFieldUpdates that are being CHANGED. Omit fields that should remain unchanged.
 
 WAYPOINT TYPES:
 - "aid_station": Full aid station with supplies and support
@@ -155,6 +174,28 @@ COURSE DATA:
   1. Calculate elevations at specific distances
   2. Identify peaks (local maxima in elevation data)
   3. Identify view points (points with significant elevation or landmarks)
+
+RACE FIELD UPDATES - WHAT YOU CAN MODIFY:
+You can update ANY of these race-level fields by including them in raceFieldUpdates:
+- name: Race name
+- date: Race date in YYYY-MM-DD format
+- location: City or region name
+- country: Country name
+- distanceKm: Total race distance in kilometers
+- elevationGainM: Total elevation gain in meters
+- elevationLossM: Total elevation loss in meters
+- startTime: Race start time in HH:MM 24-hour format (e.g., "05:00")
+- startCutoffHours: Time allowed before start cutoff (hours)
+- overallCutoffHours: Total race time limit in hours (e.g., 30 for a 30-hour limit)
+- description: Race description
+- websiteUrl: Official race website URL
+
+EXAMPLES OF RACE FIELD UPDATES:
+- "Change the start time to 6am" → raceFieldUpdates: { "startTime": "06:00" }
+- "Set the overall cutoff to 36 hours" → raceFieldUpdates: { "overallCutoffHours": 36 }
+- "Update the race name to Western States 100" → raceFieldUpdates: { "name": "Western States 100" }
+- "The race is 168km with 10,000m elevation gain" → raceFieldUpdates: { "distanceKm": 168, "elevationGainM": 10000 }
+- "Set the date to June 28, 2025" → raceFieldUpdates: { "date": "2025-06-28" }
 `;
 
 export class OpenAIProvider implements AIProvider {
@@ -162,7 +203,7 @@ export class OpenAIProvider implements AIProvider {
   private client: OpenAI | null = null;
   private model: string;
 
-  constructor(apiKey?: string, model: string = 'gpt-4-turbo-preview') {
+  constructor(apiKey?: string, model: string = 'gpt-4o') {
     const key = apiKey || process.env.OPENAI_API_KEY;
     if (key) {
       this.client = new OpenAI({ apiKey: key });
@@ -184,6 +225,13 @@ export class OpenAIProvider implements AIProvider {
 ${options?.includeAidStations !== false ? 'Include all aid stations with their distances, services (drop bags, crew, pacers), and cutoff times if known.' : ''}
 ${options?.includeCourseData !== false ? 'Include approximate course coordinates for major waypoints.' : ''}`;
 
+    // Log the prompt being sent to the AI
+    console.log('=== AI RACE SEARCH REQUEST ===');
+    console.log('Query:', query);
+    console.log('System Prompt:', RACE_SEARCH_SYSTEM_PROMPT);
+    console.log('User Prompt:', userPrompt);
+    console.log('==============================');
+
     try {
       const response = await this.client.chat.completions.create({
         model: this.model,
@@ -201,11 +249,26 @@ ${options?.includeCourseData !== false ? 'Include approximate course coordinates
         throw new Error('No response from OpenAI');
       }
 
+      // Log the raw AI response
+      console.log('=== AI RACE SEARCH RESPONSE (RAW) ===');
+      console.log(content);
+      console.log('=====================================');
+
       const parsed = JSON.parse(content) as RaceSearchResult;
 
       // Validate and clean the response
-      return this.validateAndCleanResult(parsed, query);
+      const result = this.validateAndCleanResult(parsed, query);
+
+      // Log the cleaned/validated result
+      console.log('=== AI RACE SEARCH RESULT (CLEANED) ===');
+      console.log(JSON.stringify(result, null, 2));
+      console.log('=======================================');
+
+      return result;
     } catch (error) {
+      console.error('=== AI RACE SEARCH ERROR ===');
+      console.error(error);
+      console.error('============================');
       if (error instanceof SyntaxError) {
         throw new Error('Failed to parse AI response as JSON');
       }
@@ -280,21 +343,41 @@ ${options?.includeCourseData !== false ? 'Include approximate course coordinates
     // Build context for the AI
     const contextParts: string[] = [];
 
-    if (options.raceDistanceKm) {
+    // Include current race data if available - THIS IS THE FULL RACE CONTEXT
+    if (options.currentRaceData) {
+      const rd = options.currentRaceData;
+      contextParts.push('=== CURRENT RACE DETAILS ===');
+      if (rd.name) contextParts.push(`Name: ${rd.name}`);
+      if (rd.date) contextParts.push(`Date: ${rd.date}`);
+      if (rd.location) contextParts.push(`Location: ${rd.location}`);
+      if (rd.country) contextParts.push(`Country: ${rd.country}`);
+      if (rd.distanceKm !== null && rd.distanceKm !== undefined) contextParts.push(`Distance: ${rd.distanceKm} km`);
+      if (rd.elevationGainM !== null && rd.elevationGainM !== undefined) contextParts.push(`Elevation Gain: ${rd.elevationGainM} m`);
+      if (rd.elevationLossM !== null && rd.elevationLossM !== undefined) contextParts.push(`Elevation Loss: ${rd.elevationLossM} m`);
+      if (rd.startTime) contextParts.push(`Start Time: ${rd.startTime}`);
+      if (rd.startCutoffHours !== null && rd.startCutoffHours !== undefined) contextParts.push(`Start Cutoff: ${rd.startCutoffHours} hours`);
+      if (rd.overallCutoffHours !== null && rd.overallCutoffHours !== undefined) contextParts.push(`Overall Cutoff: ${rd.overallCutoffHours} hours`);
+      if (rd.description) contextParts.push(`Description: ${rd.description}`);
+      if (rd.websiteUrl) contextParts.push(`Website: ${rd.websiteUrl}`);
+      contextParts.push('');
+    } else if (options.raceDistanceKm) {
       contextParts.push(`Race distance: ${options.raceDistanceKm} km`);
     }
 
     if (options.existingWaypoints && options.existingWaypoints.length > 0) {
-      contextParts.push('Existing waypoints:');
+      contextParts.push('=== EXISTING WAYPOINTS/AID STATIONS ===');
       options.existingWaypoints.forEach((wp, i) => {
         const parts = [
           `  ${i + 1}. "${wp.name}"`,
           wp.distanceKm !== null ? `at ${wp.distanceKm}km` : '',
           wp.waypointType ? `(${wp.waypointType})` : '',
           wp.elevationM !== null ? `elevation: ${wp.elevationM}m` : '',
+          wp.cutoffHoursFromStart !== null && wp.cutoffHoursFromStart !== undefined ? `cutoff: ${wp.cutoffHoursFromStart}h` : '',
+          wp.cutoffTime ? `cutoffTime: ${wp.cutoffTime}` : '',
         ].filter(Boolean);
         contextParts.push(parts.join(' '));
       });
+      contextParts.push('');
     }
 
     if (options.courseCoordinates && options.courseCoordinates.length > 0) {
@@ -322,6 +405,13 @@ ${options?.includeCourseData !== false ? 'Include approximate course coordinates
 
 Please interpret this instruction and generate the appropriate waypoint updates.`;
 
+    // Log the prompt being sent to the AI
+    console.log('=== AI RACE UPDATE REQUEST ===');
+    console.log('Instruction:', instruction);
+    console.log('System Prompt:', RACE_UPDATE_SYSTEM_PROMPT);
+    console.log('User Prompt:', userPrompt);
+    console.log('==============================');
+
     try {
       const response = await this.client.chat.completions.create({
         model: this.model,
@@ -339,11 +429,26 @@ Please interpret this instruction and generate the appropriate waypoint updates.
         throw new Error('No response from OpenAI');
       }
 
+      // Log the raw AI response
+      console.log('=== AI RACE UPDATE RESPONSE (RAW) ===');
+      console.log(content);
+      console.log('=====================================');
+
       const parsed = JSON.parse(content) as RaceUpdateResult;
 
       // Validate and clean the response
-      return this.validateAndCleanUpdateResult(parsed);
+      const result = this.validateAndCleanUpdateResult(parsed);
+
+      // Log the cleaned/validated result
+      console.log('=== AI RACE UPDATE RESULT (CLEANED) ===');
+      console.log(JSON.stringify(result, null, 2));
+      console.log('=======================================');
+
+      return result;
     } catch (error) {
+      console.error('=== AI RACE UPDATE ERROR ===');
+      console.error(error);
+      console.error('============================');
       if (error instanceof SyntaxError) {
         return {
           success: false,

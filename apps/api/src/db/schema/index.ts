@@ -29,6 +29,7 @@ export const races = pgTable('races', {
   elevationGainM: real('elevation_gain_m'),
   elevationLossM: real('elevation_loss_m'),
   startTime: text('start_time'),
+  startCutoffHours: real('start_cutoff_hours'),
   overallCutoffHours: real('overall_cutoff_hours'),
   courseGpx: text('course_gpx'), // Raw GPX content
   // courseGeometry will be added via raw SQL migration for PostGIS
@@ -53,6 +54,7 @@ export const raceVersions = pgTable('race_versions', {
   elevationGainM: real('elevation_gain_m'),
   elevationLossM: real('elevation_loss_m'),
   startTime: text('start_time'),
+  startCutoffHours: real('start_cutoff_hours'),
   overallCutoffHours: real('overall_cutoff_hours'),
   courseGpx: text('course_gpx'),
   isPublic: boolean('is_public'),

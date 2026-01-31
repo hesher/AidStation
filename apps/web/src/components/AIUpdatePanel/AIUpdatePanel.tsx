@@ -7,19 +7,23 @@
 
 import React, { useState, useCallback } from 'react';
 import styles from './AIUpdatePanel.module.css';
-import { updateRaceWithAI, WaypointUpdate } from '@/lib/api';
-import { AidStation } from '@/lib/types';
+import { updateRaceWithAI, WaypointUpdate, RaceFieldUpdates } from '@/lib/api';
+import { AidStation, RaceData } from '@/lib/types';
 
 interface AIUpdatePanelProps {
     raceId: string;
-    onUpdateComplete?: (updatedAidStations: AidStation[]) => void;
+    onUpdateComplete?: (updates: {
+        updatedAidStations?: AidStation[];
+        raceFieldUpdates?: RaceFieldUpdates;
+        updatedRace?: RaceData;
+    }) => void;
 }
 
 export function AIUpdatePanel({ raceId, onUpdateComplete }: AIUpdatePanelProps) {
     const [instruction, setInstruction] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [success, setSuccess] = useState<{ message: string; updates: WaypointUpdate[] } | null>(null);
+    const [success, setSuccess] = useState<{ message: string; updates: WaypointUpdate[]; raceFieldUpdates?: RaceFieldUpdates } | null>(null);
     const [isExpanded, setIsExpanded] = useState(false);
 
     const handleSubmit = useCallback(async (e: React.FormEvent) => {
@@ -38,11 +42,16 @@ export function AIUpdatePanel({ raceId, onUpdateComplete }: AIUpdatePanelProps) 
                 setSuccess({
                     message: result.data.message,
                     updates: result.data.waypointUpdates,
+                    raceFieldUpdates: result.data.raceFieldUpdates,
                 });
                 setInstruction('');
 
-                if (result.data.updatedAidStations && onUpdateComplete) {
-                    onUpdateComplete(result.data.updatedAidStations as AidStation[]);
+                if (onUpdateComplete) {
+                    onUpdateComplete({
+                        updatedAidStations: result.data.updatedAidStations as AidStation[] | undefined,
+                        raceFieldUpdates: result.data.raceFieldUpdates,
+                        updatedRace: result.data.updatedRace as RaceData | undefined,
+                    });
                 }
             } else {
                 setError(result.error || 'Failed to update race');
@@ -185,6 +194,18 @@ export function AIUpdatePanel({ raceId, onUpdateComplete }: AIUpdatePanelProps) 
                                 <span className={styles.successIcon}>✅</span>
                                 <span className={styles.successMessage}>{success.message}</span>
                             </div>
+                            {success.raceFieldUpdates && Object.keys(success.raceFieldUpdates).length > 0 && (
+                                <ul className={styles.updatesList}>
+                                    {Object.entries(success.raceFieldUpdates).map(([field, value]) => (
+                                        <li key={field} className={styles.updateItem}>
+                                            <span className={styles.updateAction}>✏️</span>
+                                            <span className={styles.updateDetails}>
+                                                <strong>{field}</strong>: {String(value)}
+                                            </span>
+                                        </li>
+                                    ))}
+                                </ul>
+                            )}
                             {success.updates.length > 0 && (
                                 <ul className={styles.updatesList}>
                                     {success.updates.map((update, index) => (

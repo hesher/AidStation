@@ -43,6 +43,7 @@ const saveRaceSchema = z.object({
   elevationGainM: z.number().nullish(),
   elevationLossM: z.number().nullish(),
   startTime: z.string().nullish(),
+  startCutoffHours: z.number().nullish(),
   overallCutoffHours: z.number().nullish(),
   description: z.string().nullish(),
   websiteUrl: z.string().nullish(),
@@ -76,6 +77,7 @@ const updateRaceSchema = z.object({
   elevationGainM: z.number().nullish(),
   elevationLossM: z.number().nullish(),
   startTime: z.string().nullish(),
+  startCutoffHours: z.number().nullish(),
   overallCutoffHours: z.number().nullish(),
   description: z.string().nullish(),
   websiteUrl: z.string().nullish(),
@@ -150,6 +152,7 @@ interface RaceResponse {
     elevationGainM?: number | null;
     elevationLossM?: number | null;
     startTime?: string | null;
+    startCutoffHours?: number | null;
     overallCutoffHours?: number | null;
     aidStations?: AidStationData[];
     courseCoordinates?: Array<{ lat: number; lon: number; elevation?: number }>;
@@ -302,6 +305,7 @@ export async function raceRoutes(app: FastifyInstance) {
           elevationGainM: validatedBody.elevationGainM,
           elevationLossM: validatedBody.elevationLossM,
           startTime: validatedBody.startTime,
+          startCutoffHours: validatedBody.startCutoffHours,
           overallCutoffHours: validatedBody.overallCutoffHours,
           ownerId: userId,
           metadata: {
@@ -343,6 +347,7 @@ export async function raceRoutes(app: FastifyInstance) {
           elevationGainM: race.elevationGainM,
           elevationLossM: race.elevationLossM,
           startTime: race.startTime,
+          startCutoffHours: race.startCutoffHours,
           overallCutoffHours: race.overallCutoffHours,
           aidStations: race.aidStations.map((as) => ({
             name: as.name,
@@ -449,6 +454,7 @@ export async function raceRoutes(app: FastifyInstance) {
           elevationGainM: race.elevationGainM,
           elevationLossM: race.elevationLossM,
           startTime: race.startTime,
+          startCutoffHours: race.startCutoffHours,
           overallCutoffHours: race.overallCutoffHours,
           aidStations: race.aidStations.map((as) => ({
             name: as.name,
@@ -538,6 +544,7 @@ export async function raceRoutes(app: FastifyInstance) {
           elevationGainM: race.elevationGainM,
           elevationLossM: race.elevationLossM,
           startTime: race.startTime,
+          startCutoffHours: race.startCutoffHours,
           overallCutoffHours: race.overallCutoffHours,
           aidStations: race.aidStations.map((as) => ({
             name: as.name,
@@ -664,6 +671,7 @@ export async function raceRoutes(app: FastifyInstance) {
           elevationGainM: validatedBody.elevationGainM,
           elevationLossM: validatedBody.elevationLossM,
           startTime: validatedBody.startTime,
+          startCutoffHours: validatedBody.startCutoffHours,
           overallCutoffHours: validatedBody.overallCutoffHours,
           isPublic: validatedBody.isPublic ?? undefined,
           metadata: {
@@ -698,6 +706,7 @@ export async function raceRoutes(app: FastifyInstance) {
           elevationGainM: race.elevationGainM,
           elevationLossM: race.elevationLossM,
           startTime: race.startTime,
+          startCutoffHours: race.startCutoffHours,
           overallCutoffHours: race.overallCutoffHours,
           aidStations: race.aidStations.map((as) => ({
             name: as.name,
@@ -1086,6 +1095,7 @@ export async function raceRoutes(app: FastifyInstance) {
           elevationGainM: raceVersion.elevationGainM,
           elevationLossM: raceVersion.elevationLossM,
           startTime: raceVersion.startTime,
+          startCutoffHours: raceVersion.startCutoffHours,
           overallCutoffHours: raceVersion.overallCutoffHours,
           aidStations: raceVersion.aidStationsSnapshot?.map((as) => ({
             name: as.name,
@@ -1174,6 +1184,7 @@ export async function raceRoutes(app: FastifyInstance) {
           elevationGainM: restoredRace.elevationGainM,
           elevationLossM: restoredRace.elevationLossM,
           startTime: restoredRace.startTime,
+          startCutoffHours: restoredRace.startCutoffHours,
           overallCutoffHours: restoredRace.overallCutoffHours,
           aidStations: restoredRace.aidStations.map((as) => ({
             name: as.name,
@@ -1227,6 +1238,31 @@ export async function raceRoutes(app: FastifyInstance) {
       message: string;
       waypointUpdates: WaypointUpdate[];
       updatedAidStations?: AidStationData[];
+      raceFieldUpdates?: {
+        name?: string;
+        date?: string;
+        location?: string;
+        country?: string;
+        distanceKm?: number;
+        elevationGainM?: number;
+        elevationLossM?: number;
+        startTime?: string;
+        overallCutoffHours?: number;
+        startCutoffHours?: number;
+      };
+      updatedRace?: {
+        id: string;
+        name: string;
+        date: string | null;
+        location: string | null;
+        country: string | null;
+        distanceKm: number | null;
+        elevationGainM: number | null;
+        elevationLossM: number | null;
+        startTime: string | null;
+        startCutoffHours: number | null;
+        overallCutoffHours: number | null;
+      };
     };
     error?: string;
   }> => {
@@ -1302,6 +1338,21 @@ export async function raceRoutes(app: FastifyInstance) {
           raceDistanceKm: race.distanceKm,
           existingWaypoints,
           courseCoordinates,
+          // Pass full race data so AI can read and update any field
+          currentRaceData: {
+            name: race.name,
+            date: race.date ? (typeof race.date === 'string' ? race.date : race.date.toISOString().split('T')[0]) : null,
+            location: race.location,
+            country: race.country,
+            distanceKm: race.distanceKm,
+            elevationGainM: race.elevationGainM,
+            elevationLossM: race.elevationLossM,
+            startTime: race.startTime,
+            startCutoffHours: race.startCutoffHours,
+            overallCutoffHours: race.overallCutoffHours,
+            description: (metadata?.description as string) ?? null,
+            websiteUrl: (metadata?.websiteUrl as string) ?? null,
+          },
         });
       } catch (aiError) {
         const aiErrorMessage = aiError instanceof Error ? aiError.message : 'AI service error';
@@ -1434,8 +1485,20 @@ export async function raceRoutes(app: FastifyInstance) {
         }
       }
 
-      // Update the race in the database
-      const updatedRace = await updateRace(id, {}, updatedAidStations);
+      // Update the race in the database with both aid stations and race field updates
+      const raceFieldUpdates = aiResult.raceFieldUpdates ?? {};
+      const updatedRace = await updateRace(id, {
+        name: raceFieldUpdates.name,
+        date: raceFieldUpdates.date,
+        location: raceFieldUpdates.location,
+        country: raceFieldUpdates.country,
+        distanceKm: raceFieldUpdates.distanceKm,
+        elevationGainM: raceFieldUpdates.elevationGainM,
+        elevationLossM: raceFieldUpdates.elevationLossM,
+        startTime: raceFieldUpdates.startTime,
+        startCutoffHours: (raceFieldUpdates as { startCutoffHours?: number }).startCutoffHours,
+        overallCutoffHours: raceFieldUpdates.overallCutoffHours,
+      }, updatedAidStations);
 
       if (!updatedRace) {
         reply.status(500);
@@ -1449,6 +1512,7 @@ export async function raceRoutes(app: FastifyInstance) {
         raceId: id,
         instruction,
         updatesApplied: aiResult.waypointUpdates.length,
+        raceFieldsUpdated: Object.keys(raceFieldUpdates),
       });
 
       return {
@@ -1457,6 +1521,20 @@ export async function raceRoutes(app: FastifyInstance) {
           message: aiResult.message,
           waypointUpdates: aiResult.waypointUpdates,
           updatedAidStations,
+          raceFieldUpdates: Object.keys(raceFieldUpdates).length > 0 ? raceFieldUpdates : undefined,
+          updatedRace: {
+            id: updatedRace.id,
+            name: updatedRace.name,
+            date: updatedRace.date ? (typeof updatedRace.date === 'string' ? updatedRace.date : updatedRace.date.toISOString().split('T')[0]) : null,
+            location: updatedRace.location,
+            country: updatedRace.country,
+            distanceKm: updatedRace.distanceKm,
+            elevationGainM: updatedRace.elevationGainM,
+            elevationLossM: updatedRace.elevationLossM,
+            startTime: updatedRace.startTime,
+            startCutoffHours: updatedRace.startCutoffHours,
+            overallCutoffHours: updatedRace.overallCutoffHours,
+          },
         },
       };
     } catch (error) {

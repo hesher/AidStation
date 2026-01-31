@@ -27,6 +27,20 @@ export interface WaypointUpdate {
   longitude?: number;
 }
 
+// Race field updates from AI service
+export interface RaceFieldUpdates {
+  name?: string;
+  date?: string;
+  location?: string;
+  country?: string;
+  distanceKm?: number;
+  elevationGainM?: number;
+  elevationLossM?: number;
+  startTime?: string;
+  startCutoffHours?: number;
+  overallCutoffHours?: number;
+}
+
 // Response for AI-powered race update
 export interface UpdateRaceWithAIResponse {
   success: boolean;
@@ -34,6 +48,8 @@ export interface UpdateRaceWithAIResponse {
     message: string;
     waypointUpdates: WaypointUpdate[];
     updatedAidStations?: AidStation[];
+    raceFieldUpdates?: RaceFieldUpdates;
+    updatedRace?: RaceData;
   };
   error?: string;
 }
@@ -1028,6 +1044,8 @@ export interface GpxAnalysisResult {
     distance_from_prev_km: number;
     elevation_gain_from_prev_m: number;
     elevation_loss_from_prev_m: number;
+    latitude?: number;
+    longitude?: number;
   }>;
   coordinates?: Array<{
     lat: number;
@@ -1108,6 +1126,37 @@ export async function updateRaceWithAI(
       return {
         success: false,
         error: data.error || 'Failed to update race with AI',
+      };
+    }
+
+    return data;
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Network error occurred',
+    };
+  }
+}
+
+/**
+ * Delete a race
+ */
+export async function deleteRace(id: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/races/${id}`, {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include',
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      return {
+        success: false,
+        error: data.error || 'Failed to delete race',
       };
     }
 

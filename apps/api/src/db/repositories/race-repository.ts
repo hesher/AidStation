@@ -94,6 +94,7 @@ export async function createRace(
       elevationGainM: raceData.elevationGainM ?? null,
       elevationLossM: raceData.elevationLossM ?? null,
       startTime: raceData.startTime ?? null,
+      startCutoffHours: raceData.startCutoffHours ?? null,
       overallCutoffHours: raceData.overallCutoffHours ?? null,
       courseGpx: raceData.courseGpx,
       isPublic: raceData.isPublic ?? false,
@@ -194,6 +195,7 @@ export async function updateRace(
   if (raceData.elevationGainM !== undefined) updateValues.elevationGainM = raceData.elevationGainM;
   if (raceData.elevationLossM !== undefined) updateValues.elevationLossM = raceData.elevationLossM;
   if (raceData.startTime !== undefined) updateValues.startTime = raceData.startTime;
+  if (raceData.startCutoffHours !== undefined) updateValues.startCutoffHours = raceData.startCutoffHours;
   if (raceData.overallCutoffHours !== undefined) updateValues.overallCutoffHours = raceData.overallCutoffHours;
   if (raceData.courseGpx !== undefined) updateValues.courseGpx = raceData.courseGpx;
   if (raceData.isPublic !== undefined) updateValues.isPublic = raceData.isPublic;
@@ -432,6 +434,7 @@ export interface RaceVersion {
   elevationGainM: number | null;
   elevationLossM: number | null;
   startTime: string | null;
+  startCutoffHours: number | null;
   overallCutoffHours: number | null;
   courseGpx: string | null;
   isPublic: boolean | null;
@@ -473,6 +476,7 @@ export async function getRaceVersionHistory(
         elevation_gain_m,
         elevation_loss_m,
         start_time,
+        start_cutoff_hours,
         overall_cutoff_hours,
         course_gpx,
         is_public,
@@ -500,6 +504,7 @@ export async function getRaceVersionHistory(
       elevation_gain_m: number | null;
       elevation_loss_m: number | null;
       start_time: string | null;
+      start_cutoff_hours: number | null;
       overall_cutoff_hours: number | null;
       course_gpx: string | null;
       is_public: boolean | null;
@@ -520,6 +525,7 @@ export async function getRaceVersionHistory(
       elevationGainM: row.elevation_gain_m,
       elevationLossM: row.elevation_loss_m,
       startTime: row.start_time,
+      startCutoffHours: row.start_cutoff_hours,
       overallCutoffHours: row.overall_cutoff_hours,
       courseGpx: row.course_gpx,
       isPublic: row.is_public,
@@ -558,6 +564,7 @@ export async function getRaceVersion(
         elevation_gain_m,
         elevation_loss_m,
         start_time,
+        start_cutoff_hours,
         overall_cutoff_hours,
         course_gpx,
         is_public,
@@ -586,6 +593,7 @@ export async function getRaceVersion(
       elevation_gain_m: number | null;
       elevation_loss_m: number | null;
       start_time: string | null;
+      start_cutoff_hours: number | null;
       overall_cutoff_hours: number | null;
       course_gpx: string | null;
       is_public: boolean | null;
@@ -608,6 +616,7 @@ export async function getRaceVersion(
       elevationGainM: row.elevation_gain_m,
       elevationLossM: row.elevation_loss_m,
       startTime: row.start_time,
+      startCutoffHours: row.start_cutoff_hours,
       overallCutoffHours: row.overall_cutoff_hours,
       courseGpx: row.course_gpx,
       isPublic: row.is_public,
@@ -648,6 +657,7 @@ export async function restoreRaceVersion(
       elevationGainM: version.elevationGainM ?? undefined,
       elevationLossM: version.elevationLossM ?? undefined,
       startTime: version.startTime ?? undefined,
+      startCutoffHours: version.startCutoffHours ?? undefined,
       overallCutoffHours: version.overallCutoffHours ?? undefined,
       courseGpx: version.courseGpx ?? undefined,
       isPublic: version.isPublic ?? undefined,

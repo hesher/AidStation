@@ -1,26 +1,27 @@
 /**
  * AidStationTable Styles
+ * Clean, minimal table design that matches the dark theme
  */
 
 .container {
-  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-  border: 1px solid #30475e;
-  border-radius: 16px;
-  padding: 24px;
+  background: rgba(26, 26, 46, 0.6);
+  border: 1px solid rgba(48, 71, 94, 0.5);
+  border-radius: 12px;
+  padding: 20px;
   color: #fff;
 }
 
 .title {
-  font-size: 1.25rem;
+  font-size: 1.125rem;
   font-weight: 600;
-  margin: 0 0 20px 0;
+  margin: 0;
   color: #f0f0f0;
 }
 
 .tableWrapper {
   overflow-x: auto;
-  margin: 0 -24px;
-  padding: 0 24px;
+  margin: 0 -20px;
+  padding: 0 20px;
 }
 
 .table {
@@ -31,42 +32,40 @@
 
 .table th {
   text-align: left;
-  padding: 12px 8px;
-  border-bottom: 2px solid #30475e;
-  color: #888;
+  padding: 12px 12px;
+  border-bottom: 1px solid rgba(48, 71, 94, 0.6);
+  color: #8892a0;
   font-weight: 500;
-  text-transform: uppercase;
-  font-size: 0.7rem;
-  letter-spacing: 0.5px;
+  font-size: 0.75rem;
+  letter-spacing: 0.3px;
   white-space: nowrap;
 }
 
 .thStation {
-  min-width: 180px;
+  min-width: 160px;
 }
 
 .thNumber {
-  min-width: 80px;
+  min-width: 70px;
   text-align: right !important;
 }
 
 .thServices {
-  min-width: 160px;
+  min-width: 140px;
   text-align: center !important;
 }
 
 .row {
-  cursor: pointer;
-  transition: background-color 0.2s ease;
+  transition: background-color 0.15s ease;
 }
 
 .row:hover {
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.03);
 }
 
 .row td {
-  padding: 12px 8px;
-  border-bottom: 1px solid #30475e40;
+  padding: 14px 12px;
+  border-bottom: 1px solid rgba(48, 71, 94, 0.3);
   vertical-align: middle;
 }
 
@@ -80,12 +79,12 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
+  width: 26px;
+  height: 26px;
   background: #4caf50;
   color: #fff;
   border-radius: 50%;
-  font-size: 0.75rem;
+  font-size: 0.7rem;
   font-weight: 600;
   flex-shrink: 0;
 }
@@ -102,20 +101,20 @@
 
 /* Start row styling */
 .startRow {
-  background: rgba(33, 150, 243, 0.05);
+  background: rgba(33, 150, 243, 0.03);
 }
 
 .startRow:hover {
-  background: rgba(33, 150, 243, 0.1);
+  background: rgba(33, 150, 243, 0.06);
 }
 
 /* Finish row styling */
 .finishRow {
-  background: rgba(244, 67, 54, 0.05);
+  background: rgba(244, 67, 54, 0.03);
 }
 
 .finishRow:hover {
-  background: rgba(244, 67, 54, 0.1);
+  background: rgba(244, 67, 54, 0.06);
 }
 
 .stationName {
@@ -125,59 +124,123 @@
 
 .tdNumber {
   text-align: right;
-  color: #b0b0b0;
+  color: #a0a8b4;
   font-family: 'Monaco', 'Menlo', monospace;
+  font-size: 0.8rem;
 }
 
 .gain {
-  color: #4caf50;
+  color: #66bb6a;
 }
 
 .loss {
-  color: #f44336;
+  color: #ef5350;
 }
 
 .tdServices {
   display: flex;
-  gap: 4px;
+  gap: 6px;
   justify-content: center;
+}
+
+/* Cutoff cell with SmartDurationInput */
+.tdCutoff {
+  min-width: 140px;
+  padding: 8px 12px !important;
+  vertical-align: middle;
+}
+
+/* SmartDurationInput overrides for table context */
+.tdCutoff :global(.container) {
+  width: 100%;
+}
+
+.tdCutoff :global(.display) {
+  background-color: transparent;
+  border-color: transparent;
+  min-height: 32px;
+  padding: 4px 8px;
+}
+
+.tdCutoff :global(.display:hover) {
+  background-color: rgba(76, 175, 80, 0.08);
+  border-color: rgba(76, 175, 80, 0.4);
+}
+
+.tdCutoff :global(.displayPrimary) {
+  color: #a0a8b4;
+  font-family: 'Monaco', 'Menlo', monospace;
+  font-size: 0.8rem;
+}
+
+.tdCutoff :global(.displaySecondary) {
+  color: #666;
+  font-size: 0.7rem;
+}
+
+.tdCutoff :global(.input) {
+  background-color: rgba(255, 255, 255, 0.08);
+  border-color: rgba(76, 175, 80, 0.6);
+  color: white;
+  font-size: 0.8rem;
+}
+
+.tdCutoff :global(.input::placeholder) {
+  color: #666;
+}
+
+.tdCutoff :global(.preview) {
+  font-size: 0.7rem;
+}
+
+.tdCutoff :global(.previewValid) {
+  background-color: rgba(76, 175, 80, 0.12);
+  border-color: rgba(76, 175, 80, 0.3);
+  color: #81c784;
+}
+
+.tdCutoff :global(.previewError) {
+  background-color: rgba(244, 67, 54, 0.12);
+  border-color: rgba(244, 67, 54, 0.3);
+  color: #e57373;
 }
 
 .badge {
   display: inline-block;
-  padding: 4px 8px;
+  padding: 3px 6px;
   border-radius: 4px;
-  font-size: 0.7rem;
+  font-size: 0.65rem;
   font-weight: 500;
   text-transform: uppercase;
+  letter-spacing: 0.2px;
 }
 
 .badgeActive {
-  background: rgba(76, 175, 80, 0.2);
+  background: rgba(76, 175, 80, 0.15);
   color: #81c784;
-  border: 1px solid #4caf5050;
+  border: 1px solid rgba(76, 175, 80, 0.3);
 }
 
 .badgeInactive {
-  background: rgba(128, 128, 128, 0.1);
-  color: #666;
-  border: 1px solid #66666650;
+  background: transparent;
+  color: #555;
+  border: 1px solid rgba(100, 100, 100, 0.3);
 }
 
 .legend {
   display: flex;
-  gap: 20px;
-  margin-top: 16px;
-  padding-top: 16px;
-  border-top: 1px solid #30475e;
+  gap: 16px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(48, 71, 94, 0.4);
 }
 
 .legendItem {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 0.75rem;
-  color: #888;
+  gap: 6px;
+  font-size: 0.7rem;
+  color: #6b7280;
 }
 
 /* Title row with edit button */
@@ -185,19 +248,19 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 16px;
+  margin-bottom: 14px;
 }
 
 .addButton {
   background: #4caf50;
   color: white;
   border: none;
-  padding: 8px 16px;
-  border-radius: 8px;
+  padding: 7px 14px;
+  border-radius: 6px;
   cursor: pointer;
-  font-size: 0.875rem;
+  font-size: 0.8rem;
   font-weight: 500;
-  transition: background-color 0.2s ease;
+  transition: background-color 0.15s ease;
 }
 
 .addButton:hover {
@@ -205,9 +268,9 @@
 }
 
 .editHint {
-  font-size: 0.75rem;
-  color: #888;
-  margin: -8px 0 16px 0;
+  font-size: 0.7rem;
+  color: #6b7280;
+  margin: -6px 0 12px 0;
   font-style: italic;
 }
 
@@ -217,67 +280,69 @@
 }
 
 .editableRow:hover {
-  background: rgba(76, 175, 80, 0.1);
+  background: rgba(76, 175, 80, 0.06);
 }
 
-/* Editing row */
+/* Editing row - subtle highlight */
 .editingRow {
-  background: rgba(33, 150, 243, 0.1);
+  background: rgba(33, 150, 243, 0.04);
 }
 
 .editingRow:hover {
-  background: rgba(33, 150, 243, 0.15);
+  background: rgba(33, 150, 243, 0.08);
 }
 
-/* Edit inputs */
+/* Edit inputs - clean minimal style */
 .editInput {
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid #4caf50;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(76, 175, 80, 0.4);
   color: white;
   padding: 6px 10px;
   border-radius: 4px;
-  font-size: 0.875rem;
-  width: 150px;
+  font-size: 0.85rem;
+  width: 140px;
+  transition: border-color 0.15s ease;
 }
 
 .editInput:focus {
   outline: none;
-  border-color: #81c784;
-  box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.2);
+  border-color: #66bb6a;
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .editInputNumber {
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid #4caf50;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(76, 175, 80, 0.4);
   color: white;
   padding: 6px 8px;
   border-radius: 4px;
   font-size: 0.8rem;
-  width: 70px;
+  width: 65px;
   text-align: right;
   font-family: 'Monaco', 'Menlo', monospace;
+  transition: border-color 0.15s ease;
 }
 
 .editInputNumber:focus {
   outline: none;
-  border-color: #81c784;
-  box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.2);
+  border-color: #66bb6a;
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .editInputSelect {
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid #4caf50;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(76, 175, 80, 0.4);
   color: white;
   padding: 6px 8px;
   border-radius: 4px;
   font-size: 0.75rem;
   cursor: pointer;
+  transition: border-color 0.15s ease;
 }
 
 .editInputSelect:focus {
   outline: none;
-  border-color: #81c784;
-  box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.2);
+  border-color: #66bb6a;
 }
 
 .editInputSelect option {
@@ -292,16 +357,16 @@
 }
 
 .cutoffEditGroup .editInputSelect {
-  width: 70px;
+  min-width: 65px;
 }
 
-.cutoffEditGroup .editInputNumber {
-  width: 55px;
+.cutoffEditGroup .editInputSelect:last-child {
+  min-width: 75px;
 }
 
 /* Action buttons column */
 .thActions {
-  min-width: 80px;
+  min-width: 60px;
   text-align: center !important;
 }
 
@@ -316,10 +381,16 @@
   background: transparent;
   border: none;
   cursor: pointer;
-  padding: 6px 8px;
+  padding: 5px 6px;
   border-radius: 4px;
-  font-size: 1rem;
-  transition: background-color 0.2s ease;
+  font-size: 0.9rem;
+  transition: background-color 0.15s ease, opacity 0.15s ease;
+  opacity: 0.6;
+}
+
+.deleteButton:hover {
+  opacity: 1;
+  background: rgba(255, 152, 0, 0.15);
 }
 
 .saveButton {
@@ -327,7 +398,8 @@
 }
 
 .saveButton:hover {
-  background: rgba(76, 175, 80, 0.2);
+  opacity: 1;
+  background: rgba(76, 175, 80, 0.15);
 }
 
 .cancelButton {
@@ -335,26 +407,23 @@
 }
 
 .cancelButton:hover {
-  background: rgba(244, 67, 54, 0.2);
+  opacity: 1;
+  background: rgba(244, 67, 54, 0.15);
 }
 
 .deleteButton {
   color: #ff9800;
 }
 
-.deleteButton:hover {
-  background: rgba(255, 152, 0, 0.2);
-}
-
 /* Clickable badge in edit mode */
 .badgeClickable {
   cursor: pointer;
-  transition: transform 0.1s ease, box-shadow 0.1s ease;
+  transition: transform 0.1s ease, background-color 0.15s ease;
 }
 
 .badgeClickable:hover {
-  transform: scale(1.05);
-  box-shadow: 0 0 8px rgba(76, 175, 80, 0.3);
+  transform: scale(1.02);
+  background: rgba(76, 175, 80, 0.25);
 }
 
 /* Waypoint type badge */
@@ -362,15 +431,15 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
-  height: 24px;
-  border-radius: 6px;
+  width: 22px;
+  height: 22px;
+  border-radius: 5px;
   border: 1px solid;
   flex-shrink: 0;
 }
 
 .waypointIcon {
-  font-size: 0.875rem;
+  font-size: 0.8rem;
   line-height: 1;
 }
 
@@ -378,30 +447,30 @@
 .calculatedValue {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px 10px;
-  background: rgba(33, 150, 243, 0.1);
-  border: 1px solid rgba(33, 150, 243, 0.3);
+  gap: 5px;
+  padding: 5px 8px;
+  background: rgba(33, 150, 243, 0.08);
+  border: 1px solid rgba(33, 150, 243, 0.2);
   border-radius: 4px;
   color: #90caf9;
   font-family: 'Monaco', 'Menlo', monospace;
-  font-size: 0.8rem;
+  font-size: 0.75rem;
 }
 
 .calculatedIcon {
-  font-size: 0.7rem;
-  opacity: 0.7;
+  font-size: 0.65rem;
+  opacity: 0.6;
 }
 
 /* Responsive adjustments */
 @media (max-width: 768px) {
   .container {
-    padding: 16px;
+    padding: 14px;
   }
 
   .tableWrapper {
-    margin: 0 -16px;
-    padding: 0 16px;
+    margin: 0 -14px;
+    padding: 0 14px;
   }
 
   .table {
@@ -409,24 +478,24 @@
   }
 
   .thStation {
-    min-width: 140px;
+    min-width: 120px;
   }
 
   .thNumber {
-    min-width: 60px;
+    min-width: 55px;
   }
 
   .thServices {
-    min-width: 120px;
+    min-width: 100px;
   }
 
   .badge {
     padding: 2px 4px;
-    font-size: 0.6rem;
+    font-size: 0.55rem;
   }
 
   .legend {
     flex-direction: column;
-    gap: 8px;
+    gap: 6px;
   }
 }

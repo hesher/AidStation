@@ -14,3 +14,5 @@ export { Skeleton, SkeletonCard, SkeletonTable, SkeletonMap } from './Skeleton';
 export { ErrorBoundary } from './ErrorBoundary';
 export { NavBar } from './NavBar';
 export { AIUpdatePanel } from './AIUpdatePanel';
+export { SmartDurationInput } from './SmartDurationInput';
+export type { SmartDurationInputProps, SmartDurationInputValue } from './SmartDurationInput';

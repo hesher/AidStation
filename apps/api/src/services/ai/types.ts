@@ -78,6 +78,7 @@ export interface RaceUpdateResult {
     elevationGainM?: number;
     elevationLossM?: number;
     startTime?: string;
+    startCutoffHours?: number;
     overallCutoffHours?: number;
   };
 }
@@ -89,6 +90,21 @@ export interface AIRaceUpdateOptions {
   raceDistanceKm?: number | null;
   existingWaypoints?: AidStationInfo[];
   courseCoordinates?: Array<{ lat: number; lon: number; elevation?: number | null }>;
+  // Full race context for AI to understand the current state
+  currentRaceData?: {
+    name?: string;
+    date?: string | null;
+    location?: string | null;
+    country?: string | null;
+    distanceKm?: number | null;
+    elevationGainM?: number | null;
+    elevationLossM?: number | null;
+    startTime?: string | null;
+    startCutoffHours?: number | null;
+    overallCutoffHours?: number | null;
+    description?: string | null;
+    websiteUrl?: string | null;
+  };
 }
 
 export interface AIProvider {

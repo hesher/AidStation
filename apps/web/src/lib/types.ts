@@ -26,6 +26,8 @@ export interface AidStation {
   cutoffHoursFromStart?: number | null;
   cutoffDayOffset?: number | null; // Day offset from race start (0 = race day, 1 = day 2, etc.)
   waypointType?: WaypointType;
+  latitude?: number | null;
+  longitude?: number | null;
 }
 
 export interface CourseCoordinate {
@@ -43,7 +45,9 @@ export interface RaceData {
   distanceKm?: number;
   elevationGainM?: number;
   elevationLossM?: number;
+  startElevationM?: number;
   startTime?: string;
+  startCutoffHours?: number;
   overallCutoffHours?: number;
   description?: string;
   websiteUrl?: string;
